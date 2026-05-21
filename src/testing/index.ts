@@ -46,6 +46,7 @@ export type CliPackageEntrypoint =
   | 'config'
   | 'plugins'
   | 'repair'
+  | 'schema'
   | 'testing';
 
 export interface CliEntrypointModule {
@@ -136,7 +137,7 @@ export const foundationFixtures = Object.freeze([
     description: 'The root and documented subpath entrypoints can be imported by consumers.',
     capabilities: ['package.exports', 'subpath.imports'],
     data: {
-      entrypoints: ['root', 'help', 'completion', 'manifest', 'config', 'plugins', 'repair', 'testing']
+      entrypoints: ['root', 'help', 'completion', 'manifest', 'config', 'plugins', 'repair', 'schema', 'testing']
     }
   })
 ]);
@@ -230,7 +231,7 @@ export const commandFixtures = Object.freeze([
     capabilities: ['command.paths', 'scale.command-index'],
     data: {
       name: 'large',
-      commands: Array.from({ length: 32 }, (_unused, index) => ({
+      commands: Array.from({ length: 128 }, (_unused, index) => ({
         name: `command-${index}`,
         aliases: [`c${index}`],
         options: [{ name: `option${index}`, type: 'boolean', flags: [`--option-${index}`] }]
@@ -551,6 +552,7 @@ const packageEntrypoints: readonly CliPackageEntrypoint[] = Object.freeze([
   'config',
   'plugins',
   'repair',
+  'schema',
   'testing'
 ]);
 
