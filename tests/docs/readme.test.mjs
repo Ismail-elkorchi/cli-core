@@ -7,6 +7,7 @@ import { runCommandModelExample } from '../../examples/command-model.mjs';
 import { runHelpManifestExample } from '../../examples/help-manifest.mjs';
 import { runPluginsExample } from '../../examples/plugins.mjs';
 import { runExecutionExample } from '../../examples/run.mjs';
+import { runSchemaRedactionExample } from '../../examples/schema-redaction.mjs';
 import { runTestingHarnessExample } from '../../examples/testing-harness.mjs';
 
 test('README documents current public surface without feature-complete claims', async () => {
@@ -20,6 +21,8 @@ test('README documents current public surface without feature-complete claims', 
   assert.match(readme, /suggestRepairs/);
   assert.match(readme, /createCliPluginHost/);
   assert.match(readme, /runCli/);
+  assert.match(readme, /createCliSchemaEnvelope/);
+  assert.match(readme, /redactCliSecrets/);
   assert.match(readme, /createCliHarness/);
   assert.doesNotMatch(readme, /feature-complete/i);
 });
@@ -77,4 +80,14 @@ test('run example executes against the built package', async () => {
   assert.equal(plan.effects[0].kind, 'spawn');
   assert.equal(apply.mode, 'apply');
   assert.equal(apply.artifacts[0].id, 'deploy-summary');
+});
+
+test('schema and redaction example executes against the built package', async () => {
+  const { schemas, run, envelope, failure, report } = await runSchemaRedactionExample();
+
+  assert.equal(schemas.some((schema) => schema.version === 'cli-core.run-result.v1'), true);
+  assert.equal(run.effects[0].env.SHIP_TOKEN, '[REDACTED]');
+  assert.equal(envelope.payloadSchemaVersion, 'cli-core.run-result.v1');
+  assert.equal(failure.redacted, true);
+  assert.equal(report.value.password, '[REDACTED]');
 });

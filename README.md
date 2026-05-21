@@ -10,8 +10,9 @@ argv binding through `argv-flags`, help/version documents, command manifests,
 manifest import/export, config resolution with provenance, completion payloads
 and scripts, repair suggestions, plugin manifest/host contracts, run result
 envelopes, events, effects, artifacts, exit status policy, and a testing harness
-for data-only fixture and entrypoint scenarios. Schema/redaction and full
-runtime matrix behavior are not part of the current public surface.
+for data-only fixture and entrypoint scenarios. Public schema envelopes,
+failure envelopes, and secret redaction are available. Full runtime matrix
+behavior is not part of the current public surface.
 
 ## Boundary
 
@@ -217,6 +218,42 @@ const apply = await runCli(program, {
 });
 ```
 
+## Schema And Redaction
+
+Schema helpers expose stable schema/version descriptors and wrappers for
+machine-readable payloads. Failure envelopes and run results redact secret-like
+keys and common token patterns by default. Redaction is data-only; consumers
+choose where to store, log, or display the redacted envelopes.
+
+```ts
+import { defineCli, parseCli, runCli } from '@ismail-elkorchi/cli-core';
+import {
+  createCliFailureEnvelope,
+  createCliSchemaEnvelope,
+  describeCliSchemas,
+  redactCliSecrets
+} from '@ismail-elkorchi/cli-core/schema';
+
+const program = defineCli({ name: 'ship', commands: [{ name: 'deploy' }] });
+const invocation = parseCli(program, { argv: ['deploy'] });
+const run = await runCli(program, {
+  mode: 'plan',
+  invocation,
+  effects: [{ kind: 'spawn', command: 'ship', argv: ['deploy'], env: { SHIP_TOKEN: 'abc123' } }]
+});
+
+const schemas = describeCliSchemas();
+const envelope = createCliSchemaEnvelope({
+  payloadSchemaVersion: run.schemaVersion,
+  data: run
+});
+const failure = createCliFailureEnvelope({
+  kind: 'policy_denial',
+  diagnostics: run.diagnostics
+});
+const redacted = redactCliSecrets({ password: 'secret', safe: 'visible' });
+```
+
 ## Testing Harness
 
 The testing subpath provides immutable fixture registration and a data-only
@@ -261,6 +298,7 @@ The package publishes the root entrypoint plus these subpaths:
 - `@ismail-elkorchi/cli-core/config`
 - `@ismail-elkorchi/cli-core/plugins`
 - `@ismail-elkorchi/cli-core/repair`
+- `@ismail-elkorchi/cli-core/schema`
 - `@ismail-elkorchi/cli-core/testing`
 
 ## Verification

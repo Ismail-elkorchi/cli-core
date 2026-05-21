@@ -7,6 +7,7 @@ import {
 } from '../diagnostics.js';
 import { cliCorePackage } from '../package.js';
 import { parseCli, type ParsedInvocation } from '../parse/index.js';
+import { redactCliDiagnostics, redactCliSecrets, type CliRedactionOptions } from '../schema/index.js';
 
 export { cliCorePackage };
 export type { CliCorePackage } from '../package.js';
@@ -37,6 +38,7 @@ export interface RunRequest {
   readonly artifacts?: readonly RunArtifact[];
   readonly context?: RunData;
   readonly exitStatusPolicy?: ExitStatusPolicy;
+  readonly redaction?: CliRedactionOptions;
   readonly cancelled?: boolean;
   readonly interrupted?: boolean;
   readonly timeoutMs?: number;
@@ -161,7 +163,8 @@ export async function runCli(program: CliProgram, request: RunRequest): Promise<
       effects: plannedEffects,
       artifacts: plannedArtifacts,
       events,
-      policy: request.exitStatusPolicy
+      policy: request.exitStatusPolicy,
+      redaction: request.redaction
     });
   }
 
@@ -177,7 +180,8 @@ export async function runCli(program: CliProgram, request: RunRequest): Promise<
       effects: plannedEffects,
       artifacts: plannedArtifacts,
       events,
-      policy: request.exitStatusPolicy
+      policy: request.exitStatusPolicy,
+      redaction: request.redaction
     });
   }
 
@@ -197,7 +201,8 @@ export async function runCli(program: CliProgram, request: RunRequest): Promise<
       effects: plannedEffects,
       artifacts: plannedArtifacts,
       events,
-      policy: request.exitStatusPolicy
+      policy: request.exitStatusPolicy,
+      redaction: request.redaction
     });
   }
 
@@ -218,7 +223,8 @@ export async function runCli(program: CliProgram, request: RunRequest): Promise<
       effects: plannedEffects,
       artifacts: plannedArtifacts,
       events,
-      policy: request.exitStatusPolicy
+      policy: request.exitStatusPolicy,
+      redaction: request.redaction
     });
   }
 
@@ -254,7 +260,8 @@ export async function runCli(program: CliProgram, request: RunRequest): Promise<
       effects: appliedEffects,
       artifacts,
       events,
-      policy: request.exitStatusPolicy
+      policy: request.exitStatusPolicy,
+      redaction: request.redaction
     });
   } catch (error) {
     diagnostics.push(createCliDiagnostic('CLI_RUN_HANDLER_FAILED', 'error', 'Run handler failed.', {
@@ -272,7 +279,8 @@ export async function runCli(program: CliProgram, request: RunRequest): Promise<
       effects: plannedEffects,
       artifacts: plannedArtifacts,
       events,
-      policy: request.exitStatusPolicy
+      policy: request.exitStatusPolicy,
+      redaction: request.redaction
     });
   }
 }
@@ -288,15 +296,19 @@ interface FinishRunInput {
   readonly artifacts: readonly RunArtifact[];
   readonly events: RunEventRecorder;
   readonly policy: ExitStatusPolicy | undefined;
+  readonly redaction: CliRedactionOptions | undefined;
 }
 
 function finishRun(input: FinishRunInput): RunResult {
-  const diagnostics = Object.freeze([...input.diagnostics]);
+  const diagnostics = redactCliDiagnostics(input.diagnostics, input.redaction);
   const exitStatus = input.explicitExitStatus ?? exitStatusFor(input.exitKind, input.policy);
   input.events.record('run.completed', {
     exitKind: input.exitKind,
     exitStatus
   });
+  const events = Object.freeze(input.events.snapshot().map((event) => redactCliSecrets(event, input.redaction) as RunEvent));
+  const effects = Object.freeze(input.effects.map((effect) => redactCliSecrets(effect, input.redaction) as RunEffect));
+  const artifacts = Object.freeze(input.artifacts.map((artifact) => redactCliSecrets(artifact, input.redaction) as RunArtifact));
 
   return Object.freeze({
     schemaVersion: 'cli-core.run-result.v1',
@@ -306,9 +318,9 @@ function finishRun(input: FinishRunInput): RunResult {
     ok: input.exitKind === 'ok' && !hasErrorDiagnostics(diagnostics),
     exitKind: input.exitKind,
     exitStatus,
-    events: input.events.snapshot(),
-    effects: Object.freeze([...input.effects]),
-    artifacts: Object.freeze([...input.artifacts]),
+    events,
+    effects,
+    artifacts,
     diagnostics
   });
 }

@@ -9,6 +9,19 @@ export { parseCli, validateCli } from './parse/index.js';
 export { checkCliPluginCompatibility, createCliPluginHost, defineCliPluginManifest } from './plugins/index.js';
 export { suggestRepairs } from './repair/index.js';
 export { runCli } from './run/index.js';
+export {
+  createCliFailureEnvelope,
+  createCliSchemaEnvelope,
+  createUnsupportedSchemaDiagnostic,
+  describeCliSchemas,
+  exitKindToFailureKind,
+  failureKindForDiagnostics,
+  isCliSchemaVersion,
+  redactCliDiagnostic,
+  redactCliDiagnostics,
+  redactCliSecrets,
+  redactCliSecretsWithReport
+} from './schema/index.js';
 export type {
   CliAlias,
   CliAliasDefinition,
@@ -128,3 +141,17 @@ export type {
   RunResult,
   SpawnRunEffect
 } from './run/index.js';
+export type {
+  CliFailureEnvelope,
+  CliFailureEnvelopeInput,
+  CliFailureKind,
+  CliRedactionMatch,
+  CliRedactionOptions,
+  CliRedactionReason,
+  CliRedactionResult,
+  CliSchemaDescriptor,
+  CliSchemaEnvelope,
+  CliSchemaEnvelopeInput,
+  CliSchemaName,
+  CliSchemaVersion
+} from './schema/index.js';
