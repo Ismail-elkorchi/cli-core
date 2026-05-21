@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  applyCliPluginCommands,
   checkCliPluginCompatibility,
   createCliPluginHost,
   defineCliPluginManifest
@@ -145,4 +146,67 @@ test('planHooks reports ordering cycles without loading plugins', () => {
 
   assert.equal(plan.diagnostics[0].code, 'CLI_PLUGIN_HOOK_ORDER_CYCLE');
   assert.equal(loads, 0);
+});
+
+test('applyCliPluginCommands adds compatible manifest commands without loading plugin code', () => {
+  const application = applyCliPluginCommands({
+    name: 'ship',
+    commands: [{ name: 'status' }]
+  }, [
+    {
+      name: 'ship-audit',
+      version: '1.0.0',
+      commands: [
+        {
+          name: 'audit',
+          aliases: ['a'],
+          options: [{ name: 'json', type: 'boolean', flags: ['--json'] }]
+        }
+      ]
+    }
+  ]);
+
+  assert.equal(application.ok, true);
+  assert.equal(application.program.commands.some((command) => command.path.join(' ') === 'audit'), true);
+  const command = application.program.commands.find((candidate) => candidate.path.join(' ') === 'audit');
+  assert.equal(command.source.kind, 'plugin');
+  assert.equal(command.source.pluginName, 'ship-audit');
+  assert.deepEqual(application.contributions[0].commandPaths, [['audit']]);
+  assert.deepEqual(application.contributions[0].aliasPaths, [['a']]);
+});
+
+test('applyCliPluginCommands rejects incompatible plugin commands before they reach the program', () => {
+  const application = applyCliPluginCommands({
+    name: 'ship',
+    commands: [{ name: 'status' }]
+  }, [
+    {
+      name: 'future-audit',
+      version: '1.0.0',
+      cliCore: { minVersion: '99.0.0' },
+      commands: [{ name: 'audit' }]
+    }
+  ]);
+
+  assert.equal(application.ok, false);
+  assert.equal(application.program.commands.some((command) => command.path.join(' ') === 'audit'), false);
+  assert.equal(application.diagnostics.some((diagnostic) => diagnostic.code === 'CLI_PLUGIN_COMMAND_REJECTED'), true);
+});
+
+test('applyCliPluginCommands rejects duplicate plugin command paths and aliases', () => {
+  const application = applyCliPluginCommands({
+    name: 'ship',
+    commands: [{ name: 'status', aliases: ['st'] }]
+  }, [
+    { name: 'duplicate-path', version: '1.0.0', commands: [{ name: 'status' }] },
+    { name: 'duplicate-alias', version: '1.0.0', commands: [{ name: 'audit', aliases: ['st'] }] }
+  ]);
+
+  assert.equal(application.ok, false);
+  assert.equal(application.program.commands.filter((command) => command.path.join(' ') === 'status').length, 1);
+  assert.equal(application.program.commands.some((command) => command.path.join(' ') === 'audit'), false);
+  assert.deepEqual(application.diagnostics.map((diagnostic) => diagnostic.code), [
+    'CLI_PLUGIN_COMMAND_CONFLICT',
+    'CLI_PLUGIN_COMMAND_CONFLICT'
+  ]);
 });

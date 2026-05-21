@@ -1,4 +1,15 @@
-import type { CliCommandDefinition } from '../command/index.js';
+import {
+  defineCli,
+  type CliAliasInput,
+  type CliCommand,
+  type CliCommandDefinition,
+  type CliDefinition,
+  type CliOption,
+  type CliOptionDefinition,
+  type CliPositional,
+  type CliPositionalDefinition,
+  type CliProgram
+} from '../command/index.js';
 import {
   createCliDiagnostic,
   hasErrorDiagnostics,
@@ -109,6 +120,24 @@ export interface CliPluginCompatibilityResult {
   readonly diagnostics: readonly CliDiagnostic[];
 }
 
+export type CliPluginCommandApplicationInput = CliPluginHostInput;
+
+export interface CliPluginCommandApplication {
+  readonly schemaVersion: 'cli-core.plugin-command-application.v1';
+  readonly ok: boolean;
+  readonly definition: CliDefinition;
+  readonly program: CliProgram;
+  readonly contributions: readonly CliPluginCommandContribution[];
+  readonly diagnostics: readonly CliDiagnostic[];
+}
+
+export interface CliPluginCommandContribution {
+  readonly pluginName: string;
+  readonly pluginVersion: string;
+  readonly commandPaths: readonly (readonly string[])[];
+  readonly aliasPaths: readonly (readonly string[])[];
+}
+
 export interface CliPluginHost {
   readonly manifests: readonly CliPluginManifest[];
   readonly diagnostics: readonly CliDiagnostic[];
@@ -203,6 +232,92 @@ export function checkCliPluginCompatibility(
     ok: !hasErrorDiagnostics(diagnostics),
     manifest,
     diagnostics
+  });
+}
+
+export function applyCliPluginCommands(
+  target: CliDefinition | CliProgram,
+  plugins: readonly (CliPluginManifestDefinition | CliPluginManifest)[],
+  input: CliPluginCommandApplicationInput = {}
+): CliPluginCommandApplication {
+  const baseDefinition = isCliProgram(target) ? definitionFromProgram(target) : cloneDefinition(target);
+  const acceptedCommands: CliCommandDefinition[] = [];
+  const contributions: CliPluginCommandContribution[] = [];
+  const diagnostics: CliDiagnostic[] = [];
+  const commandPaths = new Set<string>();
+  const aliasPaths = new Set<string>();
+
+  for (const command of baseDefinition.commands ?? []) {
+    indexDefinitionTree(command, [], commandPaths, aliasPaths);
+  }
+
+  for (const pluginInput of plugins) {
+    const compatibility = checkCliPluginCompatibility(pluginInput, input);
+    const manifest = compatibility.manifest;
+    diagnostics.push(...compatibility.diagnostics);
+    if (!compatibility.ok) {
+      if (manifest.commands.length > 0) {
+        diagnostics.push(pluginDiagnostic('CLI_PLUGIN_COMMAND_REJECTED', 'Plugin command contributions were rejected by compatibility checks.', {
+          pluginName: manifest.name,
+          pluginVersion: manifest.version
+        }));
+      }
+      continue;
+    }
+
+    const acceptedForPlugin: CliCommandDefinition[] = [];
+    for (const command of manifest.commands) {
+      const indexed = collectDefinitionTree(command, []);
+      const conflict = firstCommandConflict(indexed, commandPaths, aliasPaths);
+      if (conflict !== undefined) {
+        diagnostics.push(pluginDiagnostic('CLI_PLUGIN_COMMAND_CONFLICT', 'Plugin command contribution conflicts with an existing command path or alias.', {
+          pluginName: manifest.name,
+          pluginVersion: manifest.version,
+          path: conflict.path,
+          conflictKind: conflict.kind
+        }));
+        continue;
+      }
+
+      const sourced = cloneCommandDefinition(command, {
+        kind: 'plugin',
+        pluginName: manifest.name,
+        pluginVersion: manifest.version
+      });
+      acceptedForPlugin.push(sourced);
+      for (const path of indexed.commandPaths) commandPaths.add(pathKey(path));
+      for (const path of indexed.aliasPaths) aliasPaths.add(pathKey(path));
+    }
+
+    if (acceptedForPlugin.length > 0) {
+      acceptedCommands.push(...acceptedForPlugin);
+      const acceptedIndex = acceptedForPlugin.reduce<CollectedCommandPaths>(
+        (collected, command) => mergeCollectedPaths(collected, collectDefinitionTree(command, [])),
+        emptyCollectedPaths()
+      );
+      contributions.push(Object.freeze({
+        pluginName: manifest.name,
+        pluginVersion: manifest.version,
+        commandPaths: freezePaths(acceptedIndex.commandPaths),
+        aliasPaths: freezePaths(acceptedIndex.aliasPaths)
+      }));
+    }
+  }
+
+  const definition = freezeDefinition({
+    ...baseDefinition,
+    commands: Object.freeze([...(baseDefinition.commands ?? []), ...acceptedCommands])
+  });
+  const program = defineCli(definition);
+  const allDiagnostics = Object.freeze([...diagnostics, ...program.diagnostics]);
+
+  return Object.freeze({
+    schemaVersion: 'cli-core.plugin-command-application.v1',
+    ok: !hasErrorDiagnostics(allDiagnostics),
+    definition,
+    program,
+    contributions: Object.freeze(contributions),
+    diagnostics: allDiagnostics
   });
 }
 
@@ -306,6 +421,242 @@ interface HookNode {
   readonly hook: CliPluginHookDefinition;
   readonly manifestIndex: number;
   readonly hookIndex: number;
+}
+
+interface CollectedCommandPaths {
+  readonly commandPaths: readonly (readonly string[])[];
+  readonly aliasPaths: readonly (readonly string[])[];
+}
+
+interface CommandConflict {
+  readonly kind: 'command_path' | 'alias_path';
+  readonly path: readonly string[];
+}
+
+function isCliProgram(target: CliDefinition | CliProgram): target is CliProgram {
+  return 'schemaVersion' in target && target.schemaVersion === 'cli-core.program.v1';
+}
+
+function definitionFromProgram(program: CliProgram): CliDefinition {
+  const fields: {
+    version?: string;
+    description?: string;
+    config?: NonNullable<CliDefinition['config']>;
+    options?: readonly CliOptionDefinition[];
+    commands?: readonly CliCommandDefinition[];
+  } = {};
+  if (program.version !== undefined) fields.version = program.version;
+  if (program.description !== undefined) fields.description = program.description;
+  if (program.config !== undefined) fields.config = program.config;
+  fields.options = program.root.inheritedOptions.map(optionToDefinition);
+  fields.commands = program.commands
+    .filter((command) => command.parentId === program.root.id)
+    .map((command) => commandToDefinition(command, program));
+  return freezeDefinition({ name: program.name, ...fields });
+}
+
+function commandToDefinition(command: CliCommand, program: CliProgram): CliCommandDefinition {
+  const fields: {
+    aliases?: readonly CliAliasInput[];
+    description?: string;
+    deprecated?: boolean | string;
+    source?: NonNullable<CliCommandDefinition['source']>;
+    positionals?: readonly CliPositionalDefinition[];
+    options?: readonly CliOptionDefinition[];
+    commands?: readonly CliCommandDefinition[];
+    allowPassThrough?: boolean;
+  } = {};
+  if (command.aliases.length > 0) {
+    fields.aliases = command.aliases.map((alias) => alias.deprecated === undefined ? alias.name : {
+      name: alias.name,
+      deprecated: alias.deprecated
+    });
+  }
+  if (command.description !== undefined) fields.description = command.description;
+  if (command.deprecated !== undefined) fields.deprecated = command.deprecated;
+  fields.source = command.source;
+  if (command.positionals.length > 0) fields.positionals = command.positionals.map(positionalToDefinition);
+  if (command.options.length > 0) fields.options = command.options.map(optionToDefinition);
+  if (command.allowPassThrough) fields.allowPassThrough = command.allowPassThrough;
+  const childCommands = program.commands
+    .filter((candidate) => candidate.parentId === command.id)
+    .map((candidate) => commandToDefinition(candidate, program));
+  if (childCommands.length > 0) fields.commands = childCommands;
+  return cloneCommandDefinition({ name: command.name, ...fields }, command.source);
+}
+
+function cloneDefinition(definition: CliDefinition): CliDefinition {
+  const fields: {
+    version?: string;
+    description?: string;
+    config?: NonNullable<CliDefinition['config']>;
+    options?: readonly CliOptionDefinition[];
+    commands?: readonly CliCommandDefinition[];
+  } = {};
+  if (definition.version !== undefined) fields.version = definition.version;
+  if (definition.description !== undefined) fields.description = definition.description;
+  if (definition.config !== undefined) fields.config = definition.config;
+  if (definition.options !== undefined) fields.options = definition.options.map(optionToDefinition);
+  if (definition.commands !== undefined) {
+    fields.commands = definition.commands.map((command) => cloneCommandDefinition(command, command.source ?? { kind: 'definition' }));
+  }
+  return freezeDefinition({ name: definition.name, ...fields });
+}
+
+function freezeDefinition(definition: CliDefinition): CliDefinition {
+  const optionalFields: {
+    version?: string;
+    description?: string;
+    config?: NonNullable<CliDefinition['config']>;
+    options?: readonly CliOptionDefinition[];
+    commands?: CliDefinition['commands'];
+  } = {};
+  if (definition.version !== undefined) optionalFields.version = definition.version;
+  if (definition.description !== undefined) optionalFields.description = definition.description;
+  if (definition.config !== undefined) optionalFields.config = freezePluginValue(definition.config);
+  if (definition.options !== undefined) optionalFields.options = Object.freeze(definition.options.map(optionToDefinition));
+  if (definition.commands !== undefined) {
+    optionalFields.commands = Object.freeze(definition.commands.map((command) => cloneCommandDefinition(command, command.source ?? { kind: 'definition' })));
+  }
+  return Object.freeze({ name: definition.name, ...optionalFields }) as CliDefinition;
+}
+
+function cloneCommandDefinition(
+  command: CliCommandDefinition,
+  source: NonNullable<CliCommandDefinition['source']>
+): CliCommandDefinition {
+  const optionalFields: {
+    aliases?: readonly CliAliasInput[];
+    description?: string;
+    deprecated?: boolean | string;
+    source?: NonNullable<CliCommandDefinition['source']>;
+    positionals?: CliCommandDefinition['positionals'];
+    options?: readonly CliOptionDefinition[];
+    commands?: CliCommandDefinition['commands'];
+    allowPassThrough?: boolean;
+  } = {};
+  if (command.aliases !== undefined) optionalFields.aliases = Object.freeze(command.aliases.map(cloneAliasInput));
+  if (command.description !== undefined) optionalFields.description = command.description;
+  if (command.deprecated !== undefined) optionalFields.deprecated = command.deprecated;
+  optionalFields.source = Object.freeze({ ...source });
+  if (command.positionals !== undefined) {
+    optionalFields.positionals = Object.freeze(command.positionals.map((positional) => Object.freeze({ ...positional })));
+  }
+  if (command.options !== undefined) optionalFields.options = Object.freeze(command.options.map(optionToDefinition));
+  if (command.commands !== undefined) {
+    optionalFields.commands = Object.freeze(command.commands.map((child) => cloneCommandDefinition(child, source)));
+  }
+  if (command.allowPassThrough !== undefined) optionalFields.allowPassThrough = command.allowPassThrough;
+  return Object.freeze({ name: command.name, ...optionalFields }) as CliCommandDefinition;
+}
+
+function cloneAliasInput(alias: CliAliasInput): CliAliasInput {
+  return typeof alias === 'string' ? alias : Object.freeze({ ...alias });
+}
+
+function optionToDefinition(option: CliOption | CliOptionDefinition): CliOptionDefinition {
+  const optionalFields: {
+    description?: string;
+    required?: boolean;
+    default?: CliOptionDefinition['default'];
+    allowEmpty?: boolean;
+    allowNo?: boolean;
+    hidden?: boolean;
+  } = {};
+  if (option.description !== undefined) optionalFields.description = option.description;
+  if (option.required !== undefined) optionalFields.required = option.required;
+  if (option.default !== undefined) {
+    optionalFields.default = Array.isArray(option.default) ? [...option.default] : option.default;
+  }
+  if (option.allowEmpty !== undefined) optionalFields.allowEmpty = option.allowEmpty;
+  if (option.allowNo !== undefined) optionalFields.allowNo = option.allowNo;
+  if (option.hidden !== undefined) optionalFields.hidden = option.hidden;
+  return Object.freeze({
+    name: option.name,
+    type: option.type,
+    flags: Object.freeze([...option.flags]),
+    ...optionalFields
+  }) as CliOptionDefinition;
+}
+
+function positionalToDefinition(positional: CliPositional): CliPositionalDefinition {
+  return Object.freeze({ ...positional });
+}
+
+function indexDefinitionTree(
+  command: CliCommandDefinition,
+  parentPath: readonly string[],
+  commandPaths: Set<string>,
+  aliasPaths: Set<string>
+): void {
+  const collected = collectDefinitionTree(command, parentPath);
+  for (const path of collected.commandPaths) commandPaths.add(pathKey(path));
+  for (const path of collected.aliasPaths) aliasPaths.add(pathKey(path));
+}
+
+function collectDefinitionTree(command: CliCommandDefinition, parentPath: readonly string[]): CollectedCommandPaths {
+  const path = Object.freeze([...parentPath, command.name]);
+  const commandPaths: (readonly string[])[] = [path];
+  const aliasPaths: (readonly string[])[] = (command.aliases ?? []).map((alias) =>
+    Object.freeze([...parentPath, typeof alias === 'string' ? alias : alias.name])
+  );
+
+  for (const child of command.commands ?? []) {
+    const childPaths = collectDefinitionTree(child, path);
+    commandPaths.push(...childPaths.commandPaths);
+    aliasPaths.push(...childPaths.aliasPaths);
+  }
+
+  return Object.freeze({
+    commandPaths: freezePaths(commandPaths),
+    aliasPaths: freezePaths(aliasPaths)
+  });
+}
+
+function firstCommandConflict(
+  collected: CollectedCommandPaths,
+  commandPaths: ReadonlySet<string>,
+  aliasPaths: ReadonlySet<string>
+): CommandConflict | undefined {
+  const seenCommands = new Set<string>();
+  const seenAliases = new Set<string>();
+  for (const path of collected.commandPaths) {
+    const key = pathKey(path);
+    if (seenCommands.has(key) || commandPaths.has(key) || aliasPaths.has(key)) {
+      return { kind: 'command_path', path };
+    }
+    seenCommands.add(key);
+  }
+  for (const path of collected.aliasPaths) {
+    const key = pathKey(path);
+    if (seenAliases.has(key) || seenCommands.has(key) || commandPaths.has(key) || aliasPaths.has(key)) {
+      return { kind: 'alias_path', path };
+    }
+    seenAliases.add(key);
+  }
+  return undefined;
+}
+
+function emptyCollectedPaths(): CollectedCommandPaths {
+  return Object.freeze({
+    commandPaths: Object.freeze([]),
+    aliasPaths: Object.freeze([])
+  });
+}
+
+function mergeCollectedPaths(left: CollectedCommandPaths, right: CollectedCommandPaths): CollectedCommandPaths {
+  return Object.freeze({
+    commandPaths: freezePaths([...left.commandPaths, ...right.commandPaths]),
+    aliasPaths: freezePaths([...left.aliasPaths, ...right.aliasPaths])
+  });
+}
+
+function freezePaths(paths: readonly (readonly string[])[]): readonly (readonly string[])[] {
+  return Object.freeze(paths.map((path) => Object.freeze([...path])));
+}
+
+function pathKey(path: readonly string[]): string {
+  return path.join('\u0000');
 }
 
 function manifestDiagnostics(manifest: CliPluginManifest): readonly CliDiagnostic[] {

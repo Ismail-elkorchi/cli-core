@@ -1,4 +1,4 @@
-import type { CliCommand, CliOption, CliPositional, CliProgram } from '../command/index.js';
+import type { CliCommand, CliCommandSource, CliOption, CliPositional, CliProgram } from '../command/index.js';
 import type { CliDiagnostic } from '../diagnostics.js';
 import { cliCorePackage } from '../package.js';
 
@@ -30,11 +30,14 @@ export interface ManifestCommand {
   readonly aliases: readonly ManifestAlias[];
   readonly description: string | undefined;
   readonly deprecated: boolean | string | undefined;
+  readonly source: ManifestCommandSource;
   readonly positionals: readonly ManifestPositional[];
   readonly options: readonly ManifestOption[];
   readonly inheritedOptions: readonly ManifestOption[];
   readonly allowPassThrough: boolean;
 }
+
+export type ManifestCommandSource = CliCommandSource;
 
 export interface ManifestAlias {
   readonly name: string;
@@ -97,6 +100,7 @@ function toManifestCommand(command: CliCommand): ManifestCommand {
     }))),
     description: command.description,
     deprecated: command.deprecated,
+    source: Object.freeze({ ...command.source }),
     positionals: Object.freeze(command.positionals.map(toManifestPositional)),
     options: Object.freeze(command.options.map(toManifestOption)),
     inheritedOptions: Object.freeze(command.inheritedOptions.map(toManifestOption)),
@@ -138,6 +142,7 @@ function freezeManifest(manifest: CommandManifest): CommandManifest {
         path: Object.freeze([...alias.path])
       }))),
       positionals: Object.freeze(command.positionals.map((positional) => Object.freeze({ ...positional }))),
+      source: Object.freeze({ ...command.source }),
       options: Object.freeze(command.options.map((option) => Object.freeze({
         ...option,
         flags: Object.freeze([...option.flags])

@@ -70,9 +70,10 @@ test('completion and repair example executes against the built package', () => {
 });
 
 test('plugins example executes against the built package', async () => {
-  const { compatibility, plan, run } = await runPluginsExample();
+  const { compatibility, application, plan, run } = await runPluginsExample();
 
   assert.equal(compatibility.ok, true);
+  assert.equal(application.program.commands.some((command) => command.path.join(' ') === 'audit'), true);
   assert.equal(plan.hooks[0].id, 'ship-audit:audit-prerun');
   assert.equal(run.ok, true);
 });

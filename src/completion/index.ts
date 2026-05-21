@@ -1,4 +1,4 @@
-import type { CliCommand, CliProgram } from '../command/index.js';
+import type { CliCommand, CliCommandSource, CliProgram } from '../command/index.js';
 import { cliCorePackage } from '../package.js';
 
 export { cliCorePackage };
@@ -25,6 +25,7 @@ export interface CompletionItem {
   readonly value: string;
   readonly label: string;
   readonly description: string | undefined;
+  readonly source?: CliCommandSource;
 }
 
 export interface CompletionScript {
@@ -118,7 +119,8 @@ function commandCompletion(command: CliCommand): CompletionItem {
     kind: 'command',
     value: command.name,
     label: command.name,
-    description: command.description
+    description: command.description,
+    source: command.source
   };
 }
 
@@ -129,7 +131,8 @@ function childAliasCompletion(command: CliCommand): CompletionItem[] {
     label: alias.name,
     description: alias.deprecated === undefined
       ? `Alias for ${command.path.join(' ')}.`
-      : `Deprecated alias for ${command.path.join(' ')}.`
+      : `Deprecated alias for ${command.path.join(' ')}.`,
+    source: command.source
   }));
 }
 

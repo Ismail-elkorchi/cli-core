@@ -162,12 +162,17 @@ const repairs = suggestRepairs(parseCli(program, { argv: ['deply', 'api'] }), pr
 
 ## Plugins
 
-Plugin APIs are manifest-first. Consumers can inspect compatibility and hook
-ordering without loading plugin code. Loaders run only when a plugin or hook is
-used, and loader or hook failures become typed diagnostics.
+Plugin APIs are manifest-first. Consumers can inspect compatibility, apply
+compatible plugin command contributions, and plan hook ordering without loading
+plugin code. Rejected plugin commands produce diagnostics before they affect
+parsing. Accepted plugin commands preserve provenance in the compiled program,
+help documents, completion candidates, and command manifests. Loaders run only
+when a plugin or hook is used, and loader or hook failures become typed
+diagnostics.
 
 ```ts
 import {
+  applyCliPluginCommands,
   checkCliPluginCompatibility,
   createCliPluginHost,
   defineCliPluginManifest
@@ -177,8 +182,13 @@ const manifest = defineCliPluginManifest({
   name: 'ship-audit',
   version: '1.0.0',
   capabilities: ['audit'],
+  commands: [{ name: 'audit', aliases: ['a'], description: 'Inspect deployment history.' }],
   hooks: [{ name: 'audit-prerun', event: 'prerun' }]
 });
+const application = applyCliPluginCommands({
+  name: 'ship',
+  commands: [{ name: 'status' }]
+}, [manifest], { allowedCapabilities: ['audit'] });
 
 const host = createCliPluginHost([
   {
@@ -195,6 +205,7 @@ const host = createCliPluginHost([
 ], { allowedCapabilities: ['audit'] });
 
 const compatibility = checkCliPluginCompatibility(manifest, { runtime: 'node' });
+const program = application.program;
 const plan = host.planHooks('prerun');
 const run = await host.runHooks('prerun');
 ```
