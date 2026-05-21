@@ -14,13 +14,13 @@ export function runLargeCommandSurfaceCase(commandCount) {
   const fixture = measure(metrics, 'generate-large-command-fixture', () =>
     createLargeCommandFixture({ commandCount, programName: 'scale' })
   );
-  const program = measure(metrics, 'compile-large-command-fixture', () => defineCli(fixture.data));
+  const program = measure(metrics, 'compile-large-command-fixture', () => defineCli(fixture.value));
   const targetIndex = commandCount - 1;
   const targetName = `command-${targetIndex}`;
   const targetFlag = `--detail-${targetIndex}`;
 
   assert.equal(fixture.id, `commands.large-program.${commandCount}`);
-  assert.equal(fixture.data.commands.length, commandCount);
+  assert.equal(fixture.value.commands.length, commandCount);
   assert.equal(createLargeCommandDefinition({ commandCount, programName: 'scale' }).commands.length, commandCount);
   assert.equal(program.diagnostics.length, 0);
   assert.equal(program.commands.length, commandCount + 1);

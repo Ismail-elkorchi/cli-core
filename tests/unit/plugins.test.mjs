@@ -40,7 +40,7 @@ test('createCliPluginHost keeps plugin modules lazy until load or hook execution
         return {
           manifest,
           hooks: {
-            'audit-prerun': () => ({ effects: [{ kind: 'audit.record', data: { ok: true } }] })
+            'audit-prerun': () => ({ effects: [{ kind: 'audit.record', payload: { ok: true } }] })
           }
         };
       }

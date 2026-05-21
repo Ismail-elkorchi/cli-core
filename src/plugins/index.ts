@@ -31,7 +31,7 @@ export type CliPluginHookEvent =
   | 'finally'
   | 'command_not_found';
 
-export type CliPluginData = CliDiagnosticValue;
+export type CliPluginPayload = CliDiagnosticValue;
 
 export interface CliPluginManifestDefinition {
   readonly name: string;
@@ -95,7 +95,7 @@ export interface CliPluginHookContext {
   readonly event: CliPluginHookEvent;
   readonly pluginName: string;
   readonly hookName: string;
-  readonly data: CliPluginData;
+  readonly payload: CliPluginPayload;
 }
 
 export interface CliPluginHookOutput {
@@ -105,7 +105,7 @@ export interface CliPluginHookOutput {
 
 export interface CliPluginEffect {
   readonly kind: string;
-  readonly data?: CliPluginData;
+  readonly payload?: CliPluginPayload;
 }
 
 export interface CliPluginHostInput {
@@ -169,7 +169,7 @@ export interface CliPluginLoadResult {
 }
 
 export interface CliPluginHookRunInput {
-  readonly data?: CliPluginData;
+  readonly payload?: CliPluginPayload;
 }
 
 export interface CliPluginHookRunResult {
@@ -884,7 +884,7 @@ async function runPluginHook(
       event: hook.event,
       pluginName: hook.pluginName,
       hookName: hook.hookName,
-      data: freezePluginValue(input.data ?? null)
+      payload: freezePluginValue(input.payload ?? null)
     }));
     const effects = Object.freeze([...(output?.effects ?? [])].map((effect) => freezePluginValue(effect)));
     const diagnostics = Object.freeze([...(output?.diagnostics ?? [])]);

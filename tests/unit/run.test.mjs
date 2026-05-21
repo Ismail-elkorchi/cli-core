@@ -42,8 +42,8 @@ test('runCli apply mode invokes a handler and returns artifacts and effects', as
     argv: ['deploy', 'api'],
     handlers: {
       deploy: (context) => ({
-        effects: [{ kind: 'custom', name: 'deploy.service', data: { service: context.invocation.positionals.service } }],
-        artifacts: [{ id: 'deploy-summary', kind: 'json', data: { service: 'api' } }]
+        effects: [{ kind: 'custom', name: 'deploy.service', payload: { service: context.invocation.positionals.service } }],
+        artifacts: [{ id: 'deploy-summary', kind: 'json', payload: { service: 'api' } }]
       })
     }
   });
@@ -129,8 +129,8 @@ test('runCli includes plugin prerun and postrun hook effects in the result envel
       },
       load: () => ({
         hooks: {
-          before: () => ({ effects: [{ kind: 'audit.before', data: { token: 'secret-token' } }] }),
-          after: () => ({ effects: [{ kind: 'audit.after', data: { ok: true } }] })
+          before: () => ({ effects: [{ kind: 'audit.before', payload: { token: 'secret-token' } }] }),
+          after: () => ({ effects: [{ kind: 'audit.after', payload: { ok: true } }] })
         }
       })
     }
@@ -145,7 +145,7 @@ test('runCli includes plugin prerun and postrun hook effects in the result envel
   assert.equal(result.ok, true);
   assert.deepEqual(result.effects.map((effect) => effect.kind), ['plugin', 'plugin']);
   assert.deepEqual(result.effects.map((effect) => effect.event), ['prerun', 'postrun']);
-  assert.equal(result.effects[0].data.token, '[REDACTED]');
+  assert.equal(result.effects[0].payload.token, '[REDACTED]');
   assert.equal(result.events.some((event) => event.name === 'plugin.hooks.planned'), true);
   assert.equal(result.events.some((event) => event.name === 'plugin.hooks.completed'), true);
 });
@@ -181,7 +181,7 @@ test('runCli runs finally hooks after handler failure', async () => {
       manifest: { name: 'cleanup', version: '1.0.0', hooks: [{ name: 'always', event: 'finally' }] },
       load: () => ({
         hooks: {
-          always: () => ({ effects: [{ kind: 'cleanup.seen', data: { ok: true } }] })
+          always: () => ({ effects: [{ kind: 'cleanup.seen', payload: { ok: true } }] })
         }
       })
     }
@@ -209,7 +209,7 @@ test('runCli runs command_not_found hooks without hiding the parse failure', asy
       manifest: { name: 'not-found', version: '1.0.0', hooks: [{ name: 'suggest', event: 'command_not_found' }] },
       load: () => ({
         hooks: {
-          suggest: () => ({ effects: [{ kind: 'suggest.command', data: { replacement: 'deploy' } }] })
+          suggest: () => ({ effects: [{ kind: 'suggest.command', payload: { replacement: 'deploy' } }] })
         }
       })
     }

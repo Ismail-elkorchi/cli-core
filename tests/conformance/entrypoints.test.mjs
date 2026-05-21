@@ -25,6 +25,7 @@ test('root and subpath entrypoints load', async () => {
 
 test('testing subpath exposes harness and fixture contracts', async () => {
   const module = await import('../../dist/testing/index.js');
+  const text = await readFile(new URL('../../dist/testing/index.d.ts', import.meta.url), 'utf8');
 
   assert.equal(typeof module.createCliHarness, 'function');
   assert.equal(typeof module.createLargeCommandDefinition, 'function');
@@ -34,6 +35,8 @@ test('testing subpath exposes harness and fixture contracts', async () => {
   assert.equal(Array.isArray(module.foundationFixtures), true);
   assert.equal(Array.isArray(module.pluginFixtures), true);
   assert.equal(Array.isArray(module.runFixtures), true);
+  assert.match(text, /readonly value/);
+  assert.doesNotMatch(text, /readonly data/);
 });
 
 test('public declaration files do not expose internal module paths', async () => {

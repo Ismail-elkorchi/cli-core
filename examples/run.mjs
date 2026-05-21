@@ -11,7 +11,7 @@ export async function runExecutionExample() {
       manifest: { name: 'audit', version: '1.0.0', hooks: [{ name: 'record', event: 'prerun' }] },
       load: () => ({
         hooks: {
-          record: () => ({ effects: [{ kind: 'audit.record', data: { command: 'deploy' } }] })
+          record: () => ({ effects: [{ kind: 'audit.record', payload: { command: 'deploy' } }] })
         }
       })
     }
@@ -27,7 +27,7 @@ export async function runExecutionExample() {
     invocation,
     handlers: {
       deploy: () => ({
-        artifacts: [{ id: 'deploy-summary', kind: 'json', data: { service: 'api' } }]
+        artifacts: [{ id: 'deploy-summary', kind: 'json', payload: { service: 'api' } }]
       })
     }
   });

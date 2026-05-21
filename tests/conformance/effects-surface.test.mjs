@@ -21,5 +21,7 @@ test('effect declarations include host, policy, and report contracts', async () 
   assert.match(text, /EffectApplicationPolicy/);
   assert.match(text, /EffectApplicationReport/);
   assert.match(text, /MemoryEffectHost/);
+  assert.match(text, /readonly payload/);
+  assert.doesNotMatch(text, /readonly data/);
   assert.doesNotMatch(text, /internal\//);
 });

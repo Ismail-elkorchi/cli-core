@@ -34,7 +34,7 @@ test('consumer can validate a plugin manifest and run declared hooks lazily', as
         return {
           manifest,
           hooks: {
-            'audit-prerun': (context) => ({ effects: [{ kind: 'audit.seen', data: { event: context.event } }] })
+            'audit-prerun': (context) => ({ effects: [{ kind: 'audit.seen', payload: { event: context.event } }] })
           }
         };
       }

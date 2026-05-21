@@ -12,9 +12,9 @@
     "ok": { "type": "boolean" },
     "exitKind": { "enum": ["ok", "usage", "policy_denied", "cancelled", "interrupted", "timeout", "external_error", "internal_error"] },
     "exitStatus": { "type": "integer" },
-    "events": { "type": "array", "items": { "type": "object", "required": ["schemaVersion", "runId", "sequence", "name", "data"] } },
+    "events": { "type": "array", "items": { "type": "object", "required": ["schemaVersion", "runId", "sequence", "name", "payload"] } },
     "effects": { "type": "array", "items": { "type": "object", "required": ["kind"] } },
-    "artifacts": { "type": "array", "items": { "type": "object", "required": ["id", "kind", "data"] } },
+    "artifacts": { "type": "array", "items": { "type": "object", "required": ["id", "kind", "payload"] } },
     "diagnostics": { "type": "array", "items": { "type": "object", "required": ["code", "severity", "message", "fields"] } }
   },
   "additionalProperties": true

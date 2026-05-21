@@ -13,7 +13,7 @@ import {
   runCli,
   type ExitStatusPolicy,
   type RunArtifact,
-  type RunData,
+  type RunPayload,
   type RunEffect,
   type RunHandler,
   type RunMode,
@@ -42,9 +42,9 @@ export interface CliMainRequest {
   readonly handlers?: Readonly<Record<string, RunHandler>>;
   readonly effects?: readonly RunEffect[];
   readonly artifacts?: readonly RunArtifact[];
-  readonly context?: RunData;
+  readonly context?: RunPayload;
   readonly pluginHost?: CliPluginHost;
-  readonly pluginContext?: RunData;
+  readonly pluginContext?: RunPayload;
   readonly exitStatusPolicy?: ExitStatusPolicy;
   readonly redaction?: CliRedactionOptions;
   readonly effectMode?: CliMainEffectMode;
@@ -156,9 +156,9 @@ function buildRunRequest(request: CliMainRequest, host: CliMainHost) {
     handlers?: Readonly<Record<string, RunHandler>>;
     effects?: readonly RunEffect[];
     artifacts?: readonly RunArtifact[];
-    context?: RunData;
+    context?: RunPayload;
     pluginHost?: CliPluginHost;
-    pluginContext?: RunData;
+    pluginContext?: RunPayload;
     exitStatusPolicy?: ExitStatusPolicy;
     redaction?: CliRedactionOptions;
   } = {

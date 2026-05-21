@@ -79,12 +79,12 @@ export interface CliSchemaEnvelope<TData = unknown> {
   readonly payloadSchemaVersion: CliSchemaVersion;
   readonly packageName: string;
   readonly packageVersion: string;
-  readonly data: TData;
+  readonly payload: TData;
 }
 
 export interface CliSchemaEnvelopeInput<TData = unknown> {
   readonly payloadSchemaVersion: CliSchemaVersion;
-  readonly data: TData;
+  readonly payload: TData;
   readonly redaction?: CliRedactionOptions;
 }
 
@@ -107,14 +107,14 @@ export interface CliFailureEnvelope<TData = unknown> {
   readonly ok: false;
   readonly kind: CliFailureKind;
   readonly diagnostics: readonly CliDiagnostic[];
-  readonly data: TData;
+  readonly payload: TData;
   readonly redacted: boolean;
 }
 
 export interface CliFailureEnvelopeInput<TData = unknown> {
   readonly kind: CliFailureKind;
   readonly diagnostics: readonly CliDiagnostic[];
-  readonly data?: TData;
+  readonly payload?: TData;
   readonly redaction?: CliRedactionOptions;
 }
 
@@ -214,13 +214,13 @@ export function createCliSchemaEnvelope<TData>(input: CliSchemaEnvelopeInput<TDa
     payloadSchemaVersion: input.payloadSchemaVersion,
     packageName: cliCorePackage.name,
     packageVersion: cliCorePackage.version,
-    data: redactCliSecrets(input.data, input.redaction)
+    payload: redactCliSecrets(input.payload, input.redaction)
   });
 }
 
 export function createCliFailureEnvelope<TData = null>(input: CliFailureEnvelopeInput<TData>): CliFailureEnvelope<TData | null> {
   const diagnosticReport = redactCliSecretsWithReport(input.diagnostics, input.redaction);
-  const dataReport = redactCliSecretsWithReport(input.data ?? null, input.redaction);
+  const payloadReport = redactCliSecretsWithReport(input.payload ?? null, input.redaction);
 
   return Object.freeze({
     schemaVersion: 'cli-core.failure.v1' as const,
@@ -229,8 +229,8 @@ export function createCliFailureEnvelope<TData = null>(input: CliFailureEnvelope
     ok: false as const,
     kind: input.kind,
     diagnostics: diagnosticReport.value as readonly CliDiagnostic[],
-    data: dataReport.value,
-    redacted: diagnosticReport.redacted || dataReport.redacted
+    payload: payloadReport.value,
+    redacted: diagnosticReport.redacted || payloadReport.redacted
   });
 }
 

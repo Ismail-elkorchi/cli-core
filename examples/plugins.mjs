@@ -24,7 +24,7 @@ export async function runPluginsExample() {
         manifest,
         hooks: {
           'audit-prerun': (context) => ({
-            effects: [{ kind: 'audit.record', data: { event: context.event } }]
+            effects: [{ kind: 'audit.record', payload: { event: context.event } }]
           })
         }
       })

@@ -126,8 +126,8 @@ const pressureAssertions = {
         load: () => ({
           manifest,
           hooks: {
-            record: (context) => ({ effects: [{ kind: 'audit.record', data: { event: context.event } }] }),
-            finish: (context) => ({ effects: [{ kind: 'audit.finish', data: { event: context.event } }] })
+            record: (context) => ({ effects: [{ kind: 'audit.record', payload: { event: context.event } }] }),
+            finish: (context) => ({ effects: [{ kind: 'audit.finish', payload: { event: context.event } }] })
           }
         })
       }
@@ -154,7 +154,7 @@ const pressureAssertions = {
     const invocation = parseCli(program, { argv: ['project', 'i', '--immutable'] });
     const envelope = createCliSchemaEnvelope({
       payloadSchemaVersion: invocation.schemaVersion,
-      data: invocation
+      payload: invocation
     });
 
     assert.equal(invocation.ok, true);

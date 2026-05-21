@@ -5,7 +5,7 @@ import {
   type CliDiagnosticValue
 } from '../diagnostics.js';
 import { cliCorePackage } from '../package.js';
-import type { FileRunEffect, RunEffect, RunData, SpawnRunEffect } from '../run/index.js';
+import type { FileRunEffect, RunEffect, RunPayload, SpawnRunEffect } from '../run/index.js';
 import { redactCliDiagnostics, redactCliSecrets, type CliRedactionOptions } from '../schema/index.js';
 
 export { cliCorePackage };
@@ -37,7 +37,7 @@ export interface CliEffectHost {
 
 export interface EffectHostResult {
   readonly ok?: boolean;
-  readonly data?: RunData;
+  readonly payload?: RunPayload;
   readonly diagnostics?: readonly CliDiagnostic[];
 }
 
@@ -52,7 +52,7 @@ export interface EffectApplicationReport {
 export interface EffectApplicationItemReport {
   readonly effect: RunEffect;
   readonly status: 'planned' | 'applied' | 'denied' | 'failed';
-  readonly data: RunData;
+  readonly payload: RunPayload;
   readonly diagnostics: readonly CliDiagnostic[];
 }
 
@@ -97,7 +97,7 @@ export async function applyCliEffects(request: EffectApplicationRequest): Promis
       const result = await applyOneEffect(effect, request.host as CliEffectHost);
       const itemDiagnostics = Object.freeze([...(result.diagnostics ?? [])]);
       diagnostics.push(...itemDiagnostics);
-      reports.push(itemReport(effect, result.ok === false || hasErrorDiagnostics(itemDiagnostics) ? 'failed' : 'applied', result.data ?? null, itemDiagnostics));
+      reports.push(itemReport(effect, result.ok === false || hasErrorDiagnostics(itemDiagnostics) ? 'failed' : 'applied', result.payload ?? null, itemDiagnostics));
     } catch (error) {
       const diagnostic = effectDiagnostic('CLI_EFFECT_APPLY_FAILED', 'Effect host failed while applying an effect.', {
         effectKind: effect.kind,
@@ -122,18 +122,18 @@ export function createMemoryEffectHost(): MemoryEffectHost {
         cwd: effect.cwd,
         env: effect.env === undefined ? undefined : Object.freeze({ ...effect.env })
       }));
-      return { data: { command: effect.command, argv: effect.argv, exitStatus: 0 } };
+      return { payload: { command: effect.command, argv: effect.argv, exitStatus: 0 } };
     },
     writeFile(effect: FileRunEffect): EffectHostResult {
       files.set(effect.path, effect.content ?? '');
-      return { data: { path: effect.path, bytes: (effect.content ?? '').length } };
+      return { payload: { path: effect.path, bytes: (effect.content ?? '').length } };
     },
     deletePath(effect: FileRunEffect): EffectHostResult {
       files.delete(effect.path);
-      return { data: { path: effect.path, deleted: true } };
+      return { payload: { path: effect.path, deleted: true } };
     },
     applyCustom(effect: RunEffect): EffectHostResult {
-      return { data: { effectKind: effect.kind } };
+      return { payload: { effectKind: effect.kind } };
     }
   });
 
@@ -212,13 +212,13 @@ function applyOneEffect(effect: RunEffect, host: CliEffectHost): EffectHostResul
 function itemReport(
   effect: RunEffect,
   status: EffectApplicationItemReport['status'],
-  data: RunData,
+  payload: RunPayload,
   diagnostics: readonly CliDiagnostic[]
 ): EffectApplicationItemReport {
   return Object.freeze({
     effect,
     status,
-    data,
+    payload,
     diagnostics: Object.freeze([...diagnostics])
   });
 }
