@@ -11,7 +11,13 @@ import * as testing from '../../dist/testing/index.js';
 
 const program = root.defineCli(runtimeDefinition());
 const invocation = root.parseCli(program, { argv: ['c', '--region', 'eu', 'api'] });
-const resolved = config.resolveCliConfig(program, { env: { RUNTIME_PROFILE: 'ci' } });
+const memoryConfig = config.createMemoryConfigDiscoveryHost({ env: { RUNTIME_PROFILE: 'ci' } });
+const discoveredConfig = await config.discoverCliConfigInput(program, {
+  host: memoryConfig.host,
+  scope: 'none',
+  environment: { includeConfigFields: true }
+});
+const resolved = config.resolveCliConfig(program, discoveredConfig.input);
 const helpDocument = help.createHelpDocument(program);
 const completionPayload = completion.createCompletionPayload(program, { word: 'ch' });
 const completionBridge = completion.completeCli(program, { words: ['runtime', 'ch'], cursor: 2 });
@@ -42,6 +48,7 @@ const scenario = await testing.runCliScenario(harness, {
 
 ensure(root.cliCorePackage.name === '@ismail-elkorchi/cli-core', 'Deno runtime could not load package root.');
 ensure(invocation.ok, 'Deno runtime could not parse through root entrypoint.');
+ensure(discoveredConfig.ok, 'Deno runtime could not discover config input.');
 ensure(resolved.values.profile === 'ci', 'Deno runtime could not resolve config.');
 ensure(helpDocument.commands[0]?.name === 'check', 'Deno runtime could not create help document.');
 ensure(completionPayload.items[0]?.value === 'check', 'Deno runtime could not create completion payload.');

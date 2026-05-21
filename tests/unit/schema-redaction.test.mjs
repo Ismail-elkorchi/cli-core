@@ -17,6 +17,7 @@ test('schema registry exposes stable public schema versions', () => {
   const schemas = describeCliSchemas();
 
   assert.equal(isCliSchemaVersion('cli-core.run-result.v1'), true);
+  assert.equal(isCliSchemaVersion('cli-core.config-discovery.v1'), true);
   assert.equal(isCliSchemaVersion('cli-core.completion-response.v1'), true);
   assert.equal(isCliSchemaVersion('cli-core.effect-application.v1'), true);
   assert.equal(isCliSchemaVersion('cli-core.unknown.v1'), false);

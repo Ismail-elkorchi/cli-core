@@ -20,6 +20,7 @@ test('README documents current public surface without unsupported claims', async
   assert.match(readme, /Limitations/);
   assert.match(readme, /defineCli/);
   assert.match(readme, /resolveCliConfig/);
+  assert.match(readme, /discoverCliConfigInput/);
   assert.match(readme, /describeCli/);
   assert.match(readme, /createCompletionPayload/);
   assert.match(readme, /completeCli/);
@@ -56,11 +57,14 @@ test('help and manifest example executes against the built package', () => {
   assert.equal(manifest.schemaVersion, 'cli-core.manifest.v1');
 });
 
-test('config resolution example executes against the built package', () => {
-  const resolution = runConfigResolutionExample();
+test('config resolution example executes against the built package', async () => {
+  const { explicit, discovered, hostDriven } = await runConfigResolutionExample();
 
-  assert.equal(resolution.schemaVersion, 'cli-core.config-resolution.v1');
-  assert.equal(resolution.values.profile, 'prod');
+  assert.equal(explicit.schemaVersion, 'cli-core.config-resolution.v1');
+  assert.equal(explicit.values.profile, 'prod');
+  assert.equal(discovered.schemaVersion, 'cli-core.config-discovery.v1');
+  assert.equal(hostDriven.values.profile, 'prod');
+  assert.equal(hostDriven.values.dryRun, true);
 });
 
 test('completion and repair example executes against the built package', () => {
