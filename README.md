@@ -216,7 +216,9 @@ const run = await host.runHooks('prerun');
 effects without invoking handlers. Apply mode invokes an explicit handler for the
 matched command and returns effects, artifacts, diagnostics, ordered events, and
 an exit status selected from the exit policy. It does not call `process.exit` or
-write to stdout/stderr.
+write to stdout/stderr. A request can include an explicit plugin host; lifecycle
+hook effects and diagnostics are then folded into the same `RunResult` without
+global plugin state.
 
 ```ts
 import { defineCli, parseCli, runCli } from '@ismail-elkorchi/cli-core';

@@ -10,10 +10,14 @@ test('root entrypoint exposes runCli', async () => {
 
 test('root declarations include run result, events, effects, artifacts, and exit policy contracts', async () => {
   const text = await readFile(new URL('../../dist/index.d.ts', import.meta.url), 'utf8');
+  const runText = await readFile(new URL('../../dist/run/index.d.ts', import.meta.url), 'utf8');
 
   assert.match(text, /RunResult/);
   assert.match(text, /RunEvent/);
   assert.match(text, /RunEffect/);
+  assert.match(text, /PluginRunEffect/);
+  assert.match(runText, /pluginHost/);
+  assert.match(runText, /plugin\.hooks\.planned/);
   assert.match(text, /RunArtifact/);
   assert.match(text, /ExitKind/);
   assert.doesNotMatch(text, /internal\//);

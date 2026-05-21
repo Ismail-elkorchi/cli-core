@@ -7,6 +7,7 @@ import {
 } from '../diagnostics.js';
 import { cliCorePackage } from '../package.js';
 import { parseCli, type ParsedInvocation } from '../parse/index.js';
+import type { CliPluginHookEvent, CliPluginHookRunResult, CliPluginHost } from '../plugins/index.js';
 import { redactCliDiagnostics, redactCliSecrets, type CliRedactionOptions } from '../schema/index.js';
 
 export { cliCorePackage };
@@ -37,6 +38,8 @@ export interface RunRequest {
   readonly effects?: readonly RunEffect[];
   readonly artifacts?: readonly RunArtifact[];
   readonly context?: RunData;
+  readonly pluginHost?: CliPluginHost;
+  readonly pluginContext?: RunData;
   readonly exitStatusPolicy?: ExitStatusPolicy;
   readonly redaction?: CliRedactionOptions;
   readonly cancelled?: boolean;
@@ -90,9 +93,11 @@ export type RunEventName =
   | 'run.planned'
   | 'run.applied'
   | 'run.skipped'
+  | 'plugin.hooks.planned'
+  | 'plugin.hooks.completed'
   | 'run.completed';
 
-export type RunEffect = SpawnRunEffect | FileRunEffect | CustomRunEffect;
+export type RunEffect = SpawnRunEffect | FileRunEffect | PluginRunEffect | CustomRunEffect;
 
 export interface SpawnRunEffect {
   readonly kind: 'spawn';
@@ -106,6 +111,15 @@ export interface FileRunEffect {
   readonly kind: 'write_file' | 'delete_path';
   readonly path: string;
   readonly content?: string;
+}
+
+export interface PluginRunEffect {
+  readonly kind: 'plugin';
+  readonly pluginName: string;
+  readonly hookName: string;
+  readonly event: CliPluginHookEvent;
+  readonly effectKind: string;
+  readonly data?: RunData;
 }
 
 export interface CustomRunEffect {
@@ -140,8 +154,11 @@ export async function runCli(program: CliProgram, request: RunRequest): Promise<
   const runId = request.runId ?? createRunIdentifier(program, invocation, mode);
   const events = new RunEventRecorder(runId);
   const diagnostics: CliDiagnostic[] = [...invocation.diagnostics, ...effectDiagnostics(request.effects ?? [])];
-  const plannedEffects = Object.freeze([...(request.effects ?? [])].map((effect) => freezeRunValue(effect)));
-  const plannedArtifacts = Object.freeze([...(request.artifacts ?? [])].map((artifact) => freezeRunValue(artifact)));
+  const effects = [...(request.effects ?? [])].map((effect) => freezeRunValue(effect));
+  const artifacts = [...(request.artifacts ?? [])].map((artifact) => freezeRunValue(artifact));
+
+  await runPluginLifecycle('init', request, invocation, events, effects, diagnostics);
+  await runPluginLifecycle('preparse', request, invocation, events, effects, diagnostics);
 
   events.record('run.started', {
     mode,
@@ -153,6 +170,7 @@ export async function runCli(program: CliProgram, request: RunRequest): Promise<
   if (interrupted !== undefined) {
     diagnostics.push(interrupted.diagnostic);
     events.record('run.skipped', { reason: interrupted.exitKind });
+    await runPluginLifecycle('finally', request, invocation, events, effects, diagnostics);
     return finishRun({
       runId,
       mode,
@@ -160,8 +178,8 @@ export async function runCli(program: CliProgram, request: RunRequest): Promise<
       exitKind: interrupted.exitKind,
       explicitExitStatus: undefined,
       diagnostics,
-      effects: plannedEffects,
-      artifacts: plannedArtifacts,
+      effects,
+      artifacts,
       events,
       policy: request.exitStatusPolicy,
       redaction: request.redaction
@@ -169,7 +187,9 @@ export async function runCli(program: CliProgram, request: RunRequest): Promise<
   }
 
   if (!invocation.ok) {
+    await runPluginLifecycle('command_not_found', request, invocation, events, effects, diagnostics);
     events.record('run.skipped', { reason: 'usage' });
+    await runPluginLifecycle('finally', request, invocation, events, effects, diagnostics);
     return finishRun({
       runId,
       mode,
@@ -177,20 +197,23 @@ export async function runCli(program: CliProgram, request: RunRequest): Promise<
       exitKind: 'usage',
       explicitExitStatus: undefined,
       diagnostics,
-      effects: plannedEffects,
-      artifacts: plannedArtifacts,
+      effects,
+      artifacts,
       events,
       policy: request.exitStatusPolicy,
       redaction: request.redaction
     });
   }
 
+  await runPluginLifecycle('prerun', request, invocation, events, effects, diagnostics);
+
   events.record('run.planned', {
-    effects: plannedEffects.length,
-    artifacts: plannedArtifacts.length
+    effects: effects.length,
+    artifacts: artifacts.length
   });
 
   if (mode === 'plan') {
+    await runPluginLifecycle('finally', request, invocation, events, effects, diagnostics);
     return finishRun({
       runId,
       mode,
@@ -198,8 +221,8 @@ export async function runCli(program: CliProgram, request: RunRequest): Promise<
       exitKind: hasErrorDiagnostics(diagnostics) ? 'policy_denied' : 'ok',
       explicitExitStatus: undefined,
       diagnostics,
-      effects: plannedEffects,
-      artifacts: plannedArtifacts,
+      effects,
+      artifacts,
       events,
       policy: request.exitStatusPolicy,
       redaction: request.redaction
@@ -213,6 +236,7 @@ export async function runCli(program: CliProgram, request: RunRequest): Promise<
       commandPath: invocation.commandPath
     }));
     events.record('run.skipped', { reason: 'missing_handler' });
+    await runPluginLifecycle('finally', request, invocation, events, effects, diagnostics);
     return finishRun({
       runId,
       mode,
@@ -220,8 +244,8 @@ export async function runCli(program: CliProgram, request: RunRequest): Promise<
       exitKind: 'policy_denied',
       explicitExitStatus: undefined,
       diagnostics,
-      effects: plannedEffects,
-      artifacts: plannedArtifacts,
+      effects,
+      artifacts,
       events,
       policy: request.exitStatusPolicy,
       redaction: request.redaction
@@ -236,19 +260,17 @@ export async function runCli(program: CliProgram, request: RunRequest): Promise<
       invocation,
       context: freezeRunValue(request.context ?? null)
     }));
-    const appliedEffects = Object.freeze([
-      ...plannedEffects,
-      ...(output.effects ?? []).map((effect) => freezeRunValue(effect))
-    ]);
-    const artifacts = Object.freeze([
-      ...plannedArtifacts,
-      ...(output.artifacts ?? []).map((artifact) => freezeRunValue(artifact))
-    ]);
+    effects.push(...(output.effects ?? []).map((effect) => freezeRunValue(effect)));
+    artifacts.push(...(output.artifacts ?? []).map((artifact) => freezeRunValue(artifact)));
     diagnostics.push(...(output.diagnostics ?? []), ...effectDiagnostics(output.effects ?? []));
     events.record('run.applied', {
-      effects: appliedEffects.length,
+      effects: effects.length,
       artifacts: artifacts.length
     });
+    if ((output.exitKind ?? (hasErrorDiagnostics(diagnostics) ? 'external_error' : 'ok')) === 'ok') {
+      await runPluginLifecycle('postrun', request, invocation, events, effects, diagnostics);
+    }
+    await runPluginLifecycle('finally', request, invocation, events, effects, diagnostics);
 
     return finishRun({
       runId,
@@ -257,7 +279,7 @@ export async function runCli(program: CliProgram, request: RunRequest): Promise<
       exitKind: output.exitKind ?? (hasErrorDiagnostics(diagnostics) ? 'external_error' : 'ok'),
       explicitExitStatus: output.exitStatus,
       diagnostics,
-      effects: appliedEffects,
+      effects,
       artifacts,
       events,
       policy: request.exitStatusPolicy,
@@ -269,6 +291,7 @@ export async function runCli(program: CliProgram, request: RunRequest): Promise<
       errorMessage: errorMessage(error)
     }));
     events.record('run.skipped', { reason: 'handler_failed' });
+    await runPluginLifecycle('finally', request, invocation, events, effects, diagnostics);
     return finishRun({
       runId,
       mode,
@@ -276,13 +299,82 @@ export async function runCli(program: CliProgram, request: RunRequest): Promise<
       exitKind: 'external_error',
       explicitExitStatus: undefined,
       diagnostics,
-      effects: plannedEffects,
-      artifacts: plannedArtifacts,
+      effects,
+      artifacts,
       events,
       policy: request.exitStatusPolicy,
       redaction: request.redaction
     });
   }
+}
+
+async function runPluginLifecycle(
+  event: CliPluginHookEvent,
+  request: RunRequest,
+  invocation: ParsedInvocation,
+  events: RunEventRecorder,
+  effects: RunEffect[],
+  diagnostics: CliDiagnostic[]
+): Promise<void> {
+  if (request.pluginHost === undefined) return;
+  const plan = request.pluginHost.planHooks(event);
+  events.record('plugin.hooks.planned', {
+    event,
+    hooks: plan.hooks.map((hook) => ({
+      id: hook.id,
+      pluginName: hook.pluginName,
+      hookName: hook.hookName,
+      order: hook.order
+    }))
+  });
+  diagnostics.push(...plan.diagnostics);
+  if (hasErrorDiagnostics(plan.diagnostics)) {
+    events.record('plugin.hooks.completed', { event, status: 'failed', hooks: [] });
+    return;
+  }
+
+  const result = await request.pluginHost.runHooks(event, {
+    data: pluginHookData(request, invocation)
+  });
+  diagnostics.push(...result.diagnostics);
+  effects.push(...pluginRunEffects(result));
+  events.record('plugin.hooks.completed', {
+    event,
+    status: result.ok ? 'passed' : 'failed',
+    hooks: result.hooks.map((hook) => ({
+      pluginName: hook.pluginName,
+      hookName: hook.hookName,
+      status: hook.status,
+      effects: hook.effects.length,
+      diagnostics: hook.diagnostics.length
+    }))
+  });
+}
+
+function pluginHookData(request: RunRequest, invocation: ParsedInvocation): RunData {
+  return freezeRunValue({
+    run: request.pluginContext ?? null,
+    commandPath: invocation.commandPath,
+    argv: invocation.argv,
+    ok: invocation.ok
+  });
+}
+
+function pluginRunEffects(result: CliPluginHookRunResult): readonly PluginRunEffect[] {
+  return Object.freeze(result.hooks.flatMap((hook) =>
+    hook.effects.map((effect) => {
+      const optionalFields: { data?: RunData } = {};
+      if (effect.data !== undefined) optionalFields.data = freezeRunValue(effect.data) as RunData;
+      return Object.freeze({
+        kind: 'plugin' as const,
+        pluginName: hook.pluginName,
+        hookName: hook.hookName,
+        event: result.event,
+        effectKind: effect.kind,
+        ...optionalFields
+      });
+    })
+  ));
 }
 
 interface FinishRunInput {
