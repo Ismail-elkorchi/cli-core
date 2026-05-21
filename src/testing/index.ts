@@ -1,2 +1,380 @@
-export { cliCorePackage } from '../internal/package.js';
-export type { CliCorePackage } from '../internal/package.js';
+import { cliCorePackage } from '../package.js';
+
+export { cliCorePackage };
+export type { CliCorePackage } from '../package.js';
+
+export type CliFixtureValue =
+  | null
+  | boolean
+  | number
+  | string
+  | readonly CliFixtureValue[]
+  | { readonly [key: string]: CliFixtureValue };
+
+export type CliFixtureFamily = 'foundation' | 'commands' | 'config' | 'plugins' | 'runs';
+
+export interface CliFixtureDefinition {
+  readonly id: string;
+  readonly family: CliFixtureFamily;
+  readonly title: string;
+  readonly description?: string;
+  readonly capabilities: readonly string[];
+  readonly data?: CliFixtureValue;
+}
+
+export interface CliFixture {
+  readonly id: string;
+  readonly family: CliFixtureFamily;
+  readonly title: string;
+  readonly description?: string;
+  readonly capabilities: readonly string[];
+  readonly data: CliFixtureValue;
+}
+
+export interface CliFixtureRegistry {
+  readonly get: (id: string) => CliFixture | undefined;
+  readonly has: (id: string) => boolean;
+  readonly list: (family?: CliFixtureFamily) => readonly CliFixture[];
+  readonly snapshot: () => readonly CliFixture[];
+}
+
+export type CliPackageEntrypoint =
+  | 'root'
+  | 'help'
+  | 'completion'
+  | 'manifest'
+  | 'config'
+  | 'plugins'
+  | 'repair'
+  | 'testing';
+
+export interface CliEntrypointModule {
+  readonly [exportName: string]: unknown;
+}
+
+export interface CliHarnessInput {
+  readonly program?: unknown;
+  readonly entrypoints?: Partial<Record<CliPackageEntrypoint, CliEntrypointModule>>;
+  readonly fixtures?: readonly CliFixtureDefinition[];
+}
+
+export interface CliHarness {
+  readonly program: unknown | undefined;
+  readonly fixtures: CliFixtureRegistry;
+  readonly getEntrypoint: (entrypoint: CliPackageEntrypoint) => CliEntrypointModule | undefined;
+}
+
+export interface CliScenario {
+  readonly id: string;
+  readonly title?: string;
+  readonly steps: readonly CliScenarioStep[];
+}
+
+export type CliScenarioStep = CliEntrypointLoadStep | CliFixtureAvailableStep;
+
+export interface CliEntrypointLoadStep {
+  readonly kind: 'entrypoint-load';
+  readonly name: string;
+  readonly entrypoint: CliPackageEntrypoint;
+  readonly expectedExports?: readonly string[];
+}
+
+export interface CliFixtureAvailableStep {
+  readonly kind: 'fixture-available';
+  readonly name: string;
+  readonly fixtureId: string;
+  readonly expectedFamily?: CliFixtureFamily;
+}
+
+export type CliScenarioStatus = 'passed' | 'failed';
+
+export type CliTestDiagnosticCode =
+  | 'CLI_TEST_DUPLICATE_FIXTURE'
+  | 'CLI_TEST_ENTRYPOINT_MISSING'
+  | 'CLI_TEST_EXPORT_MISSING'
+  | 'CLI_TEST_FIXTURE_MISSING'
+  | 'CLI_TEST_FIXTURE_FAMILY_MISMATCH';
+
+export interface CliTestDiagnostic {
+  readonly code: CliTestDiagnosticCode;
+  readonly message: string;
+  readonly fields: Readonly<Record<string, CliFixtureValue>>;
+}
+
+export interface CliScenarioStepResult {
+  readonly index: number;
+  readonly name: string;
+  readonly kind: CliScenarioStep['kind'];
+  readonly status: CliScenarioStatus;
+  readonly diagnostics: readonly CliTestDiagnostic[];
+}
+
+export interface CliScenarioResult {
+  readonly scenarioId: string;
+  readonly status: CliScenarioStatus;
+  readonly steps: readonly CliScenarioStepResult[];
+  readonly diagnostics: readonly CliTestDiagnostic[];
+}
+
+export const foundationFixtures = Object.freeze([
+  defineCliFixture({
+    id: 'foundation.package-metadata',
+    family: 'foundation',
+    title: 'Package metadata contract',
+    description: 'The package name, semantic version, and contract version are importable data.',
+    capabilities: ['package.metadata', 'package.contract-version'],
+    data: {
+      name: cliCorePackage.name,
+      version: cliCorePackage.version,
+      contractVersion: cliCorePackage.contractVersion
+    }
+  }),
+  defineCliFixture({
+    id: 'foundation.entrypoints',
+    family: 'foundation',
+    title: 'Public entrypoint contract',
+    description: 'The root and documented subpath entrypoints can be imported by consumers.',
+    capabilities: ['package.exports', 'subpath.imports'],
+    data: {
+      entrypoints: ['root', 'help', 'completion', 'manifest', 'config', 'plugins', 'repair', 'testing']
+    }
+  })
+]);
+
+export function defineCliFixture(definition: CliFixtureDefinition): CliFixture {
+  const fixture = buildFixture(definition);
+  return freezeFixture(fixture);
+}
+
+export function createCliFixtureRegistry(
+  fixtures: readonly CliFixtureDefinition[] = foundationFixtures
+): CliFixtureRegistry {
+  const byId = new Map<string, CliFixture>();
+
+  for (const fixtureDefinition of fixtures) {
+    const fixture = defineCliFixture(fixtureDefinition);
+    if (byId.has(fixture.id)) {
+      throw new CliFixtureRegistryError(
+        diagnostic('CLI_TEST_DUPLICATE_FIXTURE', 'Fixture id is already registered.', {
+          fixtureId: fixture.id
+        })
+      );
+    }
+    byId.set(fixture.id, fixture);
+  }
+
+  const snapshot = Object.freeze([...byId.values()].sort(compareFixtureId));
+
+  return Object.freeze({
+    get(id: string): CliFixture | undefined {
+      return byId.get(id);
+    },
+    has(id: string): boolean {
+      return byId.has(id);
+    },
+    list(family?: CliFixtureFamily): readonly CliFixture[] {
+      const selected = family === undefined ? snapshot : snapshot.filter((fixture) => fixture.family === family);
+      return Object.freeze([...selected]);
+    },
+    snapshot(): readonly CliFixture[] {
+      return Object.freeze([...snapshot]);
+    }
+  });
+}
+
+export function createCliHarness(input: CliHarnessInput = {}): CliHarness {
+  const entrypoints = new Map<CliPackageEntrypoint, CliEntrypointModule>();
+
+  if (input.entrypoints !== undefined) {
+    for (const [entrypoint, module] of Object.entries(input.entrypoints) as Array<
+      [string, CliEntrypointModule | undefined]
+    >) {
+      if (module !== undefined && isPackageEntrypoint(entrypoint)) {
+        entrypoints.set(entrypoint, Object.freeze({ ...module }));
+      }
+    }
+  }
+
+  const fixtures = createCliFixtureRegistry(input.fixtures ?? foundationFixtures);
+
+  return Object.freeze({
+    program: input.program,
+    fixtures,
+    getEntrypoint(entrypoint: CliPackageEntrypoint): CliEntrypointModule | undefined {
+      return entrypoints.get(entrypoint);
+    }
+  });
+}
+
+export async function runCliScenario(harness: CliHarness, scenario: CliScenario): Promise<CliScenarioResult> {
+  const steps = scenario.steps.map((step, index) => runScenarioStep(harness, step, index));
+  const diagnostics = Object.freeze(steps.flatMap((step) => step.diagnostics));
+  const status: CliScenarioStatus = diagnostics.length === 0 ? 'passed' : 'failed';
+
+  return Object.freeze({
+    scenarioId: scenario.id,
+    status,
+    steps: Object.freeze(steps),
+    diagnostics
+  });
+}
+
+class CliFixtureRegistryError extends Error {
+  public readonly diagnostic: CliTestDiagnostic;
+
+  public constructor(diagnosticValue: CliTestDiagnostic) {
+    super(diagnosticValue.message);
+    this.name = 'CliFixtureRegistryError';
+    this.diagnostic = diagnosticValue;
+  }
+}
+
+const packageEntrypoints: readonly CliPackageEntrypoint[] = Object.freeze([
+  'root',
+  'help',
+  'completion',
+  'manifest',
+  'config',
+  'plugins',
+  'repair',
+  'testing'
+]);
+
+function buildFixture(definition: CliFixtureDefinition): CliFixture {
+  const fixtureData = cloneFixtureValue(definition.data ?? null);
+  const capabilities = Object.freeze([...definition.capabilities]);
+
+  if (definition.description === undefined) {
+    return {
+      id: definition.id,
+      family: definition.family,
+      title: definition.title,
+      capabilities,
+      data: fixtureData
+    };
+  }
+
+  return {
+    id: definition.id,
+    family: definition.family,
+    title: definition.title,
+    description: definition.description,
+    capabilities,
+    data: fixtureData
+  };
+}
+
+function runScenarioStep(harness: CliHarness, step: CliScenarioStep, index: number): CliScenarioStepResult {
+  const diagnostics = step.kind === 'entrypoint-load'
+    ? inspectEntrypointStep(harness, step)
+    : inspectFixtureStep(harness, step);
+
+  return Object.freeze({
+    index,
+    name: step.name,
+    kind: step.kind,
+    status: diagnostics.length === 0 ? 'passed' : 'failed',
+    diagnostics: Object.freeze(diagnostics)
+  });
+}
+
+function inspectEntrypointStep(harness: CliHarness, step: CliEntrypointLoadStep): readonly CliTestDiagnostic[] {
+  const entrypoint = harness.getEntrypoint(step.entrypoint);
+  if (entrypoint === undefined) {
+    return [
+      diagnostic('CLI_TEST_ENTRYPOINT_MISSING', 'Entrypoint module was not supplied to the harness.', {
+        entrypoint: step.entrypoint
+      })
+    ];
+  }
+
+  const expectedExports = step.expectedExports ?? [];
+  return expectedExports
+    .filter((exportName) => !(exportName in entrypoint))
+    .map((exportName) =>
+      diagnostic('CLI_TEST_EXPORT_MISSING', 'Entrypoint module does not expose an expected export.', {
+        entrypoint: step.entrypoint,
+        exportName
+      })
+    );
+}
+
+function inspectFixtureStep(harness: CliHarness, step: CliFixtureAvailableStep): readonly CliTestDiagnostic[] {
+  const fixture = harness.fixtures.get(step.fixtureId);
+  if (fixture === undefined) {
+    return [
+      diagnostic('CLI_TEST_FIXTURE_MISSING', 'Fixture is not registered in the harness.', {
+        fixtureId: step.fixtureId
+      })
+    ];
+  }
+
+  if (step.expectedFamily !== undefined && fixture.family !== step.expectedFamily) {
+    return [
+      diagnostic('CLI_TEST_FIXTURE_FAMILY_MISMATCH', 'Fixture family does not match the scenario expectation.', {
+        fixtureId: fixture.id,
+        expectedFamily: step.expectedFamily,
+        actualFamily: fixture.family
+      })
+    ];
+  }
+
+  return [];
+}
+
+function diagnostic(
+  code: CliTestDiagnosticCode,
+  message: string,
+  fields: Readonly<Record<string, CliFixtureValue>>
+): CliTestDiagnostic {
+  return Object.freeze({
+    code,
+    message,
+    fields: freezeFixtureRecord(fields)
+  });
+}
+
+function freezeFixture(fixture: CliFixture): CliFixture {
+  return Object.freeze({
+    ...fixture,
+    capabilities: Object.freeze([...fixture.capabilities]),
+    data: freezeFixtureValue(fixture.data)
+  });
+}
+
+function freezeFixtureRecord(record: Readonly<Record<string, CliFixtureValue>>): Readonly<Record<string, CliFixtureValue>> {
+  const entries = Object.entries(record).map(([key, value]) => [key, freezeFixtureValue(value)] as const);
+  return Object.freeze(Object.fromEntries(entries) as Record<string, CliFixtureValue>);
+}
+
+function freezeFixtureValue(value: CliFixtureValue): CliFixtureValue {
+  if (Array.isArray(value)) {
+    const items = value as readonly CliFixtureValue[];
+    return Object.freeze(items.map((item) => freezeFixtureValue(item)));
+  }
+  if (value !== null && typeof value === 'object') {
+    const record = value as Readonly<Record<string, CliFixtureValue>>;
+    return freezeFixtureRecord(record);
+  }
+  return value;
+}
+
+function cloneFixtureValue(value: CliFixtureValue): CliFixtureValue {
+  if (Array.isArray(value)) {
+    return value.map((item) => cloneFixtureValue(item));
+  }
+  if (value !== null && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entryValue]) => [key, cloneFixtureValue(entryValue)])
+    ) as Record<string, CliFixtureValue>;
+  }
+  return value;
+}
+
+function compareFixtureId(left: CliFixture, right: CliFixture): number {
+  return left.id.localeCompare(right.id);
+}
+
+function isPackageEntrypoint(entrypoint: string): entrypoint is CliPackageEntrypoint {
+  return packageEntrypoints.includes(entrypoint as CliPackageEntrypoint);
+}

@@ -50,5 +50,11 @@ export default [
     rules: {
       'n/no-missing-import': 'off'
     }
+  },
+  {
+    files: ['examples/**/*.mjs'],
+    rules: {
+      'n/no-missing-import': 'off'
+    }
   }
 ];
