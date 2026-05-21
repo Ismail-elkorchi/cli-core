@@ -26,6 +26,8 @@ test('testing subpath exposes harness and fixture contracts', async () => {
   const module = await import('../../dist/testing/index.js');
 
   assert.equal(typeof module.createCliHarness, 'function');
+  assert.equal(typeof module.createLargeCommandDefinition, 'function');
+  assert.equal(typeof module.createLargeCommandFixture, 'function');
   assert.equal(typeof module.runCliScenario, 'function');
   assert.equal(typeof module.defineCliFixture, 'function');
   assert.equal(Array.isArray(module.foundationFixtures), true);
