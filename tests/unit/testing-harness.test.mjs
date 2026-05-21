@@ -6,6 +6,7 @@ import {
   defineCliFixture,
   foundationFixtures,
   pluginFixtures,
+  runFixtures,
   runCliScenario
 } from '../../dist/testing/index.js';
 
@@ -60,6 +61,17 @@ test('plugin fixture corpus includes required plugin cases', () => {
     'plugins.hook-order-plugin-set',
     'plugins.faulty-plugin-manifest',
     'plugins.faulty-plugin-runtime'
+  ]);
+});
+
+test('run fixture corpus includes required run cases', () => {
+  assert.deepEqual(runFixtures.map((fixture) => fixture.id), [
+    'runs.apply-run',
+    'runs.plan-run',
+    'runs.long-running-run',
+    'runs.cancelled-run',
+    'runs.timeout-run',
+    'runs.interrupted-run'
   ]);
 });
 

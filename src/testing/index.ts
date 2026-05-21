@@ -380,11 +380,79 @@ export const pluginFixtures = Object.freeze([
   })
 ]);
 
+export const runFixtures = Object.freeze([
+  defineCliFixture({
+    id: 'runs.apply-run',
+    family: 'runs',
+    title: 'Apply run',
+    capabilities: ['run.apply', 'run.events', 'run.effects'],
+    data: {
+      argv: ['deploy', 'api'],
+      mode: 'apply',
+      expectedExitKind: 'ok'
+    }
+  }),
+  defineCliFixture({
+    id: 'runs.plan-run',
+    family: 'runs',
+    title: 'Plan run',
+    capabilities: ['run.plan', 'run.effects'],
+    data: {
+      argv: ['deploy', 'api'],
+      mode: 'plan',
+      effects: [{ kind: 'spawn', command: 'ship', argv: ['deploy', 'api'] }]
+    }
+  }),
+  defineCliFixture({
+    id: 'runs.long-running-run',
+    family: 'runs',
+    title: 'Long-running run',
+    capabilities: ['run.identifiers', 'run.events'],
+    data: {
+      runId: 'run-long',
+      mode: 'apply',
+      elapsedMs: 5000
+    }
+  }),
+  defineCliFixture({
+    id: 'runs.cancelled-run',
+    family: 'runs',
+    title: 'Cancelled run',
+    capabilities: ['run.cancelled', 'run.exit-status'],
+    data: {
+      cancelled: true,
+      expectedExitKind: 'cancelled'
+    }
+  }),
+  defineCliFixture({
+    id: 'runs.timeout-run',
+    family: 'runs',
+    title: 'Timeout run',
+    capabilities: ['run.timeout', 'run.exit-status'],
+    data: {
+      timeoutMs: 100,
+      elapsedMs: 101,
+      expectedExitKind: 'timeout'
+    }
+  }),
+  defineCliFixture({
+    id: 'runs.interrupted-run',
+    family: 'runs',
+    title: 'Interrupted run',
+    capabilities: ['run.interrupted', 'run.exit-status'],
+    data: {
+      interrupted: true,
+      expectedExitKind: 'interrupted'
+    }
+  })
+]);
+
 export const cliCoreFixtures = Object.freeze([
   ...foundationFixtures,
   ...commandFixtures,
   ...configFixtures,
-  ...pluginFixtures
+  ...pluginFixtures,
+  ...runFixtures
 ]);
 
 export function defineCliFixture(definition: CliFixtureDefinition): CliFixture {
