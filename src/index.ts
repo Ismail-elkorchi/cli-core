@@ -3,6 +3,7 @@ export type { CliCorePackage } from './package.js';
 export { defineCli, findCliCommand, findCliCommandByAlias } from './command/index.js';
 export { createCompletionInstallPlan, createCompletionPayload, createCompletionScript } from './completion/index.js';
 export { resolveCliConfig } from './config/index.js';
+export { applyCliEffects, createMemoryEffectHost, planCliEffects } from './effects/index.js';
 export { createHelpDocument, createVersionDocument } from './help/index.js';
 export { describeCli } from './manifest/index.js';
 export { parseCli, validateCli } from './parse/index.js';
@@ -81,6 +82,17 @@ export type {
   ConfigValue,
   ConfigValueType
 } from './config/index.js';
+export type {
+  CliEffectHost,
+  EffectApplicationItemReport,
+  EffectApplicationMode,
+  EffectApplicationPolicy,
+  EffectApplicationReport,
+  EffectApplicationRequest,
+  EffectHostResult,
+  MemoryEffectHost,
+  MemorySpawnRecord
+} from './effects/index.js';
 export type {
   CliDiagnostic,
   CliDiagnosticCode,

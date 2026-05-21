@@ -23,6 +23,7 @@ export type CliSchemaName =
   | 'plugin'
   | 'run-result'
   | 'run-event'
+  | 'effect-application'
   | 'schema-envelope'
   | 'failure'
   | 'redaction';
@@ -41,6 +42,7 @@ export type CliSchemaVersion =
   | 'cli-core.plugin.v1'
   | 'cli-core.run-result.v1'
   | 'cli-core.run-event.v1'
+  | 'cli-core.effect-application.v1'
   | 'cli-core.schema-envelope.v1'
   | 'cli-core.failure.v1'
   | 'cli-core.redaction.v1';
@@ -134,6 +136,7 @@ const schemaDescriptors: readonly CliSchemaDescriptor[] = Object.freeze([
   descriptor('plugin', 'cli-core.plugin.v1', 'Plugin manifest.'),
   descriptor('run-result', 'cli-core.run-result.v1', 'Run result envelope.'),
   descriptor('run-event', 'cli-core.run-event.v1', 'Run event envelope.'),
+  descriptor('effect-application', 'cli-core.effect-application.v1', 'Effect application report.'),
   descriptor('schema-envelope', 'cli-core.schema-envelope.v1', 'Generic schema/version wrapper.'),
   descriptor('failure', 'cli-core.failure.v1', 'Typed failure envelope.'),
   descriptor('redaction', 'cli-core.redaction.v1', 'Secret redaction report.')

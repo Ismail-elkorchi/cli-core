@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as completion from '../../dist/completion/index.js';
 import * as config from '../../dist/config/index.js';
+import * as effects from '../../dist/effects/index.js';
 import * as help from '../../dist/help/index.js';
 import * as manifest from '../../dist/manifest/index.js';
 import * as plugins from '../../dist/plugins/index.js';
@@ -24,6 +25,12 @@ test('node runtime can load and exercise public entrypoints', async () => {
   }), { runtime: 'node' });
   const repairs = repair.suggestRepairs(root.parseCli(program, { argv: ['chek'] }), program);
   const run = await root.runCli(program, { mode: 'plan', invocation });
+  const memoryHost = effects.createMemoryEffectHost();
+  const effectReport = await effects.applyCliEffects({
+    effects: [{ kind: 'write_file', path: 'runtime.txt', content: 'ok' }],
+    host: memoryHost.host,
+    policy: { allowWriteFile: true }
+  });
   const envelope = schema.createCliSchemaEnvelope({ payloadSchemaVersion: run.schemaVersion, data: run });
   const harness = testing.createCliHarness({ entrypoints: { root, schema, testing } });
   const scenario = await testing.runCliScenario(harness, {
@@ -43,6 +50,8 @@ test('node runtime can load and exercise public entrypoints', async () => {
   assert.equal(manifestRoundTrip.commands.some((command) => command.name === 'check'), true);
   assert.equal(compatibility.ok, true);
   assert.equal(repairs[0].code, 'REPAIR_UNKNOWN_COMMAND');
+  assert.equal(effectReport.ok, true);
+  assert.equal(memoryHost.files()['runtime.txt'], 'ok');
   assert.equal(envelope.payloadSchemaVersion, 'cli-core.run-result.v1');
   assert.equal(schema.describeCliSchemas().some((item) => item.version === 'cli-core.schema-envelope.v1'), true);
   assert.equal(scenario.status, 'passed');

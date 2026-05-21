@@ -9,6 +9,7 @@ const expectedExports = [
   './completion',
   './manifest',
   './config',
+  './effects',
   './plugins',
   './repair',
   './schema',
