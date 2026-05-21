@@ -4,6 +4,7 @@ import test from 'node:test';
 import { runCompletionRepairExample } from '../../examples/completion-repair.mjs';
 import { runConfigResolutionExample } from '../../examples/config-resolution.mjs';
 import { runCommandModelExample } from '../../examples/command-model.mjs';
+import { runEffectsExample } from '../../examples/effects.mjs';
 import { runHelpManifestExample } from '../../examples/help-manifest.mjs';
 import { runPluginsExample } from '../../examples/plugins.mjs';
 import { runExecutionExample } from '../../examples/run.mjs';
@@ -24,6 +25,7 @@ test('README documents current public surface without unsupported claims', async
   assert.match(readme, /suggestRepairs/);
   assert.match(readme, /createCliPluginHost/);
   assert.match(readme, /runCli/);
+  assert.match(readme, /applyCliEffects/);
   assert.match(readme, /createCliSchemaEnvelope/);
   assert.match(readme, /redactCliSecrets/);
   assert.match(readme, /createCliHarness/);
@@ -86,6 +88,16 @@ test('run example executes against the built package', async () => {
   assert.equal(plan.effects[1].kind, 'plugin');
   assert.equal(apply.mode, 'apply');
   assert.equal(apply.artifacts[0].id, 'deploy-summary');
+});
+
+test('effects example executes against the built package', async () => {
+  const { planned, applied, memory } = await runEffectsExample();
+
+  assert.equal(planned.mode, 'plan');
+  assert.equal(planned.reports[0].status, 'planned');
+  assert.equal(applied.ok, true);
+  assert.equal(applied.reports[1].effect.env.SHIP_TOKEN, '[REDACTED]');
+  assert.equal(memory.files()['deploy.json'], '{"ok":true}');
 });
 
 test('schema and redaction example executes against the built package', async () => {

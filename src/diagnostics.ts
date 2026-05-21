@@ -29,6 +29,9 @@ export type CliDiagnosticCode =
   | 'CLI_RUN_INTERRUPTED'
   | 'CLI_RUN_TIMEOUT'
   | 'CLI_RUN_INVALID_EFFECT'
+  | 'CLI_EFFECT_HOST_MISSING'
+  | 'CLI_EFFECT_DENIED'
+  | 'CLI_EFFECT_APPLY_FAILED'
   | 'CLI_SCHEMA_UNSUPPORTED';
 
 export type CliDiagnosticValue =

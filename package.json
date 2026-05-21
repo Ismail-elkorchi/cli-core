@@ -27,6 +27,10 @@
       "types": "./dist/config/index.d.ts",
       "default": "./dist/config/index.js"
     },
+    "./effects": {
+      "types": "./dist/effects/index.d.ts",
+      "default": "./dist/effects/index.js"
+    },
     "./plugins": {
       "types": "./dist/plugins/index.d.ts",
       "default": "./dist/plugins/index.js"
@@ -64,6 +68,7 @@
     "test:runtime:deno": "npm run build && deno run tests/runtime/deno-smoke.mjs",
     "test:runtime:bun": "npm run build && bun tests/runtime/bun-smoke.mjs",
     "test:docs": "npm run build && node --test tests/docs/*.test.mjs",
+    "test:effects": "npm run build && node --test tests/unit/effects.test.mjs tests/conformance/effects-surface.test.mjs",
     "test:pressure": "node --test tests/pressure/*.test.mjs",
     "check:exports": "node scripts/check-exports.mjs",
     "check:leakage": "node scripts/no-private-leakage.mjs",

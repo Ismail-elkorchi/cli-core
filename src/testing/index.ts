@@ -44,6 +44,7 @@ export type CliPackageEntrypoint =
   | 'completion'
   | 'manifest'
   | 'config'
+  | 'effects'
   | 'plugins'
   | 'repair'
   | 'schema'
@@ -137,7 +138,7 @@ export const foundationFixtures = Object.freeze([
     description: 'The root and documented subpath entrypoints can be imported by consumers.',
     capabilities: ['package.exports', 'subpath.imports'],
     data: {
-      entrypoints: ['root', 'help', 'completion', 'manifest', 'config', 'plugins', 'repair', 'schema', 'testing']
+      entrypoints: ['root', 'help', 'completion', 'manifest', 'config', 'effects', 'plugins', 'repair', 'schema', 'testing']
     }
   })
 ]);

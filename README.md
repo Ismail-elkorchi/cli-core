@@ -57,6 +57,8 @@ const validation = await validateCli(program, invocation);
 - `completion`: completion payloads, shell scripts, and install plans as data.
 - `manifest`: command manifest export/import.
 - `config`: config resolution inputs, provenance, migrations, and explanations.
+- `effects`: explicit policy-controlled effect planning/application hosts and
+  reports.
 - `plugins`: plugin manifests, compatibility checks, lazy loading, hook plans,
   hook execution results, and plugin diagnostics.
 - `repair`: stable repair suggestions for parse diagnostics.
@@ -243,6 +245,24 @@ const apply = await runCli(program, {
       artifacts: [{ id: 'deploy-summary', kind: 'json', data: { service: 'api' } }]
     })
   }
+});
+```
+
+## Effect Application
+
+Run effects are still data by default. Consumers that want to apply effects must
+call the explicit effects API with a host and policy. The memory host is useful
+for tests and adapters because it records file and spawn effects without touching
+the real filesystem or launching processes.
+
+```ts
+import { applyCliEffects, createMemoryEffectHost } from '@ismail-elkorchi/cli-core/effects';
+
+const memory = createMemoryEffectHost();
+const report = await applyCliEffects({
+  effects: [{ kind: 'write_file', path: 'deploy.json', content: '{"ok":true}' }],
+  host: memory.host,
+  policy: { allowWriteFile: true }
 });
 ```
 

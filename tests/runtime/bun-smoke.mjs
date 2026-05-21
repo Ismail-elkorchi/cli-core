@@ -1,5 +1,6 @@
 import * as completion from '../../dist/completion/index.js';
 import * as config from '../../dist/config/index.js';
+import * as effects from '../../dist/effects/index.js';
 import * as help from '../../dist/help/index.js';
 import * as manifest from '../../dist/manifest/index.js';
 import * as plugins from '../../dist/plugins/index.js';
@@ -21,6 +22,12 @@ const compatibility = plugins.checkCliPluginCompatibility(plugins.defineCliPlugi
 }), { runtime: 'bun' });
 const repairs = repair.suggestRepairs(root.parseCli(program, { argv: ['chek'] }), program);
 const run = await root.runCli(program, { mode: 'plan', invocation });
+const memoryHost = effects.createMemoryEffectHost();
+const effectReport = await effects.applyCliEffects({
+  effects: [{ kind: 'write_file', path: 'runtime.txt', content: 'ok' }],
+  host: memoryHost.host,
+  policy: { allowWriteFile: true }
+});
 const envelope = schema.createCliSchemaEnvelope({ payloadSchemaVersion: run.schemaVersion, data: run });
 const harness = testing.createCliHarness({ entrypoints: { root, schema, testing } });
 const scenario = await testing.runCliScenario(harness, {
@@ -40,6 +47,8 @@ ensure(completionPayload.items[0]?.value === 'check', 'Bun runtime could not cre
 ensure(manifestRoundTrip.commands.some((command) => command.name === 'check'), 'Bun runtime could not round-trip manifest.');
 ensure(compatibility.ok, 'Bun runtime could not check plugin compatibility.');
 ensure(repairs[0]?.code === 'REPAIR_UNKNOWN_COMMAND', 'Bun runtime could not create repair suggestions.');
+ensure(effectReport.ok, 'Bun runtime could not apply memory effects.');
+ensure(memoryHost.files()['runtime.txt'] === 'ok', 'Bun runtime memory effect host did not record a file.');
 ensure(envelope.payloadSchemaVersion === 'cli-core.run-result.v1', 'Bun runtime could not create schema envelope.');
 ensure(scenario.status === 'passed', 'Bun runtime could not run testing harness scenario.');
 
