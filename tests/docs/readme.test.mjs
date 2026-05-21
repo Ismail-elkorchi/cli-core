@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
+import { runConfigResolutionExample } from '../../examples/config-resolution.mjs';
 import { runCommandModelExample } from '../../examples/command-model.mjs';
 import { runHelpManifestExample } from '../../examples/help-manifest.mjs';
 import { runTestingHarnessExample } from '../../examples/testing-harness.mjs';
@@ -10,6 +11,7 @@ test('README documents current public surface without feature-complete claims', 
 
   assert.match(readme, /active implementation/);
   assert.match(readme, /defineCli/);
+  assert.match(readme, /resolveCliConfig/);
   assert.match(readme, /describeCli/);
   assert.match(readme, /createCliHarness/);
   assert.doesNotMatch(readme, /feature-complete/i);
@@ -35,4 +37,11 @@ test('help and manifest example executes against the built package', () => {
   assert.equal(help.schemaVersion, 'cli-core.help.v1');
   assert.equal(version.version, '2.0.0');
   assert.equal(manifest.schemaVersion, 'cli-core.manifest.v1');
+});
+
+test('config resolution example executes against the built package', () => {
+  const resolution = runConfigResolutionExample();
+
+  assert.equal(resolution.schemaVersion, 'cli-core.config-resolution.v1');
+  assert.equal(resolution.values.profile, 'prod');
 });

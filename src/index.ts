@@ -1,6 +1,7 @@
 export { cliCorePackage } from './package.js';
 export type { CliCorePackage } from './package.js';
 export { defineCli, findCliCommand, findCliCommandByAlias } from './command/index.js';
+export { resolveCliConfig } from './config/index.js';
 export { createHelpDocument, createVersionDocument } from './help/index.js';
 export { describeCli } from './manifest/index.js';
 export { parseCli, validateCli } from './parse/index.js';
@@ -31,6 +32,22 @@ export type {
   SemanticValidationResult,
   ValidationContext
 } from './parse/index.js';
+export type {
+  ConfigDefinition,
+  ConfigDiscoveryInput,
+  ConfigDiscoveryResult,
+  ConfigDiscoveryScope,
+  ConfigExplanation,
+  ConfigFieldDefinition,
+  ConfigFileInput,
+  ConfigInput,
+  ConfigMigration,
+  ConfigResolution,
+  ConfigResolutionEntry,
+  ConfigSource,
+  ConfigValue,
+  ConfigValueType
+} from './config/index.js';
 export type {
   CliDiagnostic,
   CliDiagnosticCode,
