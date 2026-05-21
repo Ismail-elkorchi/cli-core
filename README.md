@@ -394,6 +394,12 @@ The local and CI runtime subset loads the root package and every public subpath
 in Node, Deno, and Bun, then exercises a data-only command scenario. This is a
 runtime smoke contract, not a full runtime matrix or performance claim.
 
+The package-consumer check creates a temporary outside-repository project,
+packs this package, installs the tarball, imports root and subpath entrypoints
+by package name, and runs a vertical Node consumer scenario. It also runs a
+packed Bun import smoke when Bun is available. Deno remains covered by the local
+runtime smoke; local tarball installation for Deno is not a default gate.
+
 ## Security Model
 
 The package returns data. It does not call `process.exit`, write to stdout or
@@ -419,6 +425,7 @@ envelopes redact secret-like keys and common token patterns by default.
 
 ```sh
 npm run check
+npm run check:package-consumer
 ```
 
 The `precommit` and `prepush` scripts are manual verification commands. This

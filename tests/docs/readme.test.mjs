@@ -19,6 +19,7 @@ test('README documents current public surface without unsupported claims', async
   assert.match(readme, /API Overview/);
   assert.match(readme, /Security Model/);
   assert.match(readme, /Limitations/);
+  assert.match(readme, /package-consumer check/);
   assert.match(readme, /defineCli/);
   assert.match(readme, /resolveCliConfig/);
   assert.match(readme, /discoverCliConfigInput/);
@@ -33,6 +34,7 @@ test('README documents current public surface without unsupported claims', async
   assert.match(readme, /@ismail-elkorchi\/cli-core\/schemas/);
   assert.match(readme, /redactCliSecrets/);
   assert.match(readme, /createCliHarness/);
+  assert.match(readme, /check:package-consumer/);
   assert.doesNotMatch(readme, /feature-complete/i);
   assert.doesNotMatch(readme, /drop-in replacement/i);
 });
