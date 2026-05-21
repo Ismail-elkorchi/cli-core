@@ -17,6 +17,7 @@ test('node runtime can load and exercise public entrypoints', async () => {
   const resolved = config.resolveCliConfig(program, { env: { RUNTIME_PROFILE: 'ci' } });
   const helpDocument = help.createHelpDocument(program);
   const completionPayload = completion.createCompletionPayload(program, { word: 'ch' });
+  const completionBridge = completion.completeCli(program, { words: ['runtime', 'ch'], cursor: 2 });
   const manifestRoundTrip = manifest.importCommandManifest(manifest.exportCommandManifest(manifest.describeCli(program)));
   const compatibility = plugins.checkCliPluginCompatibility(plugins.defineCliPluginManifest({
     name: 'runtime-plugin',
@@ -47,6 +48,7 @@ test('node runtime can load and exercise public entrypoints', async () => {
   assert.equal(resolved.values.profile, 'ci');
   assert.equal(helpDocument.commands[0].name, 'check');
   assert.equal(completionPayload.items[0].value, 'check');
+  assert.equal(completionBridge.payload.items[0].value, 'check');
   assert.equal(manifestRoundTrip.commands.some((command) => command.name === 'check'), true);
   assert.equal(compatibility.ok, true);
   assert.equal(repairs[0].code, 'REPAIR_UNKNOWN_COMMAND');

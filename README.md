@@ -126,9 +126,12 @@ const config = resolveCliConfig(program, {
 
 ## Completion And Repair
 
-Completion APIs return machine-readable candidates and shell-specific script
-documents. Install plans are data envelopes describing file/profile changes;
-they do not write files or mutate shell configuration.
+Completion APIs return machine-readable candidates, bridge responses from shell
+words/current cursor state, and shell-specific script documents. The bridge uses
+the same `__complete` protocol described by generated scripts, and stops
+completion once a pass-through boundary is reached. Install plans are data
+envelopes describing file/profile changes; they do not write files or mutate
+shell configuration.
 
 Repair APIs map parse diagnostics to stable suggestion codes. When callers pass
 the compiled program, unknown command and unknown option repairs can include a
@@ -136,8 +139,11 @@ nearby replacement candidate.
 
 ```ts
 import {
+  completeCli,
+  createCompletionCommand,
   createCompletionInstallPlan,
   createCompletionPayload,
+  createCompletionRequest,
   createCompletionScript,
   defineCli,
   parseCli,
@@ -157,6 +163,8 @@ const program = defineCli({
 });
 
 const completion = createCompletionPayload(program, { word: 'd' });
+const bridge = completeCli(program, createCompletionRequest({ words: ['ship', '__complete', 'deploy', '--r'] }));
+const command = createCompletionCommand(program);
 const bash = createCompletionScript(program, 'bash');
 const installPlan = createCompletionInstallPlan(program, 'fish');
 const repairs = suggestRepairs(parseCli(program, { argv: ['deply', 'api'] }), program);
@@ -344,6 +352,7 @@ The package publishes the root entrypoint plus these subpaths:
 - `@ismail-elkorchi/cli-core/completion`
 - `@ismail-elkorchi/cli-core/manifest`
 - `@ismail-elkorchi/cli-core/config`
+- `@ismail-elkorchi/cli-core/effects`
 - `@ismail-elkorchi/cli-core/plugins`
 - `@ismail-elkorchi/cli-core/repair`
 - `@ismail-elkorchi/cli-core/schema`
@@ -373,8 +382,8 @@ envelopes redact secret-like keys and common token patterns by default.
   capture are caller responsibilities.
 - Completion install plans describe changes as data. Consumers decide whether
   and how to write files or update shell profiles.
-- Plugin APIs validate manifests and isolate loader/hook faults; applying
-  plugin-provided command-tree mutations is outside the current public surface.
+- Plugin APIs validate manifests, apply compatible command contributions, and
+  isolate loader/hook faults.
 
 ## Verification
 
