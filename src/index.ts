@@ -1,6 +1,8 @@
 export { cliCorePackage } from './package.js';
 export type { CliCorePackage } from './package.js';
 export { defineCli, findCliCommand, findCliCommandByAlias } from './command/index.js';
+export { createHelpDocument, createVersionDocument } from './help/index.js';
+export { describeCli } from './manifest/index.js';
 export { parseCli, validateCli } from './parse/index.js';
 export type {
   CliAlias,
@@ -35,3 +37,18 @@ export type {
   CliDiagnosticSeverity,
   CliDiagnosticValue
 } from './diagnostics.js';
+export type {
+  HelpCommandEntry,
+  HelpDocument,
+  HelpOptionEntry,
+  HelpPositionalEntry,
+  VersionDocument
+} from './help/index.js';
+export type {
+  CommandManifest,
+  ManifestAlias,
+  ManifestCommand,
+  ManifestOption,
+  ManifestPositional,
+  ManifestProgram
+} from './manifest/index.js';

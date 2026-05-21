@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { runCommandModelExample } from '../../examples/command-model.mjs';
+import { runHelpManifestExample } from '../../examples/help-manifest.mjs';
 import { runTestingHarnessExample } from '../../examples/testing-harness.mjs';
 
 test('README documents current public surface without feature-complete claims', async () => {
@@ -9,6 +10,7 @@ test('README documents current public surface without feature-complete claims', 
 
   assert.match(readme, /active implementation/);
   assert.match(readme, /defineCli/);
+  assert.match(readme, /describeCli/);
   assert.match(readme, /createCliHarness/);
   assert.doesNotMatch(readme, /feature-complete/i);
 });
@@ -25,4 +27,12 @@ test('testing harness example executes against the built package', async () => {
   const result = await runTestingHarnessExample();
 
   assert.equal(result.status, 'passed');
+});
+
+test('help and manifest example executes against the built package', () => {
+  const { help, version, manifest } = runHelpManifestExample();
+
+  assert.equal(help.schemaVersion, 'cli-core.help.v1');
+  assert.equal(version.version, '2.0.0');
+  assert.equal(manifest.schemaVersion, 'cli-core.manifest.v1');
 });

@@ -6,9 +6,10 @@ Typed command-core primitives for TypeScript and JavaScript CLIs.
 
 This package is in active implementation. The current public surface includes
 stable package entrypoints, contract metadata, command program compilation,
-argv binding through `argv-flags`, and a testing harness for data-only fixture
-and entrypoint scenarios. Config, completion, plugin, and run behavior are not
-part of the current public surface.
+argv binding through `argv-flags`, help/version documents, command manifests,
+manifest import/export, and a testing harness for data-only fixture and
+entrypoint scenarios. Config, completion, plugin, and run behavior are not part
+of the current public surface.
 
 ## Boundary
 
@@ -44,6 +45,34 @@ const invocation = parseCli(program, {
   argv: ['d', '--verbose', '--region', 'eu', 'api']
 });
 const validation = await validateCli(program, invocation);
+```
+
+## Help And Manifests
+
+`cli-core` exposes help, version, and manifest data as structured documents.
+Rendering those documents to a terminal, file, or service is left to consumers.
+
+```ts
+import {
+  createHelpDocument,
+  createVersionDocument,
+  defineCli,
+  describeCli
+} from '@ismail-elkorchi/cli-core';
+import {
+  exportCommandManifest,
+  importCommandManifest
+} from '@ismail-elkorchi/cli-core/manifest';
+
+const program = defineCli({
+  name: 'ship',
+  version: '2.0.0',
+  commands: [{ name: 'status', aliases: ['st'], description: 'Show service status.' }]
+});
+
+const help = createHelpDocument(program);
+const version = createVersionDocument(program);
+const manifest = importCommandManifest(exportCommandManifest(describeCli(program)));
 ```
 
 ## Testing Harness
