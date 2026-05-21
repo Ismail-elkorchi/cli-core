@@ -2,17 +2,14 @@
 
 Typed command-core primitives for TypeScript and JavaScript CLIs.
 
-## Current Status
+## What It Is
 
-This package is in active implementation. The current public surface includes
-stable package entrypoints, contract metadata, command program compilation,
-argv binding through `argv-flags`, help/version documents, command manifests,
-manifest import/export, config resolution with provenance, completion payloads
-and scripts, repair suggestions, plugin manifest/host contracts, run result
-envelopes, events, effects, artifacts, exit status policy, and a testing harness
-for data-only fixture and entrypoint scenarios. Public schema envelopes,
-failure envelopes, and secret redaction are available. Full runtime matrix
-behavior is not part of the current public surface.
+`cli-core` is a typed command-core package for CLIs that need replayable,
+machine-readable behavior. It compiles command definitions, parses invocations
+through `argv-flags`, resolves explicit config input, describes help/version and
+manifest documents, generates completion payloads and scripts, suggests repairs,
+checks plugin manifests, plans or applies command runs, emits typed effects and
+artifacts, redacts secrets, and provides data-only testing fixtures.
 
 ## Boundary
 
@@ -20,9 +17,11 @@ behavior is not part of the current public surface.
 It does not own prompts, shell loops, raw terminal control, full-screen terminal
 interfaces, or hidden process writes.
 
-Low-level flag parsing is delegated to `argv-flags`.
+Low-level flag tokenization, coercion, and flag issue semantics are delegated to
+`argv-flags`; `cli-core` binds those parsed values to command, positional,
+config, repair, and run surfaces.
 
-## Command Model
+## Quickstart
 
 Use `defineCli` to compile command definitions into an immutable program, then
 use `parseCli` to match a command path, bind global and local options, bind
@@ -49,6 +48,22 @@ const invocation = parseCli(program, {
 });
 const validation = await validateCli(program, invocation);
 ```
+
+## API Overview
+
+- Root: `defineCli`, `parseCli`, `resolveCliConfig`, `validateCli`, `runCli`,
+  `describeCli`, plus shared public types.
+- `help`: structured help and version documents.
+- `completion`: completion payloads, shell scripts, and install plans as data.
+- `manifest`: command manifest export/import.
+- `config`: config resolution inputs, provenance, migrations, and explanations.
+- `plugins`: plugin manifests, compatibility checks, lazy loading, hook plans,
+  hook execution results, and plugin diagnostics.
+- `repair`: stable repair suggestions for parse diagnostics.
+- `schema`: schema descriptors/envelopes, failure envelopes, and redaction.
+- `testing`: fixture registry and data-only scenario harness.
+
+## Command Model
 
 ## Help And Manifests
 
@@ -306,6 +321,27 @@ The package publishes the root entrypoint plus these subpaths:
 The local and CI runtime subset loads the root package and every public subpath
 in Node, Deno, and Bun, then exercises a data-only command scenario. This is a
 runtime smoke contract, not a full runtime matrix or performance claim.
+
+## Security Model
+
+The package returns data. It does not call `process.exit`, write to stdout or
+stderr, mutate shell profiles, read implicit config files, install completions,
+or execute spawn/file effects for consumers. Spawn effects use argv arrays and
+do not imply shell interpolation. Run results, failure envelopes, and schema
+envelopes redact secret-like keys and common token patterns by default.
+
+## Limitations
+
+- Runtime checks are a Node/Deno/Bun smoke subset, not exhaustive operating
+  system, shell, filesystem, or package-manager compatibility proof.
+- Benchmark tests use conservative regression budgets for representative large
+  data paths; they are not throughput guarantees.
+- Config resolution consumes explicit input. File discovery and environment
+  capture are caller responsibilities.
+- Completion install plans describe changes as data. Consumers decide whether
+  and how to write files or update shell profiles.
+- Plugin APIs validate manifests and isolate loader/hook faults; applying
+  plugin-provided command-tree mutations is outside the current public surface.
 
 ## Verification
 

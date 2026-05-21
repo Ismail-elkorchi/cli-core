@@ -10,10 +10,13 @@ import { runExecutionExample } from '../../examples/run.mjs';
 import { runSchemaRedactionExample } from '../../examples/schema-redaction.mjs';
 import { runTestingHarnessExample } from '../../examples/testing-harness.mjs';
 
-test('README documents current public surface without feature-complete claims', async () => {
+test('README documents current public surface without unsupported claims', async () => {
   const readme = await readFile(new URL('../../README.md', import.meta.url), 'utf8');
 
-  assert.match(readme, /active implementation/);
+  assert.match(readme, /typed command-core package/);
+  assert.match(readme, /API Overview/);
+  assert.match(readme, /Security Model/);
+  assert.match(readme, /Limitations/);
   assert.match(readme, /defineCli/);
   assert.match(readme, /resolveCliConfig/);
   assert.match(readme, /describeCli/);
@@ -25,6 +28,7 @@ test('README documents current public surface without feature-complete claims', 
   assert.match(readme, /redactCliSecrets/);
   assert.match(readme, /createCliHarness/);
   assert.doesNotMatch(readme, /feature-complete/i);
+  assert.doesNotMatch(readme, /drop-in replacement/i);
 });
 
 test('command model example executes against the built package', async () => {
