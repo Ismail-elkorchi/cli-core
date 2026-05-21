@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ismail-elkorchi:cli-core:schema:repair-suggestions:v1",
+  "title": "cli-core Repair Suggestions",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": ["code", "title", "detail", "replacement", "diagnostic"],
+    "properties": {
+      "code": { "pattern": "^REPAIR_" },
+      "title": { "type": "string" },
+      "detail": { "type": "string" },
+      "replacement": { "type": "array", "items": { "type": "string" } },
+      "diagnostic": { "type": "object", "required": ["code", "severity", "message", "fields"] }
+    },
+    "additionalProperties": true
+  }
+}

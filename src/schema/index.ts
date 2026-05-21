@@ -19,14 +19,20 @@ export type CliSchemaName =
   | 'config-resolution'
   | 'config-discovery'
   | 'completion'
+  | 'completion-protocol'
   | 'completion-request'
   | 'completion-response'
   | 'completion-command'
   | 'completion-script'
   | 'completion-install-plan'
+  | 'repair-suggestions'
   | 'plugin'
+  | 'plugin-command-application'
   | 'run-result'
   | 'run-event'
+  | 'run-effect'
+  | 'artifact'
+  | 'diagnostic'
   | 'effect-application'
   | 'schema-envelope'
   | 'failure'
@@ -42,14 +48,20 @@ export type CliSchemaVersion =
   | 'cli-core.config-resolution.v1'
   | 'cli-core.config-discovery.v1'
   | 'cli-core.completion.v1'
+  | 'cli-core.completion-protocol.v1'
   | 'cli-core.completion-request.v1'
   | 'cli-core.completion-response.v1'
   | 'cli-core.completion-command.v1'
   | 'cli-core.completion-script.v1'
   | 'cli-core.completion-install-plan.v1'
+  | 'cli-core.repair-suggestions.v1'
   | 'cli-core.plugin.v1'
+  | 'cli-core.plugin-command-application.v1'
   | 'cli-core.run-result.v1'
   | 'cli-core.run-event.v1'
+  | 'cli-core.run-effect.v1'
+  | 'cli-core.artifact.v1'
+  | 'cli-core.diagnostic.v1'
   | 'cli-core.effect-application.v1'
   | 'cli-core.schema-envelope.v1'
   | 'cli-core.failure.v1'
@@ -140,14 +152,20 @@ const schemaDescriptors: readonly CliSchemaDescriptor[] = Object.freeze([
   descriptor('config-resolution', 'cli-core.config-resolution.v1', 'Resolved config values and provenance.'),
   descriptor('config-discovery', 'cli-core.config-discovery.v1', 'Host-driven config input discovery.'),
   descriptor('completion', 'cli-core.completion.v1', 'Completion candidate payload.'),
+  descriptor('completion-protocol', 'cli-core.completion-protocol.v1', 'Completion bridge command protocol.'),
   descriptor('completion-request', 'cli-core.completion-request.v1', 'Completion bridge request.'),
   descriptor('completion-response', 'cli-core.completion-response.v1', 'Completion bridge response.'),
   descriptor('completion-command', 'cli-core.completion-command.v1', 'Completion command protocol.'),
   descriptor('completion-script', 'cli-core.completion-script.v1', 'Shell completion script payload.'),
   descriptor('completion-install-plan', 'cli-core.completion-install-plan.v1', 'Data-only completion install plan.'),
+  descriptor('repair-suggestions', 'cli-core.repair-suggestions.v1', 'Repair suggestion list.'),
   descriptor('plugin', 'cli-core.plugin.v1', 'Plugin manifest.'),
+  descriptor('plugin-command-application', 'cli-core.plugin-command-application.v1', 'Plugin command contribution result.'),
   descriptor('run-result', 'cli-core.run-result.v1', 'Run result envelope.'),
   descriptor('run-event', 'cli-core.run-event.v1', 'Run event envelope.'),
+  descriptor('run-effect', 'cli-core.run-effect.v1', 'Run effect envelope.'),
+  descriptor('artifact', 'cli-core.artifact.v1', 'Run artifact envelope.'),
+  descriptor('diagnostic', 'cli-core.diagnostic.v1', 'Typed diagnostic.'),
   descriptor('effect-application', 'cli-core.effect-application.v1', 'Effect application report.'),
   descriptor('schema-envelope', 'cli-core.schema-envelope.v1', 'Generic schema/version wrapper.'),
   descriptor('failure', 'cli-core.failure.v1', 'Typed failure envelope.'),

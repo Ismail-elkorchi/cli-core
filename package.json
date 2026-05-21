@@ -43,6 +43,8 @@
       "types": "./dist/schema/index.d.ts",
       "default": "./dist/schema/index.js"
     },
+    "./schemas": "./schemas/index.json",
+    "./schemas/*.json": "./schemas/*.json",
     "./testing": {
       "types": "./dist/testing/index.d.ts",
       "default": "./dist/testing/index.js"
@@ -51,6 +53,7 @@
   },
   "files": [
     "dist",
+    "schemas",
     "README.md",
     "AGENTS.md",
     "LICENSE"
@@ -69,10 +72,11 @@
     "test:runtime:bun": "npm run build && bun tests/runtime/bun-smoke.mjs",
     "test:docs": "npm run build && node --test tests/docs/*.test.mjs",
     "test:effects": "npm run build && node --test tests/unit/effects.test.mjs tests/conformance/effects-surface.test.mjs",
+    "test:schemas": "npm run build && node --test tests/schemas/*.test.mjs",
     "test:pressure": "node --test tests/pressure/*.test.mjs",
     "check:exports": "node scripts/check-exports.mjs",
     "check:leakage": "node scripts/no-private-leakage.mjs",
-    "check": "npm run lint && npm run typecheck && npm run build && npm run test:unit && npm run test:property && npm run test:acceptance && npm run test:conformance && npm run test:benchmarks && npm run test:runtime:node && npm run test:docs && npm run check:exports && npm run check:leakage",
+    "check": "npm run lint && npm run typecheck && npm run build && npm run test:unit && npm run test:property && npm run test:acceptance && npm run test:conformance && npm run test:benchmarks && npm run test:runtime:node && npm run test:docs && npm run test:schemas && npm run check:exports && npm run check:leakage",
     "precommit": "npm run lint && npm run typecheck && npm run test:unit && npm run check:leakage",
     "prepush": "npm run check"
   },

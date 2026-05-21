@@ -63,6 +63,8 @@ const validation = await validateCli(program, invocation);
   hook execution results, and plugin diagnostics.
 - `repair`: stable repair suggestions for parse diagnostics.
 - `schema`: schema descriptors/envelopes, failure envelopes, and redaction.
+- `schemas`: concrete JSON Schema artifacts for public machine-readable
+  documents.
 - `testing`: fixture registry and data-only scenario harness.
 
 ## Command Model
@@ -296,7 +298,11 @@ const report = await applyCliEffects({
 ## Schema And Redaction
 
 Schema helpers expose stable schema/version descriptors and wrappers for
-machine-readable payloads. Failure envelopes and run results redact secret-like
+machine-readable payloads. The package also ships concrete JSON Schema files
+under `@ismail-elkorchi/cli-core/schemas` and
+`@ismail-elkorchi/cli-core/schemas/*.json` for manifests, parse results,
+config, completion, repair, plugin, run, effect, artifact, diagnostic, failure,
+and redaction documents. Failure envelopes and run results redact secret-like
 keys and common token patterns by default. Redaction is data-only; consumers
 choose where to store, log, or display the redacted envelopes.
 
@@ -308,6 +314,8 @@ import {
   describeCliSchemas,
   redactCliSecrets
 } from '@ismail-elkorchi/cli-core/schema';
+import schemaIndex from '@ismail-elkorchi/cli-core/schemas' with { type: 'json' };
+import manifestSchema from '@ismail-elkorchi/cli-core/schemas/command-manifest.schema.json' with { type: 'json' };
 
 const program = defineCli({ name: 'ship', commands: [{ name: 'deploy' }] });
 const invocation = parseCli(program, { argv: ['deploy'] });
@@ -327,6 +335,7 @@ const failure = createCliFailureEnvelope({
   diagnostics: run.diagnostics
 });
 const redacted = redactCliSecrets({ password: 'secret', safe: 'visible' });
+const manifestArtifact = schemaIndex.artifacts.find((artifact) => artifact.version === manifestSchema.properties.schemaVersion.const);
 ```
 
 ## Testing Harness
@@ -375,6 +384,8 @@ The package publishes the root entrypoint plus these subpaths:
 - `@ismail-elkorchi/cli-core/plugins`
 - `@ismail-elkorchi/cli-core/repair`
 - `@ismail-elkorchi/cli-core/schema`
+- `@ismail-elkorchi/cli-core/schemas`
+- `@ismail-elkorchi/cli-core/schemas/*.json`
 - `@ismail-elkorchi/cli-core/testing`
 
 ## Runtime Support

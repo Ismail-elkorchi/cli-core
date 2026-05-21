@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ismail-elkorchi:cli-core:schema:run-effect:v1",
+  "title": "cli-core Run Effect",
+  "type": "object",
+  "required": ["kind"],
+  "properties": {
+    "kind": { "enum": ["spawn", "write_file", "delete_path", "plugin", "custom"] },
+    "command": { "type": "string" },
+    "argv": { "type": "array", "items": { "type": "string" } },
+    "path": { "type": "string" },
+    "pluginName": { "type": "string" },
+    "hookName": { "type": "string" },
+    "name": { "type": "string" },
+    "data": {}
+  },
+  "additionalProperties": true
+}

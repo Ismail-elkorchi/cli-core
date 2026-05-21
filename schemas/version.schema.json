@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ismail-elkorchi:cli-core:schema:version:v1",
+  "title": "cli-core Version Document",
+  "type": "object",
+  "required": ["schemaVersion", "name"],
+  "properties": {
+    "schemaVersion": { "const": "cli-core.version.v1" },
+    "name": { "type": "string" },
+    "version": { "type": "string" }
+  },
+  "additionalProperties": true
+}

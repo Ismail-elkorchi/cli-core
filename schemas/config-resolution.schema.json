@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ismail-elkorchi:cli-core:schema:config-resolution:v1",
+  "title": "cli-core Config Resolution",
+  "type": "object",
+  "required": ["schemaVersion", "ok", "values", "entries", "explanations", "discovery", "diagnostics"],
+  "properties": {
+    "schemaVersion": { "const": "cli-core.config-resolution.v1" },
+    "ok": { "type": "boolean" },
+    "version": { "type": "string" },
+    "values": { "type": "object" },
+    "entries": { "type": "array", "items": { "type": "object", "required": ["key", "value", "source"] } },
+    "explanations": { "type": "array", "items": { "type": "object", "required": ["key", "selected", "candidates"] } },
+    "discovery": { "type": "object", "required": ["scope", "searchedPaths"] },
+    "diagnostics": { "type": "array", "items": { "type": "object", "required": ["code", "severity", "message", "fields"] } }
+  },
+  "additionalProperties": true
+}
