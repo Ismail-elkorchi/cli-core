@@ -141,13 +141,113 @@ export const foundationFixtures = Object.freeze([
   })
 ]);
 
+export const commandFixtures = Object.freeze([
+  defineCliFixture({
+    id: 'commands.minimal-program',
+    family: 'commands',
+    title: 'Minimal command program',
+    capabilities: ['command.definition', 'command.compilation'],
+    data: {
+      name: 'minimal',
+      commands: [{ name: 'run' }]
+    }
+  }),
+  defineCliFixture({
+    id: 'commands.tree-program',
+    family: 'commands',
+    title: 'Nested command tree',
+    capabilities: ['command.paths', 'command.aliases', 'options.global', 'options.local'],
+    data: {
+      name: 'tree',
+      options: [{ name: 'verbose', type: 'boolean', flags: ['--verbose', '-v'] }],
+      commands: [
+        {
+          name: 'build',
+          aliases: ['b'],
+          options: [{ name: 'mode', type: 'string', flags: ['--mode'] }],
+          positionals: [{ name: 'target', required: false }]
+        },
+        {
+          name: 'deploy',
+          commands: [
+            {
+              name: 'production',
+              aliases: ['prod'],
+              positionals: [{ name: 'service' }]
+            }
+          ]
+        }
+      ]
+    }
+  }),
+  defineCliFixture({
+    id: 'commands.repair-program',
+    family: 'commands',
+    title: 'Repair-oriented command names',
+    capabilities: ['command.lookup', 'repair.unknown-command'],
+    data: {
+      name: 'repair',
+      commands: [{ name: 'install', aliases: ['i'] }, { name: 'inspect' }, { name: 'init' }]
+    }
+  }),
+  defineCliFixture({
+    id: 'commands.pass-through-program',
+    family: 'commands',
+    title: 'Pass-through command program',
+    capabilities: ['argv.pass-through', 'options.local'],
+    data: {
+      name: 'proxy',
+      commands: [
+        {
+          name: 'exec',
+          allowPassThrough: true,
+          options: [{ name: 'profile', type: 'string', flags: ['--profile'] }],
+          positionals: [{ name: 'script' }]
+        }
+      ]
+    }
+  }),
+  defineCliFixture({
+    id: 'commands.deprecated-program',
+    family: 'commands',
+    title: 'Deprecated alias program',
+    capabilities: ['command.aliases', 'diagnostics.deprecated-alias'],
+    data: {
+      name: 'deprecated',
+      commands: [
+        {
+          name: 'remove',
+          aliases: [{ name: 'rm', deprecated: 'Use remove instead.' }],
+          positionals: [{ name: 'target' }]
+        }
+      ]
+    }
+  }),
+  defineCliFixture({
+    id: 'commands.large-program',
+    family: 'commands',
+    title: 'Large command program',
+    capabilities: ['command.paths', 'scale.command-index'],
+    data: {
+      name: 'large',
+      commands: Array.from({ length: 32 }, (_unused, index) => ({
+        name: `command-${index}`,
+        aliases: [`c${index}`],
+        options: [{ name: `option${index}`, type: 'boolean', flags: [`--option-${index}`] }]
+      }))
+    }
+  })
+]);
+
+export const cliCoreFixtures = Object.freeze([...foundationFixtures, ...commandFixtures]);
+
 export function defineCliFixture(definition: CliFixtureDefinition): CliFixture {
   const fixture = buildFixture(definition);
   return freezeFixture(fixture);
 }
 
 export function createCliFixtureRegistry(
-  fixtures: readonly CliFixtureDefinition[] = foundationFixtures
+  fixtures: readonly CliFixtureDefinition[] = cliCoreFixtures
 ): CliFixtureRegistry {
   const byId = new Map<string, CliFixture>();
 
@@ -195,7 +295,7 @@ export function createCliHarness(input: CliHarnessInput = {}): CliHarness {
     }
   }
 
-  const fixtures = createCliFixtureRegistry(input.fixtures ?? foundationFixtures);
+  const fixtures = createCliFixtureRegistry(input.fixtures ?? cliCoreFixtures);
 
   return Object.freeze({
     program: input.program,

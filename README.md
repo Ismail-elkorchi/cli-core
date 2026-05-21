@@ -4,10 +4,11 @@ Typed command-core primitives for TypeScript and JavaScript CLIs.
 
 ## Current Status
 
-This package is at the package-foundation stage. The current public surface is
-limited to stable package entrypoints, contract metadata, and a testing harness
-for data-only fixture and entrypoint scenarios. Command, config, completion,
-plugin, and run behavior is implemented in focused pull requests.
+This package is in active implementation. The current public surface includes
+stable package entrypoints, contract metadata, command program compilation,
+argv binding through `argv-flags`, and a testing harness for data-only fixture
+and entrypoint scenarios. Config, completion, plugin, and run behavior are not
+part of the current public surface.
 
 ## Boundary
 
@@ -16,6 +17,34 @@ It does not own prompts, shell loops, raw terminal control, full-screen terminal
 interfaces, or hidden process writes.
 
 Low-level flag parsing is delegated to `argv-flags`.
+
+## Command Model
+
+Use `defineCli` to compile command definitions into an immutable program, then
+use `parseCli` to match a command path, bind global and local options, bind
+positionals, and preserve tokens after `--`.
+
+```ts
+import { defineCli, parseCli, validateCli } from '@ismail-elkorchi/cli-core';
+
+const program = defineCli({
+  name: 'ship',
+  options: [{ name: 'verbose', type: 'boolean', flags: ['--verbose', '-v'] }],
+  commands: [
+    {
+      name: 'deploy',
+      aliases: ['d'],
+      options: [{ name: 'region', type: 'string', flags: ['--region'], required: true }],
+      positionals: [{ name: 'service' }]
+    }
+  ]
+});
+
+const invocation = parseCli(program, {
+  argv: ['d', '--verbose', '--region', 'eu', 'api']
+});
+const validation = await validateCli(program, invocation);
+```
 
 ## Testing Harness
 
