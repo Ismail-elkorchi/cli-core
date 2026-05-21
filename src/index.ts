@@ -1,10 +1,12 @@
 export { cliCorePackage } from './package.js';
 export type { CliCorePackage } from './package.js';
 export { defineCli, findCliCommand, findCliCommandByAlias } from './command/index.js';
+export { createCompletionInstallPlan, createCompletionPayload, createCompletionScript } from './completion/index.js';
 export { resolveCliConfig } from './config/index.js';
 export { createHelpDocument, createVersionDocument } from './help/index.js';
 export { describeCli } from './manifest/index.js';
 export { parseCli, validateCli } from './parse/index.js';
+export { suggestRepairs } from './repair/index.js';
 export type {
   CliAlias,
   CliAliasDefinition,
@@ -23,6 +25,15 @@ export type {
   CliProgram
 } from './command/index.js';
 export type {
+  CompletionInput,
+  CompletionInstallPlan,
+  CompletionInstallStep,
+  CompletionItem,
+  CompletionPayload,
+  CompletionScript,
+  CompletionShell
+} from './completion/index.js';
+export type {
   ParsedAlias,
   ParsedCliOptionValue,
   ParsedCliOptions,
@@ -32,6 +43,7 @@ export type {
   SemanticValidationResult,
   ValidationContext
 } from './parse/index.js';
+export type { RepairSuggestion } from './repair/index.js';
 export type {
   ConfigDefinition,
   ConfigDiscoveryInput,

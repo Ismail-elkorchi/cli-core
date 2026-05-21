@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
+import { runCompletionRepairExample } from '../../examples/completion-repair.mjs';
 import { runConfigResolutionExample } from '../../examples/config-resolution.mjs';
 import { runCommandModelExample } from '../../examples/command-model.mjs';
 import { runHelpManifestExample } from '../../examples/help-manifest.mjs';
@@ -13,6 +14,8 @@ test('README documents current public surface without feature-complete claims', 
   assert.match(readme, /defineCli/);
   assert.match(readme, /resolveCliConfig/);
   assert.match(readme, /describeCli/);
+  assert.match(readme, /createCompletionPayload/);
+  assert.match(readme, /suggestRepairs/);
   assert.match(readme, /createCliHarness/);
   assert.doesNotMatch(readme, /feature-complete/i);
 });
@@ -44,4 +47,13 @@ test('config resolution example executes against the built package', () => {
 
   assert.equal(resolution.schemaVersion, 'cli-core.config-resolution.v1');
   assert.equal(resolution.values.profile, 'prod');
+});
+
+test('completion and repair example executes against the built package', () => {
+  const { completion, script, installPlan, repairs } = runCompletionRepairExample();
+
+  assert.equal(completion.schemaVersion, 'cli-core.completion.v1');
+  assert.match(script.script, /complete -F/);
+  assert.equal(installPlan.steps[0].action, 'write_file');
+  assert.equal(repairs[0].code, 'REPAIR_UNKNOWN_COMMAND');
 });
