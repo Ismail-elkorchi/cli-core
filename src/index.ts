@@ -10,7 +10,7 @@ export {
   createCompletionScript,
   handleCompletionRequest
 } from './completion/index.js';
-export { resolveCliConfig } from './config/index.js';
+export { createMemoryConfigDiscoveryHost, discoverCliConfigInput, resolveCliConfig } from './config/index.js';
 export { applyCliEffects, createMemoryEffectHost, planCliEffects } from './effects/index.js';
 export { createHelpDocument, createVersionDocument } from './help/index.js';
 export { describeCli } from './manifest/index.js';
@@ -82,7 +82,12 @@ export type {
 export type { RepairSuggestion } from './repair/index.js';
 export type {
   ConfigDefinition,
+  ConfigDiscoveryCollection,
+  ConfigDiscoveryEnvironmentInput,
+  ConfigDiscoveryHost,
+  ConfigDiscoveryHostResult,
   ConfigDiscoveryInput,
+  ConfigDiscoveryRequest,
   ConfigDiscoveryResult,
   ConfigDiscoveryScope,
   ConfigExplanation,
@@ -94,7 +99,9 @@ export type {
   ConfigResolutionEntry,
   ConfigSource,
   ConfigValue,
-  ConfigValueType
+  ConfigValueType,
+  MemoryConfigDiscoveryHost,
+  MemoryConfigDiscoveryHostInput
 } from './config/index.js';
 export type {
   CliEffectHost,

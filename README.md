@@ -97,13 +97,21 @@ const manifest = importCommandManifest(exportCommandManifest(describeCli(program
 
 ## Config Resolution
 
-Config resolution is explicit and replayable. Values are layered as built-in
-defaults, workspace defaults, config file values, environment values, then argv
-values. The result includes selected values, provenance entries, explanations,
-and discovery metadata.
+Config resolution is explicit and replayable. `resolveCliConfig` consumes only
+the `ConfigInput` passed by the caller. Host-driven discovery helpers can gather
+file and environment inputs through an explicit host, then hand that data to the
+pure resolver. Values are layered as built-in defaults, workspace defaults,
+config file values, environment values, then argv values. The result includes
+selected values, provenance entries, explanations, and discovery metadata.
 
 ```ts
-import { defineCli, parseCli, resolveCliConfig } from '@ismail-elkorchi/cli-core';
+import {
+  createMemoryConfigDiscoveryHost,
+  defineCli,
+  discoverCliConfigInput,
+  parseCli,
+  resolveCliConfig
+} from '@ismail-elkorchi/cli-core';
 
 const program = defineCli({
   name: 'ship',
@@ -117,9 +125,20 @@ const program = defineCli({
 });
 
 const invocation = parseCli(program, { argv: ['deploy', '--profile', 'prod'] });
+const memory = createMemoryConfigDiscoveryHost({
+  files: { '/workspace/.shiprc.json': { profile: 'file' } },
+  env: { SHIP_PROFILE: 'env' }
+});
+const discovered = await discoverCliConfigInput(program, {
+  host: memory.host,
+  scope: 'cwd_only',
+  cwd: '/workspace',
+  filenames: ['.shiprc.json'],
+  environment: { includeConfigFields: true }
+});
 const config = resolveCliConfig(program, {
+  ...discovered.input,
   workspaceDefaults: { profile: 'workspace' },
-  env: { SHIP_PROFILE: 'env' },
   argv: invocation.options.values
 });
 ```
@@ -379,7 +398,7 @@ envelopes redact secret-like keys and common token patterns by default.
 - Benchmark tests use conservative regression budgets for representative large
   data paths; they are not throughput guarantees.
 - Config resolution consumes explicit input. File discovery and environment
-  capture are caller responsibilities.
+  capture happen only through caller-supplied discovery hosts.
 - Completion install plans describe changes as data. Consumers decide whether
   and how to write files or update shell profiles.
 - Plugin APIs validate manifests, apply compatible command contributions, and

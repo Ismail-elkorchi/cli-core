@@ -17,6 +17,7 @@ export type CliSchemaName =
   | 'version'
   | 'manifest'
   | 'config-resolution'
+  | 'config-discovery'
   | 'completion'
   | 'completion-request'
   | 'completion-response'
@@ -39,6 +40,7 @@ export type CliSchemaVersion =
   | 'cli-core.version.v1'
   | 'cli-core.manifest.v1'
   | 'cli-core.config-resolution.v1'
+  | 'cli-core.config-discovery.v1'
   | 'cli-core.completion.v1'
   | 'cli-core.completion-request.v1'
   | 'cli-core.completion-response.v1'
@@ -136,6 +138,7 @@ const schemaDescriptors: readonly CliSchemaDescriptor[] = Object.freeze([
   descriptor('version', 'cli-core.version.v1', 'Structured version document.'),
   descriptor('manifest', 'cli-core.manifest.v1', 'Command manifest document.'),
   descriptor('config-resolution', 'cli-core.config-resolution.v1', 'Resolved config values and provenance.'),
+  descriptor('config-discovery', 'cli-core.config-discovery.v1', 'Host-driven config input discovery.'),
   descriptor('completion', 'cli-core.completion.v1', 'Completion candidate payload.'),
   descriptor('completion-request', 'cli-core.completion-request.v1', 'Completion bridge request.'),
   descriptor('completion-response', 'cli-core.completion-response.v1', 'Completion bridge response.'),

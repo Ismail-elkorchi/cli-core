@@ -14,7 +14,13 @@ import * as testing from '../../dist/testing/index.js';
 test('node runtime can load and exercise public entrypoints', async () => {
   const program = root.defineCli(runtimeDefinition());
   const invocation = root.parseCli(program, { argv: ['c', '--region', 'eu', 'api'] });
-  const resolved = config.resolveCliConfig(program, { env: { RUNTIME_PROFILE: 'ci' } });
+  const memoryConfig = config.createMemoryConfigDiscoveryHost({ env: { RUNTIME_PROFILE: 'ci' } });
+  const discoveredConfig = await config.discoverCliConfigInput(program, {
+    host: memoryConfig.host,
+    scope: 'none',
+    environment: { includeConfigFields: true }
+  });
+  const resolved = config.resolveCliConfig(program, discoveredConfig.input);
   const helpDocument = help.createHelpDocument(program);
   const completionPayload = completion.createCompletionPayload(program, { word: 'ch' });
   const completionBridge = completion.completeCli(program, { words: ['runtime', 'ch'], cursor: 2 });
@@ -45,6 +51,7 @@ test('node runtime can load and exercise public entrypoints', async () => {
 
   assert.equal(root.cliCorePackage.name, '@ismail-elkorchi/cli-core');
   assert.equal(invocation.ok, true);
+  assert.equal(discoveredConfig.ok, true);
   assert.equal(resolved.values.profile, 'ci');
   assert.equal(helpDocument.commands[0].name, 'check');
   assert.equal(completionPayload.items[0].value, 'check');
