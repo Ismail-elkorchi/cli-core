@@ -1,3 +1,4 @@
+import * as adapter from '../../dist/adapter/index.js';
 import * as completion from '../../dist/completion/index.js';
 import * as config from '../../dist/config/index.js';
 import * as effects from '../../dist/effects/index.js';
@@ -29,6 +30,7 @@ const compatibility = plugins.checkCliPluginCompatibility(plugins.defineCliPlugi
 }), { runtime: 'deno' });
 const repairs = repair.suggestRepairs(root.parseCli(program, { argv: ['chek'] }), program);
 const run = await root.runCli(program, { mode: 'plan', invocation });
+const main = await adapter.runCliMain({ program, mode: 'plan', argv: ['check', 'api'] });
 const memoryHost = effects.createMemoryEffectHost();
 const effectReport = await effects.applyCliEffects({
   effects: [{ kind: 'write_file', path: 'runtime.txt', content: 'ok' }],
@@ -36,11 +38,12 @@ const effectReport = await effects.applyCliEffects({
   policy: { allowWriteFile: true }
 });
 const envelope = schema.createCliSchemaEnvelope({ payloadSchemaVersion: run.schemaVersion, data: run });
-const harness = testing.createCliHarness({ entrypoints: { root, schema, testing } });
+const harness = testing.createCliHarness({ entrypoints: { root, adapter, schema, testing } });
 const scenario = await testing.runCliScenario(harness, {
   id: 'runtime.deno.entrypoints',
   steps: [
     { kind: 'entrypoint-load', name: 'root entrypoint', entrypoint: 'root', expectedExports: ['defineCli', 'runCli'] },
+    { kind: 'entrypoint-load', name: 'adapter entrypoint', entrypoint: 'adapter', expectedExports: ['runCliMain'] },
     { kind: 'entrypoint-load', name: 'schema entrypoint', entrypoint: 'schema', expectedExports: ['describeCliSchemas'] },
     { kind: 'fixture-available', name: 'large fixture', fixtureId: 'commands.large-program', expectedFamily: 'commands' }
   ]
@@ -57,6 +60,7 @@ ensure(manifestRoundTrip.commands.some((command) => command.name === 'check'), '
 ensure(compatibility.ok, 'Deno runtime could not check plugin compatibility.');
 ensure(repairs[0]?.code === 'REPAIR_UNKNOWN_COMMAND', 'Deno runtime could not create repair suggestions.');
 ensure(effectReport.ok, 'Deno runtime could not apply memory effects.');
+ensure(main.exitStatus === 0, 'Deno runtime could not use CLI adapter.');
 ensure(memoryHost.files()['runtime.txt'] === 'ok', 'Deno runtime memory effect host did not record a file.');
 ensure(envelope.payloadSchemaVersion === 'cli-core.run-result.v1', 'Deno runtime could not create schema envelope.');
 ensure(scenario.status === 'passed', 'Deno runtime could not run testing harness scenario.');

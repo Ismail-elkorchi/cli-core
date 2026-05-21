@@ -5,6 +5,7 @@ const packageJson = JSON.parse(await readFile(new URL('../package.json', import.
 
 const expectedExports = [
   '.',
+  './adapter',
   './help',
   './completion',
   './manifest',

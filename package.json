@@ -11,6 +11,10 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./adapter": {
+      "types": "./dist/adapter/index.d.ts",
+      "default": "./dist/adapter/index.js"
+    },
     "./help": {
       "types": "./dist/help/index.d.ts",
       "default": "./dist/help/index.js"
@@ -95,6 +99,7 @@
     "automation",
     "manifest",
     "completion",
+    "adapter",
     "testing"
   ],
   "publishConfig": {

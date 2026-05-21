@@ -47,6 +47,7 @@ export interface CliFixtureRegistry {
 
 export type CliPackageEntrypoint =
   | 'root'
+  | 'adapter'
   | 'help'
   | 'completion'
   | 'manifest'
@@ -145,7 +146,7 @@ export const foundationFixtures = Object.freeze([
     description: 'The root and documented subpath entrypoints can be imported by consumers.',
     capabilities: ['package.exports', 'subpath.imports'],
     data: {
-      entrypoints: ['root', 'help', 'completion', 'manifest', 'config', 'effects', 'plugins', 'repair', 'schema', 'testing']
+      entrypoints: ['root', 'adapter', 'help', 'completion', 'manifest', 'config', 'effects', 'plugins', 'repair', 'schema', 'testing']
     }
   })
 ]);
@@ -566,10 +567,12 @@ class CliFixtureRegistryError extends Error {
 
 const packageEntrypoints: readonly CliPackageEntrypoint[] = Object.freeze([
   'root',
+  'adapter',
   'help',
   'completion',
   'manifest',
   'config',
+  'effects',
   'plugins',
   'repair',
   'schema',
