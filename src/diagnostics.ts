@@ -26,7 +26,8 @@ export type CliDiagnosticCode =
   | 'CLI_RUN_CANCELLED'
   | 'CLI_RUN_INTERRUPTED'
   | 'CLI_RUN_TIMEOUT'
-  | 'CLI_RUN_INVALID_EFFECT';
+  | 'CLI_RUN_INVALID_EFFECT'
+  | 'CLI_SCHEMA_UNSUPPORTED';
 
 export type CliDiagnosticValue =
   | null

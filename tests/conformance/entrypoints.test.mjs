@@ -10,6 +10,7 @@ const entrypoints = [
   '../../dist/config/index.js',
   '../../dist/plugins/index.js',
   '../../dist/repair/index.js',
+  '../../dist/schema/index.js',
   '../../dist/testing/index.js'
 ];
 
@@ -40,6 +41,7 @@ test('public declaration files do not expose internal module paths', async () =>
     '../../dist/config/index.d.ts',
     '../../dist/plugins/index.d.ts',
     '../../dist/repair/index.d.ts',
+    '../../dist/schema/index.d.ts',
     '../../dist/testing/index.d.ts'
   ];
 

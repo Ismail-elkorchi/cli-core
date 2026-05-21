@@ -11,6 +11,7 @@ const expectedExports = [
   './config',
   './plugins',
   './repair',
+  './schema',
   './testing',
   './package.json'
 ];
