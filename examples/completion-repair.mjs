@@ -1,6 +1,9 @@
 import {
+  completeCli,
+  createCompletionCommand,
   createCompletionInstallPlan,
   createCompletionPayload,
+  createCompletionRequest,
   createCompletionScript,
   defineCli,
   parseCli,
@@ -24,6 +27,8 @@ export function runCompletionRepairExample() {
 
   return {
     completion: createCompletionPayload(program, { word: 'd' }),
+    bridge: completeCli(program, createCompletionRequest({ words: ['ship', '__complete', 'deploy', '--r'] })),
+    command: createCompletionCommand(program),
     script: createCompletionScript(program, 'bash'),
     installPlan: createCompletionInstallPlan(program, 'fish'),
     repairs: suggestRepairs(invocation, program)

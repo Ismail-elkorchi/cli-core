@@ -18,6 +18,9 @@ export type CliSchemaName =
   | 'manifest'
   | 'config-resolution'
   | 'completion'
+  | 'completion-request'
+  | 'completion-response'
+  | 'completion-command'
   | 'completion-script'
   | 'completion-install-plan'
   | 'plugin'
@@ -37,6 +40,9 @@ export type CliSchemaVersion =
   | 'cli-core.manifest.v1'
   | 'cli-core.config-resolution.v1'
   | 'cli-core.completion.v1'
+  | 'cli-core.completion-request.v1'
+  | 'cli-core.completion-response.v1'
+  | 'cli-core.completion-command.v1'
   | 'cli-core.completion-script.v1'
   | 'cli-core.completion-install-plan.v1'
   | 'cli-core.plugin.v1'
@@ -131,6 +137,9 @@ const schemaDescriptors: readonly CliSchemaDescriptor[] = Object.freeze([
   descriptor('manifest', 'cli-core.manifest.v1', 'Command manifest document.'),
   descriptor('config-resolution', 'cli-core.config-resolution.v1', 'Resolved config values and provenance.'),
   descriptor('completion', 'cli-core.completion.v1', 'Completion candidate payload.'),
+  descriptor('completion-request', 'cli-core.completion-request.v1', 'Completion bridge request.'),
+  descriptor('completion-response', 'cli-core.completion-response.v1', 'Completion bridge response.'),
+  descriptor('completion-command', 'cli-core.completion-command.v1', 'Completion command protocol.'),
   descriptor('completion-script', 'cli-core.completion-script.v1', 'Shell completion script payload.'),
   descriptor('completion-install-plan', 'cli-core.completion-install-plan.v1', 'Data-only completion install plan.'),
   descriptor('plugin', 'cli-core.plugin.v1', 'Plugin manifest.'),

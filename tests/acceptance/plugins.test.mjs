@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   applyCliPluginCommands,
   checkCliPluginCompatibility,
+  completeCli,
   createCompletionPayload,
   createCliPluginHost,
   createHelpDocument,
@@ -73,6 +74,7 @@ test('plugin-added commands flow through help, manifest, completion, parse, repa
   const help = createHelpDocument(program);
   const manifest = describeCli(program);
   const completion = createCompletionPayload(program, { word: 'a' });
+  const bridge = completeCli(program, { words: ['ship', 'a'], cursor: 2 });
   const invocation = parseCli(program, { argv: ['a', '--json', 'api'] });
   const repairs = suggestRepairs(parseCli(program, { argv: ['audt'] }), program);
   const run = await runCli(program, { mode: 'plan', invocation });
@@ -81,6 +83,7 @@ test('plugin-added commands flow through help, manifest, completion, parse, repa
   assert.equal(help.commands.find((command) => command.name === 'audit').source.pluginName, 'ship-audit');
   assert.equal(manifest.commands.find((command) => command.path.join(' ') === 'audit').source.pluginName, 'ship-audit');
   assert.equal(completion.items.find((item) => item.value === 'audit').source.pluginName, 'ship-audit');
+  assert.equal(bridge.payload.items.find((item) => item.value === 'audit').source.pluginName, 'ship-audit');
   assert.equal(invocation.ok, true);
   assert.equal(invocation.command.source.pluginName, 'ship-audit');
   assert.deepEqual(repairs[0].replacement, ['audit']);

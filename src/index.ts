@@ -1,7 +1,15 @@
 export { cliCorePackage } from './package.js';
 export type { CliCorePackage } from './package.js';
 export { defineCli, findCliCommand, findCliCommandByAlias } from './command/index.js';
-export { createCompletionInstallPlan, createCompletionPayload, createCompletionScript } from './completion/index.js';
+export {
+  completeCli,
+  createCompletionCommand,
+  createCompletionInstallPlan,
+  createCompletionPayload,
+  createCompletionRequest,
+  createCompletionScript,
+  handleCompletionRequest
+} from './completion/index.js';
 export { resolveCliConfig } from './config/index.js';
 export { applyCliEffects, createMemoryEffectHost, planCliEffects } from './effects/index.js';
 export { createHelpDocument, createVersionDocument } from './help/index.js';
@@ -52,6 +60,12 @@ export type {
   CompletionInstallStep,
   CompletionItem,
   CompletionPayload,
+  CompletionCommand,
+  CompletionCommandProtocol,
+  CompletionProtocolInput,
+  CompletionRequest,
+  CompletionRequestInput,
+  CompletionResponse,
   CompletionScript,
   CompletionShell
 } from './completion/index.js';

@@ -22,6 +22,7 @@ test('README documents current public surface without unsupported claims', async
   assert.match(readme, /resolveCliConfig/);
   assert.match(readme, /describeCli/);
   assert.match(readme, /createCompletionPayload/);
+  assert.match(readme, /completeCli/);
   assert.match(readme, /suggestRepairs/);
   assert.match(readme, /createCliPluginHost/);
   assert.match(readme, /runCli/);
@@ -63,9 +64,12 @@ test('config resolution example executes against the built package', () => {
 });
 
 test('completion and repair example executes against the built package', () => {
-  const { completion, script, installPlan, repairs } = runCompletionRepairExample();
+  const { completion, bridge, command, script, installPlan, repairs } = runCompletionRepairExample();
 
   assert.equal(completion.schemaVersion, 'cli-core.completion.v1');
+  assert.equal(bridge.schemaVersion, 'cli-core.completion-response.v1');
+  assert.equal(bridge.payload.items[0].value, '--region');
+  assert.equal(command.name, '__complete');
   assert.match(script.script, /complete -F/);
   assert.equal(installPlan.steps[0].action, 'write_file');
   assert.equal(repairs[0].code, 'REPAIR_UNKNOWN_COMMAND');
