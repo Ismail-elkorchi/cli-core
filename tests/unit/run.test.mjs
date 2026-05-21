@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { defineCli, runCli } from '../../dist/index.js';
+import { createCliPluginHost, defineCli, runCli } from '../../dist/index.js';
 
 const program = defineCli({
   name: 'ship',
@@ -114,4 +114,114 @@ test('runCli derives stable run identifiers from program, mode, argv, and comman
   const second = await runCli(program, { mode: 'plan', argv: ['deploy', 'api'] });
 
   assert.equal(first.runId, second.runId);
+});
+
+test('runCli includes plugin prerun and postrun hook effects in the result envelope', async () => {
+  const host = createCliPluginHost([
+    {
+      manifest: {
+        name: 'audit',
+        version: '1.0.0',
+        hooks: [
+          { name: 'before', event: 'prerun', order: 1 },
+          { name: 'after', event: 'postrun', order: 2 }
+        ]
+      },
+      load: () => ({
+        hooks: {
+          before: () => ({ effects: [{ kind: 'audit.before', data: { token: 'secret-token' } }] }),
+          after: () => ({ effects: [{ kind: 'audit.after', data: { ok: true } }] })
+        }
+      })
+    }
+  ]);
+  const result = await runCli(program, {
+    mode: 'apply',
+    argv: ['deploy', 'api'],
+    pluginHost: host,
+    handlers: { deploy: () => ({}) }
+  });
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.effects.map((effect) => effect.kind), ['plugin', 'plugin']);
+  assert.deepEqual(result.effects.map((effect) => effect.event), ['prerun', 'postrun']);
+  assert.equal(result.effects[0].data.token, '[REDACTED]');
+  assert.equal(result.events.some((event) => event.name === 'plugin.hooks.planned'), true);
+  assert.equal(result.events.some((event) => event.name === 'plugin.hooks.completed'), true);
+});
+
+test('runCli preserves plugin hook diagnostics without converting them to handler failures', async () => {
+  const host = createCliPluginHost([
+    {
+      manifest: { name: 'faulty', version: '1.0.0', hooks: [{ name: 'explode', event: 'prerun' }] },
+      load: () => ({
+        hooks: {
+          explode: () => {
+            throw new Error('plugin failed');
+          }
+        }
+      })
+    }
+  ]);
+  const result = await runCli(program, {
+    mode: 'plan',
+    argv: ['deploy', 'api'],
+    pluginHost: host
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.exitKind, 'policy_denied');
+  assert.equal(result.diagnostics[0].code, 'CLI_PLUGIN_HOOK_FAILED');
+  assert.equal(result.diagnostics.some((diagnostic) => diagnostic.code === 'CLI_RUN_HANDLER_FAILED'), false);
+});
+
+test('runCli runs finally hooks after handler failure', async () => {
+  const host = createCliPluginHost([
+    {
+      manifest: { name: 'cleanup', version: '1.0.0', hooks: [{ name: 'always', event: 'finally' }] },
+      load: () => ({
+        hooks: {
+          always: () => ({ effects: [{ kind: 'cleanup.seen', data: { ok: true } }] })
+        }
+      })
+    }
+  ]);
+  const result = await runCli(program, {
+    mode: 'apply',
+    argv: ['deploy', 'api'],
+    pluginHost: host,
+    handlers: {
+      deploy: () => {
+        throw new Error('handler failed');
+      }
+    }
+  });
+
+  assert.equal(result.exitKind, 'external_error');
+  assert.equal(result.diagnostics[0].code, 'CLI_RUN_HANDLER_FAILED');
+  assert.equal(result.effects[0].kind, 'plugin');
+  assert.equal(result.effects[0].event, 'finally');
+});
+
+test('runCli runs command_not_found hooks without hiding the parse failure', async () => {
+  const host = createCliPluginHost([
+    {
+      manifest: { name: 'not-found', version: '1.0.0', hooks: [{ name: 'suggest', event: 'command_not_found' }] },
+      load: () => ({
+        hooks: {
+          suggest: () => ({ effects: [{ kind: 'suggest.command', data: { replacement: 'deploy' } }] })
+        }
+      })
+    }
+  ]);
+  const result = await runCli(program, {
+    mode: 'plan',
+    argv: ['deply', 'api'],
+    pluginHost: host
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.exitKind, 'usage');
+  assert.equal(result.diagnostics.some((diagnostic) => diagnostic.code === 'CLI_UNKNOWN_COMMAND'), true);
+  assert.equal(result.effects[0].event, 'command_not_found');
 });

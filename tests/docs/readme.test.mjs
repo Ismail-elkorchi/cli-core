@@ -83,6 +83,7 @@ test('run example executes against the built package', async () => {
 
   assert.equal(plan.mode, 'plan');
   assert.equal(plan.effects[0].kind, 'spawn');
+  assert.equal(plan.effects[1].kind, 'plugin');
   assert.equal(apply.mode, 'apply');
   assert.equal(apply.artifacts[0].id, 'deploy-summary');
 });

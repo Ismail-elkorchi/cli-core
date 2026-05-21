@@ -137,6 +137,7 @@ export type {
   ExitKind,
   ExitStatusPolicy,
   FileRunEffect,
+  PluginRunEffect,
   RunArtifact,
   RunData,
   RunEffect,
