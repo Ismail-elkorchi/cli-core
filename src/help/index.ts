@@ -1,4 +1,11 @@
-import { findCliCommand, type CliCommand, type CliOption, type CliPositional, type CliProgram } from '../command/index.js';
+import {
+  findCliCommand,
+  type CliCommand,
+  type CliCommandSource,
+  type CliOption,
+  type CliPositional,
+  type CliProgram
+} from '../command/index.js';
 import { cliCorePackage } from '../package.js';
 
 export { cliCorePackage };
@@ -21,6 +28,7 @@ export interface HelpCommandEntry {
   readonly aliases: readonly string[];
   readonly summary: string | undefined;
   readonly deprecated: boolean | string | undefined;
+  readonly source: CliCommandSource;
 }
 
 export interface HelpPositionalEntry {
@@ -86,7 +94,8 @@ function toHelpCommandEntry(command: CliCommand): HelpCommandEntry {
     path: command.path,
     aliases: Object.freeze(command.aliases.map((alias) => alias.name)),
     summary: command.description,
-    deprecated: command.deprecated
+    deprecated: command.deprecated,
+    source: Object.freeze({ ...command.source })
   });
 }
 

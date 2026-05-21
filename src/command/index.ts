@@ -20,10 +20,17 @@ export interface CliCommandDefinition {
   readonly aliases?: readonly CliAliasInput[];
   readonly description?: string;
   readonly deprecated?: boolean | string;
+  readonly source?: CliCommandSource;
   readonly positionals?: readonly CliPositionalDefinition[];
   readonly options?: readonly CliOptionDefinition[];
   readonly commands?: readonly CliCommandDefinition[];
   readonly allowPassThrough?: boolean;
+}
+
+export interface CliCommandSource {
+  readonly kind: 'definition' | 'plugin';
+  readonly pluginName?: string;
+  readonly pluginVersion?: string;
 }
 
 export type CliAliasInput = string | CliAliasDefinition;
@@ -73,6 +80,7 @@ export interface CliCommand {
   readonly aliases: readonly CliAlias[];
   readonly description?: string;
   readonly deprecated?: boolean | string;
+  readonly source: CliCommandSource;
   readonly positionals: readonly CliPositional[];
   readonly options: readonly CliOption[];
   readonly inheritedOptions: readonly CliOption[];
@@ -127,6 +135,7 @@ export function defineCli(definition: CliDefinition): CliProgram {
     name: definition.name,
     path: [],
     aliases: [],
+    source: definitionSource(),
     positionals: [],
     options: [],
     inheritedOptions: globalOptions,
@@ -194,6 +203,7 @@ function compileCommandTree(
     path,
     parentId: parent.id,
     aliases: Object.freeze((definition.aliases ?? []).map((alias) => compileAlias(alias, parent.path))),
+    source: freezeCommandSource(definition.source ?? definitionSource()),
     positionals: Object.freeze((definition.positionals ?? []).map(compilePositional)),
     options: Object.freeze((definition.options ?? []).map((option) => compileOption(option, 'local'))),
     inheritedOptions: globalOptions,
@@ -365,10 +375,22 @@ function freezeCommand(command: CliCommand): CliCommand {
     ...command,
     path: Object.freeze([...command.path]),
     aliases: Object.freeze([...command.aliases]),
+    source: freezeCommandSource(command.source),
     positionals: Object.freeze([...command.positionals]),
     options: Object.freeze([...command.options]),
     inheritedOptions: Object.freeze([...command.inheritedOptions])
   });
+}
+
+function definitionSource(): CliCommandSource {
+  return Object.freeze({ kind: 'definition' });
+}
+
+function freezeCommandSource(source: CliCommandSource): CliCommandSource {
+  const optionalFields: { pluginName?: string; pluginVersion?: string } = {};
+  if (source.pluginName !== undefined) optionalFields.pluginName = source.pluginName;
+  if (source.pluginVersion !== undefined) optionalFields.pluginVersion = source.pluginVersion;
+  return Object.freeze({ kind: source.kind, ...optionalFields });
 }
 
 function freezeProgram(program: CliProgram): CliProgram {

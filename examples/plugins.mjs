@@ -1,4 +1,5 @@
 import {
+  applyCliPluginCommands,
   checkCliPluginCompatibility,
   createCliPluginHost,
   defineCliPluginManifest
@@ -9,8 +10,13 @@ export async function runPluginsExample() {
     name: 'ship-audit',
     version: '1.0.0',
     capabilities: ['audit'],
+    commands: [{ name: 'audit', aliases: ['a'], description: 'Inspect deployment history.' }],
     hooks: [{ name: 'audit-prerun', event: 'prerun' }]
   });
+  const application = applyCliPluginCommands({
+    name: 'ship',
+    commands: [{ name: 'status' }]
+  }, [manifest], { allowedCapabilities: ['audit'] });
   const host = createCliPluginHost([
     {
       manifest,
@@ -27,6 +33,7 @@ export async function runPluginsExample() {
 
   return {
     compatibility: checkCliPluginCompatibility(manifest, { allowedCapabilities: ['audit'] }),
+    application,
     plan: host.planHooks('prerun'),
     run: await host.runHooks('prerun')
   };
