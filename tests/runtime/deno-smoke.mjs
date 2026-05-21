@@ -1,10 +1,65 @@
-import { cliCorePackage } from '../../dist/index.js';
-import { describeCliSchemas } from '../../dist/schema/index.js';
+import * as completion from '../../dist/completion/index.js';
+import * as config from '../../dist/config/index.js';
+import * as help from '../../dist/help/index.js';
+import * as manifest from '../../dist/manifest/index.js';
+import * as plugins from '../../dist/plugins/index.js';
+import * as repair from '../../dist/repair/index.js';
+import * as root from '../../dist/index.js';
+import * as schema from '../../dist/schema/index.js';
+import * as testing from '../../dist/testing/index.js';
 
-if (cliCorePackage.name !== '@ismail-elkorchi/cli-core') {
-  throw new Error('Deno runtime could not load package root.');
+const program = root.defineCli(runtimeDefinition());
+const invocation = root.parseCli(program, { argv: ['c', '--region', 'eu', 'api'] });
+const resolved = config.resolveCliConfig(program, { env: { RUNTIME_PROFILE: 'ci' } });
+const helpDocument = help.createHelpDocument(program);
+const completionPayload = completion.createCompletionPayload(program, { word: 'ch' });
+const manifestRoundTrip = manifest.importCommandManifest(manifest.exportCommandManifest(manifest.describeCli(program)));
+const compatibility = plugins.checkCliPluginCompatibility(plugins.defineCliPluginManifest({
+  name: 'runtime-plugin',
+  version: '1.0.0',
+  runtimes: ['node', 'deno', 'bun']
+}), { runtime: 'deno' });
+const repairs = repair.suggestRepairs(root.parseCli(program, { argv: ['chek'] }), program);
+const run = await root.runCli(program, { mode: 'plan', invocation });
+const envelope = schema.createCliSchemaEnvelope({ payloadSchemaVersion: run.schemaVersion, data: run });
+const harness = testing.createCliHarness({ entrypoints: { root, schema, testing } });
+const scenario = await testing.runCliScenario(harness, {
+  id: 'runtime.deno.entrypoints',
+  steps: [
+    { kind: 'entrypoint-load', name: 'root entrypoint', entrypoint: 'root', expectedExports: ['defineCli', 'runCli'] },
+    { kind: 'entrypoint-load', name: 'schema entrypoint', entrypoint: 'schema', expectedExports: ['describeCliSchemas'] },
+    { kind: 'fixture-available', name: 'large fixture', fixtureId: 'commands.large-program', expectedFamily: 'commands' }
+  ]
+});
+
+ensure(root.cliCorePackage.name === '@ismail-elkorchi/cli-core', 'Deno runtime could not load package root.');
+ensure(invocation.ok, 'Deno runtime could not parse through root entrypoint.');
+ensure(resolved.values.profile === 'ci', 'Deno runtime could not resolve config.');
+ensure(helpDocument.commands[0]?.name === 'check', 'Deno runtime could not create help document.');
+ensure(completionPayload.items[0]?.value === 'check', 'Deno runtime could not create completion payload.');
+ensure(manifestRoundTrip.commands.some((command) => command.name === 'check'), 'Deno runtime could not round-trip manifest.');
+ensure(compatibility.ok, 'Deno runtime could not check plugin compatibility.');
+ensure(repairs[0]?.code === 'REPAIR_UNKNOWN_COMMAND', 'Deno runtime could not create repair suggestions.');
+ensure(envelope.payloadSchemaVersion === 'cli-core.run-result.v1', 'Deno runtime could not create schema envelope.');
+ensure(scenario.status === 'passed', 'Deno runtime could not run testing harness scenario.');
+
+function ensure(condition, message) {
+  if (!condition) throw new Error(message);
 }
 
-if (!describeCliSchemas().some((schema) => schema.version === 'cli-core.schema-envelope.v1')) {
-  throw new Error('Deno runtime could not load schema subpath.');
+function runtimeDefinition() {
+  return {
+    name: 'runtime',
+    config: {
+      fields: [{ name: 'profile', type: 'string', default: 'local', env: 'RUNTIME_PROFILE' }]
+    },
+    commands: [
+      {
+        name: 'check',
+        aliases: ['c'],
+        options: [{ name: 'region', type: 'string', flags: ['--region'] }],
+        positionals: [{ name: 'target' }]
+      }
+    ]
+  };
 }

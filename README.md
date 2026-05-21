@@ -301,6 +301,12 @@ The package publishes the root entrypoint plus these subpaths:
 - `@ismail-elkorchi/cli-core/schema`
 - `@ismail-elkorchi/cli-core/testing`
 
+## Runtime Support
+
+The local and CI runtime subset loads the root package and every public subpath
+in Node, Deno, and Bun, then exercises a data-only command scenario. This is a
+runtime smoke contract, not a full runtime matrix or performance claim.
+
 ## Verification
 
 ```sh
