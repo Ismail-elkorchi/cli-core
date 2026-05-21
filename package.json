@@ -1,0 +1,103 @@
+{
+  "name": "@ismail-elkorchi/cli-core",
+  "version": "0.1.0",
+  "description": "Typed, replayable command-core primitives for TypeScript and JavaScript CLIs.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./help": {
+      "types": "./dist/help/index.d.ts",
+      "default": "./dist/help/index.js"
+    },
+    "./completion": {
+      "types": "./dist/completion/index.d.ts",
+      "default": "./dist/completion/index.js"
+    },
+    "./manifest": {
+      "types": "./dist/manifest/index.d.ts",
+      "default": "./dist/manifest/index.js"
+    },
+    "./config": {
+      "types": "./dist/config/index.d.ts",
+      "default": "./dist/config/index.js"
+    },
+    "./plugins": {
+      "types": "./dist/plugins/index.d.ts",
+      "default": "./dist/plugins/index.js"
+    },
+    "./repair": {
+      "types": "./dist/repair/index.d.ts",
+      "default": "./dist/repair/index.js"
+    },
+    "./testing": {
+      "types": "./dist/testing/index.d.ts",
+      "default": "./dist/testing/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "AGENTS.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "lint": "eslint .",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test:unit": "npm run build && node --test tests/unit/*.test.mjs",
+    "test:property": "npm run build && node --test tests/property/*.test.mjs",
+    "test:acceptance": "npm run build && node --test tests/acceptance/*.test.mjs",
+    "test:conformance": "npm run build && node --test tests/conformance/*.test.mjs",
+    "test:benchmarks": "npm run build && node --test tests/benchmarks/*.test.mjs",
+    "test:runtime:node": "npm run build && node --test tests/runtime/node.test.mjs",
+    "test:runtime:deno": "npm run build && deno run tests/runtime/deno-smoke.mjs",
+    "test:runtime:bun": "npm run build && bun tests/runtime/bun-smoke.mjs",
+    "test:docs": "node --test tests/docs/*.test.mjs",
+    "check:exports": "node scripts/check-exports.mjs",
+    "check:leakage": "node scripts/no-private-leakage.mjs",
+    "check": "npm run lint && npm run typecheck && npm run build && npm run test:unit && npm run test:property && npm run test:acceptance && npm run test:conformance && npm run test:benchmarks && npm run test:runtime:node && npm run test:docs && npm run check:exports && npm run check:leakage",
+    "precommit": "npm run lint && npm run typecheck && npm run test:unit && npm run check:leakage",
+    "prepush": "npm run check"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Ismail-elkorchi/cli-core.git"
+  },
+  "keywords": [
+    "cli",
+    "command",
+    "typescript",
+    "automation",
+    "manifest"
+  ],
+  "author": "Ismail El Korchi",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Ismail-elkorchi/cli-core/issues"
+  },
+  "homepage": "https://github.com/Ismail-elkorchi/cli-core#readme",
+  "engines": {
+    "node": ">=24"
+  },
+  "dependencies": {
+    "argv-flags": "^1.0.4"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^25.9.1",
+    "@typescript-eslint/eslint-plugin": "^8.59.4",
+    "@typescript-eslint/parser": "^8.59.4",
+    "eslint": "^10.4.0",
+    "eslint-plugin-n": "^18.0.1",
+    "eslint-plugin-promise": "^7.3.0",
+    "eslint-plugin-security": "^4.0.0",
+    "globals": "^17.6.0",
+    "typescript": "^6.0.3"
+  }
+}
