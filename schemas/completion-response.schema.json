@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ismail-elkorchi:cli-core:schema:completion-response:v1",
+  "title": "cli-core Completion Response",
+  "type": "object",
+  "required": ["schemaVersion", "request", "payload", "boundary", "protocol", "diagnostics"],
+  "properties": {
+    "schemaVersion": { "const": "cli-core.completion-response.v1" },
+    "request": { "type": "object", "required": ["schemaVersion", "words", "currentWord", "cursor", "includeHidden", "protocol"] },
+    "payload": { "type": "object", "required": ["schemaVersion", "programName", "commandPath", "word", "items"] },
+    "boundary": { "enum": ["cli", "pass_through"] },
+    "protocol": { "type": "object", "required": ["schemaVersion", "commandName", "argvSeparator", "request", "response"] },
+    "diagnostics": { "type": "array", "items": { "type": "object", "required": ["code", "severity", "message", "fields"] } }
+  },
+  "additionalProperties": true
+}

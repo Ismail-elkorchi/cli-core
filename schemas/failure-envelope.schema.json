@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ismail-elkorchi:cli-core:schema:failure-envelope:v1",
+  "title": "cli-core Failure Envelope",
+  "type": "object",
+  "required": ["schemaVersion", "packageName", "packageVersion", "ok", "kind", "diagnostics", "data", "redacted"],
+  "properties": {
+    "schemaVersion": { "const": "cli-core.failure.v1" },
+    "packageName": { "const": "@ismail-elkorchi/cli-core" },
+    "packageVersion": { "type": "string" },
+    "ok": { "const": false },
+    "kind": { "type": "string" },
+    "diagnostics": { "type": "array", "items": { "type": "object", "required": ["code", "severity", "message", "fields"] } },
+    "data": {},
+    "redacted": { "type": "boolean" }
+  },
+  "additionalProperties": true
+}

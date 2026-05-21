@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ismail-elkorchi:cli-core:schema:diagnostic:v1",
+  "title": "cli-core Diagnostic",
+  "type": "object",
+  "required": ["code", "severity", "message", "fields"],
+  "properties": {
+    "code": { "type": "string", "pattern": "^CLI_" },
+    "severity": { "enum": ["error", "warning"] },
+    "message": { "type": "string" },
+    "fields": { "type": "object" }
+  },
+  "additionalProperties": true
+}

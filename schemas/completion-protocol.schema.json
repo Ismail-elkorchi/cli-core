@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ismail-elkorchi:cli-core:schema:completion-protocol:v1",
+  "title": "cli-core Completion Protocol",
+  "type": "object",
+  "required": ["schemaVersion", "commandName", "argvSeparator", "request", "response"],
+  "properties": {
+    "schemaVersion": { "const": "cli-core.completion-protocol.v1" },
+    "commandName": { "type": "string" },
+    "argvSeparator": { "const": "--" },
+    "request": { "type": "object", "required": ["words", "currentWord", "cursor", "includeHidden"] },
+    "response": { "type": "object", "required": ["schemaVersion", "items", "value"] }
+  },
+  "additionalProperties": true
+}

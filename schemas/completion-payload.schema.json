@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ismail-elkorchi:cli-core:schema:completion-payload:v1",
+  "title": "cli-core Completion Payload",
+  "type": "object",
+  "required": ["schemaVersion", "programName", "commandPath", "word", "items"],
+  "properties": {
+    "schemaVersion": { "const": "cli-core.completion.v1" },
+    "programName": { "type": "string" },
+    "commandPath": { "type": "array", "items": { "type": "string" } },
+    "word": { "type": "string" },
+    "items": { "type": "array", "items": { "type": "object", "required": ["kind", "value", "label"] } }
+  },
+  "additionalProperties": true
+}

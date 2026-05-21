@@ -7,6 +7,7 @@ import { runCommandModelExample } from '../../examples/command-model.mjs';
 import { runEffectsExample } from '../../examples/effects.mjs';
 import { runHelpManifestExample } from '../../examples/help-manifest.mjs';
 import { runPluginsExample } from '../../examples/plugins.mjs';
+import { runSchemaArtifactsExample } from '../../examples/schema-artifacts.mjs';
 import { runExecutionExample } from '../../examples/run.mjs';
 import { runSchemaRedactionExample } from '../../examples/schema-redaction.mjs';
 import { runTestingHarnessExample } from '../../examples/testing-harness.mjs';
@@ -29,6 +30,7 @@ test('README documents current public surface without unsupported claims', async
   assert.match(readme, /runCli/);
   assert.match(readme, /applyCliEffects/);
   assert.match(readme, /createCliSchemaEnvelope/);
+  assert.match(readme, /@ismail-elkorchi\/cli-core\/schemas/);
   assert.match(readme, /redactCliSecrets/);
   assert.match(readme, /createCliHarness/);
   assert.doesNotMatch(readme, /feature-complete/i);
@@ -116,4 +118,13 @@ test('schema and redaction example executes against the built package', async ()
   assert.equal(envelope.payloadSchemaVersion, 'cli-core.run-result.v1');
   assert.equal(failure.redacted, true);
   assert.equal(report.value.password, '[REDACTED]');
+});
+
+test('schema artifacts example executes against the built package', async () => {
+  const { registry, index, manifest, manifestSchema } = await runSchemaArtifactsExample();
+
+  assert.equal(registry.some((schema) => schema.version === 'cli-core.manifest.v1'), true);
+  assert.equal(index.artifacts.some((artifact) => artifact.path === './command-manifest.schema.json'), true);
+  assert.equal(manifest.schemaVersion, 'cli-core.manifest.v1');
+  assert.equal(manifestSchema.properties.schemaVersion.const, 'cli-core.manifest.v1');
 });

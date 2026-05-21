@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ismail-elkorchi:cli-core:schema:completion-script:v1",
+  "title": "cli-core Completion Script",
+  "type": "object",
+  "required": ["schemaVersion", "shell", "programName", "protocol", "script"],
+  "properties": {
+    "schemaVersion": { "const": "cli-core.completion-script.v1" },
+    "shell": { "enum": ["bash", "zsh", "fish", "pwsh"] },
+    "programName": { "type": "string" },
+    "protocol": { "type": "object", "required": ["schemaVersion", "commandName", "argvSeparator", "request", "response"] },
+    "script": { "type": "string" }
+  },
+  "additionalProperties": true
+}

@@ -19,10 +19,13 @@ test('schema registry exposes stable public schema versions', () => {
   assert.equal(isCliSchemaVersion('cli-core.run-result.v1'), true);
   assert.equal(isCliSchemaVersion('cli-core.config-discovery.v1'), true);
   assert.equal(isCliSchemaVersion('cli-core.completion-response.v1'), true);
+  assert.equal(isCliSchemaVersion('cli-core.completion-protocol.v1'), true);
   assert.equal(isCliSchemaVersion('cli-core.effect-application.v1'), true);
+  assert.equal(isCliSchemaVersion('cli-core.diagnostic.v1'), true);
   assert.equal(isCliSchemaVersion('cli-core.unknown.v1'), false);
   assert.equal(schemas.some((schema) => schema.version === 'cli-core.failure.v1'), true);
   assert.equal(schemas.some((schema) => schema.version === 'cli-core.completion-request.v1'), true);
+  assert.equal(schemas.some((schema) => schema.version === 'cli-core.plugin-command-application.v1'), true);
   assert.equal(schemas.every((schema) => schema.stability === 'public'), true);
 });
 

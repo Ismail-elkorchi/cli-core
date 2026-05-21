@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ismail-elkorchi:cli-core:schema:run-result:v1",
+  "title": "cli-core Run Result",
+  "type": "object",
+  "required": ["schemaVersion", "runId", "mode", "invocation", "ok", "exitKind", "exitStatus", "events", "effects", "artifacts", "diagnostics"],
+  "properties": {
+    "schemaVersion": { "const": "cli-core.run-result.v1" },
+    "runId": { "type": "string" },
+    "mode": { "enum": ["plan", "apply"] },
+    "invocation": { "type": "object", "required": ["schemaVersion", "ok", "argv", "commandPath"] },
+    "ok": { "type": "boolean" },
+    "exitKind": { "enum": ["ok", "usage", "policy_denied", "cancelled", "interrupted", "timeout", "external_error", "internal_error"] },
+    "exitStatus": { "type": "integer" },
+    "events": { "type": "array", "items": { "type": "object", "required": ["schemaVersion", "runId", "sequence", "name", "data"] } },
+    "effects": { "type": "array", "items": { "type": "object", "required": ["kind"] } },
+    "artifacts": { "type": "array", "items": { "type": "object", "required": ["id", "kind", "data"] } },
+    "diagnostics": { "type": "array", "items": { "type": "object", "required": ["code", "severity", "message", "fields"] } }
+  },
+  "additionalProperties": true
+}

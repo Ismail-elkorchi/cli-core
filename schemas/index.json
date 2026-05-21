@@ -1,0 +1,33 @@
+{
+  "schemaIndexVersion": "cli-core.schema-artifacts.v1",
+  "packageName": "@ismail-elkorchi/cli-core",
+  "artifacts": [
+    { "name": "program", "version": "cli-core.program.v1", "path": "./program.schema.json" },
+    { "name": "invocation", "version": "cli-core.invocation.v1", "path": "./invocation.schema.json" },
+    { "name": "semantic-validation", "version": "cli-core.semantic-validation.v1", "path": "./semantic-validation.schema.json" },
+    { "name": "help", "version": "cli-core.help.v1", "path": "./help.schema.json" },
+    { "name": "version", "version": "cli-core.version.v1", "path": "./version.schema.json" },
+    { "name": "manifest", "version": "cli-core.manifest.v1", "path": "./command-manifest.schema.json" },
+    { "name": "config-resolution", "version": "cli-core.config-resolution.v1", "path": "./config-resolution.schema.json" },
+    { "name": "config-discovery", "version": "cli-core.config-discovery.v1", "path": "./config-discovery.schema.json" },
+    { "name": "completion", "version": "cli-core.completion.v1", "path": "./completion-payload.schema.json" },
+    { "name": "completion-protocol", "version": "cli-core.completion-protocol.v1", "path": "./completion-protocol.schema.json" },
+    { "name": "completion-request", "version": "cli-core.completion-request.v1", "path": "./completion-request.schema.json" },
+    { "name": "completion-response", "version": "cli-core.completion-response.v1", "path": "./completion-response.schema.json" },
+    { "name": "completion-command", "version": "cli-core.completion-command.v1", "path": "./completion-command.schema.json" },
+    { "name": "completion-script", "version": "cli-core.completion-script.v1", "path": "./completion-script.schema.json" },
+    { "name": "completion-install-plan", "version": "cli-core.completion-install-plan.v1", "path": "./completion-install-plan.schema.json" },
+    { "name": "repair-suggestions", "version": "cli-core.repair-suggestions.v1", "path": "./repair-suggestions.schema.json" },
+    { "name": "plugin", "version": "cli-core.plugin.v1", "path": "./plugin-manifest.schema.json" },
+    { "name": "plugin-command-application", "version": "cli-core.plugin-command-application.v1", "path": "./plugin-command-application.schema.json" },
+    { "name": "run-result", "version": "cli-core.run-result.v1", "path": "./run-result.schema.json" },
+    { "name": "run-event", "version": "cli-core.run-event.v1", "path": "./run-event.schema.json" },
+    { "name": "run-effect", "version": "cli-core.run-effect.v1", "path": "./run-effect.schema.json" },
+    { "name": "artifact", "version": "cli-core.artifact.v1", "path": "./artifact.schema.json" },
+    { "name": "diagnostic", "version": "cli-core.diagnostic.v1", "path": "./diagnostic.schema.json" },
+    { "name": "effect-application", "version": "cli-core.effect-application.v1", "path": "./effect-application-report.schema.json" },
+    { "name": "schema-envelope", "version": "cli-core.schema-envelope.v1", "path": "./schema-envelope.schema.json" },
+    { "name": "failure", "version": "cli-core.failure.v1", "path": "./failure-envelope.schema.json" },
+    { "name": "redaction", "version": "cli-core.redaction.v1", "path": "./redaction-report.schema.json" }
+  ]
+}

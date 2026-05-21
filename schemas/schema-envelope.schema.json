@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ismail-elkorchi:cli-core:schema:schema-envelope:v1",
+  "title": "cli-core Schema Envelope",
+  "type": "object",
+  "required": ["schemaVersion", "payloadSchemaVersion", "packageName", "packageVersion", "data"],
+  "properties": {
+    "schemaVersion": { "const": "cli-core.schema-envelope.v1" },
+    "payloadSchemaVersion": { "type": "string", "pattern": "^cli-core\\." },
+    "packageName": { "const": "@ismail-elkorchi/cli-core" },
+    "packageVersion": { "type": "string" },
+    "data": {}
+  },
+  "additionalProperties": true
+}

@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ismail-elkorchi:cli-core:schema:redaction-report:v1",
+  "title": "cli-core Redaction Report",
+  "type": "object",
+  "required": ["schemaVersion", "value", "redacted", "matches"],
+  "properties": {
+    "schemaVersion": { "const": "cli-core.redaction.v1" },
+    "value": {},
+    "redacted": { "type": "boolean" },
+    "matches": { "type": "array", "items": { "type": "object", "required": ["path", "reason"] } }
+  },
+  "additionalProperties": true
+}

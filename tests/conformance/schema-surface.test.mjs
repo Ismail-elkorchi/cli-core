@@ -9,6 +9,10 @@ test('schema declarations expose envelopes, failure policy, and redaction contra
   assert.match(text, /CliSchemaEnvelope/);
   assert.match(text, /CliFailureEnvelope/);
   assert.match(text, /CliRedactionOptions/);
+  assert.match(text, /repair-suggestions/);
+  assert.match(text, /plugin-command-application/);
+  assert.match(text, /run-effect/);
+  assert.match(text, /diagnostic/);
   assert.match(text, /describeCliSchemas/);
   assert.match(text, /redactCliSecrets/);
   assert.match(root, /createCliSchemaEnvelope/);

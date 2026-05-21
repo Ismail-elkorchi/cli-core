@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ismail-elkorchi:cli-core:schema:run-event:v1",
+  "title": "cli-core Run Event",
+  "type": "object",
+  "required": ["schemaVersion", "runId", "sequence", "name", "data"],
+  "properties": {
+    "schemaVersion": { "const": "cli-core.run-event.v1" },
+    "runId": { "type": "string" },
+    "sequence": { "type": "integer", "minimum": 0 },
+    "name": { "type": "string" },
+    "data": {}
+  },
+  "additionalProperties": true
+}

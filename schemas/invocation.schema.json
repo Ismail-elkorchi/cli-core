@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ismail-elkorchi:cli-core:schema:invocation:v1",
+  "title": "cli-core Parsed Invocation",
+  "type": "object",
+  "required": ["schemaVersion", "ok", "argv", "commandPath", "options", "positionals", "positionalList", "passThrough", "diagnostics"],
+  "properties": {
+    "schemaVersion": { "const": "cli-core.invocation.v1" },
+    "ok": { "type": "boolean" },
+    "argv": { "type": "array", "items": { "type": "string" } },
+    "command": { "type": "object" },
+    "commandPath": { "type": "array", "items": { "type": "string" } },
+    "usedAlias": { "type": "object" },
+    "options": { "type": "object", "required": ["values", "present", "unknown", "issues"] },
+    "positionals": { "type": "object" },
+    "positionalList": { "type": "array", "items": { "type": "string" } },
+    "passThrough": { "type": "array", "items": { "type": "string" } },
+    "diagnostics": { "type": "array", "items": { "type": "object", "required": ["code", "severity", "message", "fields"] } }
+  },
+  "additionalProperties": true
+}
