@@ -1,4 +1,5 @@
 import type { FlagSpec, FlagType, FlagValue } from 'argv-flags';
+import type { ConfigDefinition } from '../config/index.js';
 import { createCliDiagnostic, type CliDiagnostic } from '../diagnostics.js';
 
 export type CliOptionType = FlagType;
@@ -9,6 +10,7 @@ export interface CliDefinition {
   readonly name: string;
   readonly version?: string;
   readonly description?: string;
+  readonly config?: ConfigDefinition;
   readonly options?: readonly CliOptionDefinition[];
   readonly commands?: readonly CliCommandDefinition[];
 }
@@ -55,6 +57,7 @@ export interface CliProgram {
   readonly name: string;
   readonly version?: string;
   readonly description?: string;
+  readonly config: ConfigDefinition | undefined;
   readonly root: CliCommand;
   readonly commands: readonly CliCommand[];
   readonly pathIndex: readonly CliCommandPathIndexEntry[];
@@ -344,6 +347,7 @@ function buildProgram(
   const common = {
     schemaVersion: 'cli-core.program.v1' as const,
     name: definition.name,
+    config: definition.config,
     root,
     commands: Object.freeze([...commands]),
     pathIndex,

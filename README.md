@@ -7,9 +7,9 @@ Typed command-core primitives for TypeScript and JavaScript CLIs.
 This package is in active implementation. The current public surface includes
 stable package entrypoints, contract metadata, command program compilation,
 argv binding through `argv-flags`, help/version documents, command manifests,
-manifest import/export, and a testing harness for data-only fixture and
-entrypoint scenarios. Config, completion, plugin, and run behavior are not part
-of the current public surface.
+manifest import/export, config resolution with provenance, and a testing harness
+for data-only fixture and entrypoint scenarios. Completion, plugin, and run
+behavior are not part of the current public surface.
 
 ## Boundary
 
@@ -73,6 +73,35 @@ const program = defineCli({
 const help = createHelpDocument(program);
 const version = createVersionDocument(program);
 const manifest = importCommandManifest(exportCommandManifest(describeCli(program)));
+```
+
+## Config Resolution
+
+Config resolution is explicit and replayable. Values are layered as built-in
+defaults, workspace defaults, config file values, environment values, then argv
+values. The result includes selected values, provenance entries, explanations,
+and discovery metadata.
+
+```ts
+import { defineCli, parseCli, resolveCliConfig } from '@ismail-elkorchi/cli-core';
+
+const program = defineCli({
+  name: 'ship',
+  config: {
+    fields: [
+      { name: 'profile', type: 'string', default: 'default', env: 'SHIP_PROFILE' },
+      { name: 'dryRun', type: 'boolean', default: false }
+    ]
+  },
+  commands: [{ name: 'deploy', options: [{ name: 'profile', type: 'string', flags: ['--profile'] }] }]
+});
+
+const invocation = parseCli(program, { argv: ['deploy', '--profile', 'prod'] });
+const config = resolveCliConfig(program, {
+  workspaceDefaults: { profile: 'workspace' },
+  env: { SHIP_PROFILE: 'env' },
+  argv: invocation.options.values
+});
 ```
 
 ## Testing Harness

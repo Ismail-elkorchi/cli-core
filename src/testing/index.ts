@@ -239,7 +239,63 @@ export const commandFixtures = Object.freeze([
   })
 ]);
 
-export const cliCoreFixtures = Object.freeze([...foundationFixtures, ...commandFixtures]);
+export const configFixtures = Object.freeze([
+  defineCliFixture({
+    id: 'config.config-layer-stack',
+    family: 'config',
+    title: 'Config layer stack',
+    capabilities: ['config.precedence', 'config.provenance'],
+    data: {
+      definition: {
+        fields: [
+          { name: 'mode', type: 'string', default: 'safe', env: 'SHIP_MODE' },
+          { name: 'retries', type: 'number', default: 1, env: 'SHIP_RETRIES' }
+        ]
+      },
+      input: {
+        workspaceDefaults: { mode: 'workspace' },
+        configFiles: [{ path: '.shiprc.json', version: '1', values: { mode: 'file' } }],
+        env: { SHIP_MODE: 'env', SHIP_RETRIES: '3' },
+        argv: { mode: 'argv' }
+      }
+    }
+  }),
+  defineCliFixture({
+    id: 'config.config-discovery-scope',
+    family: 'config',
+    title: 'Config discovery scope',
+    capabilities: ['config.discovery'],
+    data: {
+      discovery: {
+        scope: 'explicit_paths',
+        cwd: '/workspace',
+        explicitPaths: ['a.json', 'b.json']
+      }
+    }
+  }),
+  defineCliFixture({
+    id: 'config.config-migration-v1-v2',
+    family: 'config',
+    title: 'Config migration v1 to v2',
+    capabilities: ['config.versioning', 'config.migration'],
+    data: {
+      migration: { from: '1', to: '2', rename: { zone: 'region' } },
+      input: { path: 'ship.v1.json', version: '1', values: { zone: 'eu' } }
+    }
+  }),
+  defineCliFixture({
+    id: 'config.config-malformed',
+    family: 'config',
+    title: 'Malformed config input',
+    capabilities: ['config.diagnostics'],
+    data: {
+      path: 'bad.json',
+      text: '{'
+    }
+  })
+]);
+
+export const cliCoreFixtures = Object.freeze([...foundationFixtures, ...commandFixtures, ...configFixtures]);
 
 export function defineCliFixture(definition: CliFixtureDefinition): CliFixture {
   const fixture = buildFixture(definition);
