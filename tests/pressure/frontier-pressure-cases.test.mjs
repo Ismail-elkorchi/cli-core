@@ -13,7 +13,8 @@ import {
   discoverCliConfigInput,
   parseCli,
   resolveCliConfig,
-  runCli
+  runCli,
+  runCliMain
 } from '../../dist/index.js';
 import { frontierPressureCases } from './frontier-pressure-cases.mjs';
 
@@ -72,12 +73,19 @@ const pressureAssertions = {
       invocation,
       effects: [{ kind: 'spawn', command: 'proxy', argv: ['exec', 'build.js', '--remote', 'prod'] }]
     });
+    const main = await runCliMain({
+      program,
+      mode: 'plan',
+      argv: ['exec', 'build.js', '--', '--remote', 'prod']
+    });
 
     assert.equal(invocation.ok, true);
     assert.deepEqual(invocation.passThrough, ['--remote', 'prod']);
     assert.equal(help.commandPath.join(' '), 'exec');
     assert.equal(plan.exitKind, 'ok');
     assert.equal(plan.effects[0].kind, 'spawn');
+    assert.equal(main.exitStatus, 0);
+    assert.match(main.rendered.stdout, /command exec/);
   },
 
   'yargs-command-groups-completion'() {

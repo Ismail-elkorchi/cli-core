@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import * as adapter from '../../dist/adapter/index.js';
 import * as completion from '../../dist/completion/index.js';
 import * as config from '../../dist/config/index.js';
 import * as effects from '../../dist/effects/index.js';
@@ -32,6 +33,7 @@ test('node runtime can load and exercise public entrypoints', async () => {
   }), { runtime: 'node' });
   const repairs = repair.suggestRepairs(root.parseCli(program, { argv: ['chek'] }), program);
   const run = await root.runCli(program, { mode: 'plan', invocation });
+  const main = await adapter.runCliMain({ program, mode: 'plan', argv: ['check', 'api'] });
   const memoryHost = effects.createMemoryEffectHost();
   const effectReport = await effects.applyCliEffects({
     effects: [{ kind: 'write_file', path: 'runtime.txt', content: 'ok' }],
@@ -39,11 +41,12 @@ test('node runtime can load and exercise public entrypoints', async () => {
     policy: { allowWriteFile: true }
   });
   const envelope = schema.createCliSchemaEnvelope({ payloadSchemaVersion: run.schemaVersion, data: run });
-  const harness = testing.createCliHarness({ entrypoints: { root, schema, testing } });
+  const harness = testing.createCliHarness({ entrypoints: { root, adapter, schema, testing } });
   const scenario = await testing.runCliScenario(harness, {
     id: 'runtime.node.entrypoints',
     steps: [
       { kind: 'entrypoint-load', name: 'root entrypoint', entrypoint: 'root', expectedExports: ['defineCli', 'runCli'] },
+      { kind: 'entrypoint-load', name: 'adapter entrypoint', entrypoint: 'adapter', expectedExports: ['runCliMain'] },
       { kind: 'entrypoint-load', name: 'schema entrypoint', entrypoint: 'schema', expectedExports: ['describeCliSchemas'] },
       { kind: 'fixture-available', name: 'large fixture', fixtureId: 'commands.large-program', expectedFamily: 'commands' }
     ]
@@ -60,6 +63,7 @@ test('node runtime can load and exercise public entrypoints', async () => {
   assert.equal(compatibility.ok, true);
   assert.equal(repairs[0].code, 'REPAIR_UNKNOWN_COMMAND');
   assert.equal(effectReport.ok, true);
+  assert.equal(main.exitStatus, 0);
   assert.equal(memoryHost.files()['runtime.txt'], 'ok');
   assert.equal(envelope.payloadSchemaVersion, 'cli-core.run-result.v1');
   assert.equal(schema.describeCliSchemas().some((item) => item.version === 'cli-core.schema-envelope.v1'), true);

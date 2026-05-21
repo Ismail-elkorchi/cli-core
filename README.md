@@ -53,6 +53,8 @@ const validation = await validateCli(program, invocation);
 
 - Root: `defineCli`, `parseCli`, `resolveCliConfig`, `validateCli`, `runCli`,
   `describeCli`, plus shared public types.
+- `adapter`: explicit CLI entrypoint adapters for argv/stdout/stderr/exit-code
+  wiring.
 - `help`: structured help and version documents.
 - `completion`: completion payloads, shell scripts, and install plans as data.
 - `manifest`: command manifest export/import.
@@ -277,6 +279,34 @@ const apply = await runCli(program, {
 });
 ```
 
+## CLI Adapter
+
+The adapter subpath shows how a real CLI entrypoint can connect argv,
+stdout/stderr, and exit status while keeping core behavior explicit. Adapter
+hosts are caller supplied; `cli-core` still does not read global process state,
+call `process.exit`, or write output from `runCli`.
+
+```ts
+import {
+  createCliMain,
+  createNodeCliAdapter,
+  defineCli
+} from '@ismail-elkorchi/cli-core';
+
+const program = defineCli({
+  name: 'ship',
+  commands: [{ name: 'deploy', positionals: [{ name: 'service' }] }]
+});
+
+const main = createCliMain({
+  program,
+  mode: 'plan',
+  effects: [{ kind: 'spawn', command: 'ship', argv: ['deploy'] }]
+});
+
+await main(createNodeCliAdapter(process));
+```
+
 ## Effect Application
 
 Run effects are still data by default. Consumers that want to apply effects must
@@ -393,6 +423,7 @@ discovery, variadic positional binding, and adapter-owned output/exit behavior.
 The package publishes the root entrypoint plus these subpaths:
 
 - `@ismail-elkorchi/cli-core/help`
+- `@ismail-elkorchi/cli-core/adapter`
 - `@ismail-elkorchi/cli-core/completion`
 - `@ismail-elkorchi/cli-core/manifest`
 - `@ismail-elkorchi/cli-core/config`
@@ -439,6 +470,8 @@ envelopes redact secret-like keys and common token patterns by default.
   and how to write files or update shell profiles.
 - Plugin APIs validate manifests, apply compatible command contributions, and
   isolate loader/hook faults.
+- Adapter APIs write stdout/stderr and set exit status only through an explicit
+  caller-supplied host.
 
 ## Verification
 

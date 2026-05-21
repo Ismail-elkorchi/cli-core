@@ -1,5 +1,11 @@
 export { cliCorePackage } from './package.js';
 export type { CliCorePackage } from './package.js';
+export {
+  createCliMain,
+  createNodeCliAdapter,
+  renderRunResultText,
+  runCliMain
+} from './adapter/index.js';
 export { defineCli, findCliCommand, findCliCommandByAlias } from './command/index.js';
 export {
   completeCli,
@@ -36,6 +42,18 @@ export {
   redactCliSecrets,
   redactCliSecretsWithReport
 } from './schema/index.js';
+export type {
+  CliMain,
+  CliMainEffectMode,
+  CliMainHost,
+  CliMainRenderer,
+  CliMainRequest,
+  CliMainResult,
+  CliMainText,
+  CliTextWriter,
+  CliWritableStream,
+  NodeCliProcessLike
+} from './adapter/index.js';
 export type {
   CliAlias,
   CliAliasDefinition,

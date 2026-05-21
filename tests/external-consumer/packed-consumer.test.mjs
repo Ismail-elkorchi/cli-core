@@ -42,6 +42,7 @@ test('packed package installs and runs from an outside Node consumer', async (co
   assert.equal(result.completionCandidate, 'audit');
   assert.equal(result.repairCode, 'REPAIR_UNKNOWN_COMMAND');
   assert.equal(result.runOk, true);
+  assert.equal(result.mainExitStatus, 0);
   assert.equal(result.effectReportOk, true);
   assert.equal(result.redactedToken, '[REDACTED]');
   assert.equal(result.harnessStatus, 'passed');
@@ -79,6 +80,7 @@ test('packed package can be imported by Bun from an outside consumer when Bun is
   assert.equal(result.invocationOk, true);
   assert.equal(result.completionCandidate, 'check');
   assert.equal(result.runSchemaVersion, 'cli-core.run-result.v1');
+  assert.equal(result.mainExitStatus, 0);
 });
 
 async function packPackage(destination) {
@@ -95,6 +97,7 @@ function assertPackageFiles(files) {
 
   assert.equal(paths.has('package.json'), true);
   assert.equal(paths.has('dist/index.js'), true);
+  assert.equal(paths.has('dist/adapter/index.js'), true);
   assert.equal(paths.has('dist/completion/index.js'), true);
   assert.equal(paths.has('dist/config/index.js'), true);
   assert.equal(paths.has('dist/effects/index.js'), true);
@@ -123,6 +126,7 @@ function consumerScenarioSource() {
   return `
 import * as assert from 'node:assert/strict';
 import * as root from '@ismail-elkorchi/cli-core';
+import * as adapter from '@ismail-elkorchi/cli-core/adapter';
 import * as completion from '@ismail-elkorchi/cli-core/completion';
 import * as config from '@ismail-elkorchi/cli-core/config';
 import * as effects from '@ismail-elkorchi/cli-core/effects';
@@ -181,6 +185,16 @@ const run = await root.runCli(program, {
     })
   }
 });
+const main = await adapter.runCliMain({
+  program,
+  mode: 'plan',
+  argv: ['deploy', '--region', 'eu', 'api'],
+  handlers: {
+    deploy: () => ({
+      artifacts: [{ id: 'main-summary', kind: 'json', data: { service: 'api' } }]
+    })
+  }
+});
 const memoryEffects = effects.createMemoryEffectHost();
 const effectReport = await effects.applyCliEffects({
   effects: run.effects,
@@ -188,11 +202,12 @@ const effectReport = await effects.applyCliEffects({
   policy: { allowWriteFile: true }
 });
 const redaction = schema.redactCliSecretsWithReport({ token: 'secret-token', visible: true });
-const harness = testing.createCliHarness({ entrypoints: { root, testing, schema } });
+const harness = testing.createCliHarness({ entrypoints: { root, adapter, testing, schema } });
 const scenario = await testing.runCliScenario(harness, {
   id: 'external.consumer.vertical',
   steps: [
     { kind: 'entrypoint-load', name: 'root entrypoint', entrypoint: 'root', expectedExports: ['defineCli', 'runCli'] },
+    { kind: 'entrypoint-load', name: 'adapter entrypoint', entrypoint: 'adapter', expectedExports: ['runCliMain'] },
     { kind: 'entrypoint-load', name: 'testing entrypoint', entrypoint: 'testing', expectedExports: ['createCliHarness', 'runCliScenario'] },
     { kind: 'fixture-available', name: 'large fixture', fixtureId: 'commands.large-program', expectedFamily: 'commands' }
   ]
@@ -211,6 +226,7 @@ console.log(JSON.stringify({
   completionCandidate: completionResponse.payload.items[0]?.value,
   repairCode: repairs[0]?.code,
   runOk: run.ok,
+  mainExitStatus: main.exitStatus,
   effectReportOk: effectReport.ok,
   redactedToken: redaction.value.token,
   harnessStatus: scenario.status,
@@ -222,6 +238,7 @@ console.log(JSON.stringify({
 function bunConsumerSource() {
   return `
 import * as root from '@ismail-elkorchi/cli-core';
+import * as adapter from '@ismail-elkorchi/cli-core/adapter';
 import * as completion from '@ismail-elkorchi/cli-core/completion';
 import * as config from '@ismail-elkorchi/cli-core/config';
 import * as schema from '@ismail-elkorchi/cli-core/schema';
@@ -241,13 +258,15 @@ const discovered = await config.discoverCliConfigInput(program, {
 const resolved = config.resolveCliConfig(program, discovered.input);
 const completions = completion.completeCli(program, { words: ['ship', 'ch'], cursor: 2 });
 const run = await root.runCli(program, { mode: 'plan', invocation });
+const main = await adapter.runCliMain({ program, mode: 'plan', argv: ['check', 'api'] });
 const envelope = schema.createCliSchemaEnvelope({ payloadSchemaVersion: run.schemaVersion, data: run });
 
 console.log(JSON.stringify({
   packageName: root.cliCorePackage.name,
   invocationOk: invocation.ok && resolved.values.profile === 'ci',
   completionCandidate: completions.payload.items[0]?.value,
-  runSchemaVersion: envelope.payloadSchemaVersion
+  runSchemaVersion: envelope.payloadSchemaVersion,
+  mainExitStatus: main.exitStatus
 }));
 `;
 }

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
+import { runCliMainExample } from '../../examples/cli-main.mjs';
 import { runCompletionRepairExample } from '../../examples/completion-repair.mjs';
 import { runConfigResolutionExample } from '../../examples/config-resolution.mjs';
 import { runCommandModelExample } from '../../examples/command-model.mjs';
@@ -17,6 +18,7 @@ test('README documents current public surface without unsupported claims', async
 
   assert.match(readme, /typed command-core package/);
   assert.match(readme, /API Overview/);
+  assert.match(readme, /CLI Adapter/);
   assert.match(readme, /Security Model/);
   assert.match(readme, /Limitations/);
   assert.match(readme, /package-consumer check/);
@@ -29,6 +31,8 @@ test('README documents current public surface without unsupported claims', async
   assert.match(readme, /suggestRepairs/);
   assert.match(readme, /createCliPluginHost/);
   assert.match(readme, /runCli/);
+  assert.match(readme, /createCliMain/);
+  assert.match(readme, /createNodeCliAdapter/);
   assert.match(readme, /applyCliEffects/);
   assert.match(readme, /createCliSchemaEnvelope/);
   assert.match(readme, /@ismail-elkorchi\/cli-core\/schemas/);
@@ -107,6 +111,15 @@ test('run example executes against the built package', async () => {
   assert.equal(plan.effects[1].kind, 'plugin');
   assert.equal(apply.mode, 'apply');
   assert.equal(apply.artifacts[0].id, 'deploy-summary');
+});
+
+test('CLI adapter example executes against the built package', async () => {
+  const { result, processLike } = await runCliMainExample();
+
+  assert.equal(result.run.mode, 'plan');
+  assert.equal(result.exitStatus, 0);
+  assert.equal(processLike.exitCode, 0);
+  assert.equal(processLike.stdout.chunks.length, 1);
 });
 
 test('effects example executes against the built package', async () => {

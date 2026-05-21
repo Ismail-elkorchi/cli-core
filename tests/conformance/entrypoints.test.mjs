@@ -4,6 +4,7 @@ import test from 'node:test';
 
 const entrypoints = [
   '../../dist/index.js',
+  '../../dist/adapter/index.js',
   '../../dist/help/index.js',
   '../../dist/completion/index.js',
   '../../dist/manifest/index.js',
@@ -38,6 +39,7 @@ test('testing subpath exposes harness and fixture contracts', async () => {
 test('public declaration files do not expose internal module paths', async () => {
   const declarations = [
     '../../dist/index.d.ts',
+    '../../dist/adapter/index.d.ts',
     '../../dist/help/index.d.ts',
     '../../dist/completion/index.d.ts',
     '../../dist/manifest/index.d.ts',
