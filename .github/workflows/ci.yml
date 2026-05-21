@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  node:
+    name: ci / node
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - name: Setup Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install
+        run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Build
+        run: npm run build
+      - name: Unit tests
+        run: npm run test:unit
+      - name: Property tests
+        run: npm run test:property
+      - name: Acceptance tests
+        run: npm run test:acceptance
+      - name: Conformance tests
+        run: npm run test:conformance
+      - name: Benchmarks
+        run: npm run test:benchmarks
+      - name: Node runtime
+        run: npm run test:runtime:node
+      - name: Docs
+        run: npm run test:docs
+      - name: Export check
+        run: npm run check:exports
+      - name: Public leakage check
+        run: npm run check:leakage
+
+  runtime:
+    name: ci / runtime-subset
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - name: Setup Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Setup Deno
+        uses: denoland/setup-deno@667a34cdef165d8d2b2e98dde39547c9daac7282
+        with:
+          deno-version: v2.x
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+      - name: Install
+        run: npm ci
+      - name: Deno runtime
+        run: npm run test:runtime:deno
+      - name: Bun runtime
+        run: npm run test:runtime:bun
