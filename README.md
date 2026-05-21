@@ -7,9 +7,10 @@ Typed command-core primitives for TypeScript and JavaScript CLIs.
 This package is in active implementation. The current public surface includes
 stable package entrypoints, contract metadata, command program compilation,
 argv binding through `argv-flags`, help/version documents, command manifests,
-manifest import/export, config resolution with provenance, and a testing harness
-for data-only fixture and entrypoint scenarios. Completion, plugin, and run
-behavior are not part of the current public surface.
+manifest import/export, config resolution with provenance, completion payloads
+and scripts, repair suggestions, and a testing harness for data-only fixture and
+entrypoint scenarios. Plugin and run behavior are not part of the current public
+surface.
 
 ## Boundary
 
@@ -102,6 +103,44 @@ const config = resolveCliConfig(program, {
   env: { SHIP_PROFILE: 'env' },
   argv: invocation.options.values
 });
+```
+
+## Completion And Repair
+
+Completion APIs return machine-readable candidates and shell-specific script
+documents. Install plans are data envelopes describing file/profile changes;
+they do not write files or mutate shell configuration.
+
+Repair APIs map parse diagnostics to stable suggestion codes. When callers pass
+the compiled program, unknown command and unknown option repairs can include a
+nearby replacement candidate.
+
+```ts
+import {
+  createCompletionInstallPlan,
+  createCompletionPayload,
+  createCompletionScript,
+  defineCli,
+  parseCli,
+  suggestRepairs
+} from '@ismail-elkorchi/cli-core';
+
+const program = defineCli({
+  name: 'ship',
+  commands: [
+    {
+      name: 'deploy',
+      aliases: ['d'],
+      options: [{ name: 'region', type: 'string', flags: ['--region'] }],
+      positionals: [{ name: 'service' }]
+    }
+  ]
+});
+
+const completion = createCompletionPayload(program, { word: 'd' });
+const bash = createCompletionScript(program, 'bash');
+const installPlan = createCompletionInstallPlan(program, 'fish');
+const repairs = suggestRepairs(parseCli(program, { argv: ['deply', 'api'] }), program);
 ```
 
 ## Testing Harness
