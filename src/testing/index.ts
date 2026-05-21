@@ -1,3 +1,4 @@
+import type { CliDefinition } from '../command/index.js';
 import { cliCorePackage } from '../package.js';
 
 export { cliCorePackage };
@@ -29,6 +30,12 @@ export interface CliFixture {
   readonly description?: string;
   readonly capabilities: readonly string[];
   readonly data: CliFixtureValue;
+}
+
+export interface LargeCommandFixtureInput {
+  readonly id?: string;
+  readonly commandCount?: number;
+  readonly programName?: string;
 }
 
 export interface CliFixtureRegistry {
@@ -230,14 +237,7 @@ export const commandFixtures = Object.freeze([
     family: 'commands',
     title: 'Large command program',
     capabilities: ['command.paths', 'scale.command-index'],
-    data: {
-      name: 'large',
-      commands: Array.from({ length: 128 }, (_unused, index) => ({
-        name: `command-${index}`,
-        aliases: [`c${index}`],
-        options: [{ name: `option${index}`, type: 'boolean', flags: [`--option-${index}`] }]
-      }))
-    }
+    data: largeCommandFixtureValue({ commandCount: 128, programName: 'large' })
   })
 ]);
 
@@ -462,6 +462,25 @@ export function defineCliFixture(definition: CliFixtureDefinition): CliFixture {
   return freezeFixture(fixture);
 }
 
+export function createLargeCommandDefinition(input: LargeCommandFixtureInput = {}): CliDefinition {
+  const commandCount = normalizeCommandCount(input.commandCount ?? 128);
+  const programName = input.programName ?? 'large';
+  return largeCommandDefinition({ commandCount, programName });
+}
+
+export function createLargeCommandFixture(input: LargeCommandFixtureInput = {}): CliFixture {
+  const commandCount = normalizeCommandCount(input.commandCount ?? 128);
+  const programName = input.programName ?? 'large';
+  return defineCliFixture({
+    id: input.id ?? `commands.large-program.${commandCount}`,
+    family: 'commands',
+    title: `Large command program (${commandCount})`,
+    description: 'Generated command-surface fixture for scale-sensitive compilation, lookup, completion, repair, and manifest checks.',
+    capabilities: ['command.paths', 'command.aliases', 'options.local', 'scale.command-index', 'scale.generated'],
+    data: largeCommandFixtureValue({ commandCount, programName })
+  });
+}
+
 export function createCliFixtureRegistry(
   fixtures: readonly CliFixtureDefinition[] = cliCoreFixtures
 ): CliFixtureRegistry {
@@ -579,6 +598,31 @@ function buildFixture(definition: CliFixtureDefinition): CliFixture {
     capabilities,
     data: fixtureData
   };
+}
+
+function largeCommandDefinition(input: { readonly commandCount: number; readonly programName: string }): CliDefinition {
+  return {
+    name: input.programName,
+    commands: Array.from({ length: input.commandCount }, (_unused, index) => ({
+      name: largeCommandName(index),
+      aliases: [`c${index}`],
+      options: [{ name: `detail${index}`, type: 'boolean', flags: [`--detail-${index}`] }],
+      positionals: [{ name: 'target', required: false }]
+    }))
+  };
+}
+
+function largeCommandFixtureValue(input: { readonly commandCount: number; readonly programName: string }): CliFixtureValue {
+  return largeCommandDefinition(input) as unknown as CliFixtureValue;
+}
+
+function largeCommandName(index: number): string {
+  return `command-${index}`;
+}
+
+function normalizeCommandCount(value: number): number {
+  if (!Number.isFinite(value) || value < 1) return 1;
+  return Math.trunc(value);
 }
 
 function runScenarioStep(harness: CliHarness, step: CliScenarioStep, index: number): CliScenarioStepResult {

@@ -372,6 +372,22 @@ const result = await testing.runCliScenario(harness, {
 });
 ```
 
+## Scale And Pressure Fixtures
+
+The testing subpath includes `createLargeCommandDefinition` and
+`createLargeCommandFixture` for generated command surfaces. Local scale checks
+use 128 commands by default; `test:scale:manual` generates a 10,000-command
+surface for manual or scheduled proof without making the default gate slow. The
+scale lane checks compilation, indexed command lookup, parsing, manifest
+generation, completion filtering, and repair candidate selection with
+conservative budgets.
+
+The pressure lane records ecosystem pressure from Commander, Yargs, oclif,
+Clipanion, CAC, and Cliffy as fixtures. These are not parity claims. They
+protect cli-core decisions such as pass-through data preservation,
+manifest-first plugin extension, structured completion, explicit config
+discovery, variadic positional binding, and adapter-owned output/exit behavior.
+
 ## Entry Points
 
 The package publishes the root entrypoint plus these subpaths:
@@ -413,7 +429,10 @@ envelopes redact secret-like keys and common token patterns by default.
 - Runtime checks are a Node/Deno/Bun smoke subset, not exhaustive operating
   system, shell, filesystem, or package-manager compatibility proof.
 - Benchmark tests use conservative regression budgets for representative large
-  data paths; they are not throughput guarantees.
+  data paths; they are not throughput guarantees. The 10,000-command scale mode
+  is manual or scheduled, not part of the default local check.
+- Competitor pressure fixtures document design pressure and cli-core decisions;
+  they do not claim drop-in behavior or full parity with other CLI frameworks.
 - Config resolution consumes explicit input. File discovery and environment
   capture happen only through caller-supplied discovery hosts.
 - Completion install plans describe changes as data. Consumers decide whether
@@ -426,6 +445,8 @@ envelopes redact secret-like keys and common token patterns by default.
 ```sh
 npm run check
 npm run check:package-consumer
+npm run test:scale:local
+npm run test:pressure
 ```
 
 The `precommit` and `prepush` scripts are manual verification commands. This

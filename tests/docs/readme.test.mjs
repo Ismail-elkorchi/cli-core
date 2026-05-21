@@ -35,6 +35,13 @@ test('README documents current public surface without unsupported claims', async
   assert.match(readme, /redactCliSecrets/);
   assert.match(readme, /createCliHarness/);
   assert.match(readme, /check:package-consumer/);
+  assert.match(readme, /createLargeCommandDefinition/);
+  assert.match(readme, /createLargeCommandFixture/);
+  assert.match(readme, /test:scale:local/);
+  assert.match(readme, /test:scale:manual/);
+  assert.match(readme, /test:pressure/);
+  assert.match(readme, /10,000-command scale mode/);
+  assert.match(readme, /not parity claims/);
   assert.doesNotMatch(readme, /feature-complete/i);
   assert.doesNotMatch(readme, /drop-in replacement/i);
 });

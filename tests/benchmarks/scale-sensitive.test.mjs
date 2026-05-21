@@ -9,6 +9,7 @@ import {
   runCli,
   suggestRepairs
 } from '../../dist/index.js';
+import { createLargeCommandDefinition } from '../../dist/testing/index.js';
 
 test('scale-sensitive command, completion, repair, run, and redaction paths stay within a conservative budget', async () => {
   const metrics = [];
@@ -65,11 +66,11 @@ async function measureAsync(metrics, name, operation) {
 }
 
 function largeDefinition(count) {
+  const definition = createLargeCommandDefinition({ commandCount: count, programName: 'runtime' });
   return {
-    name: 'runtime',
-    commands: Array.from({ length: count }, (_unused, index) => ({
-      name: `command-${index}`,
-      aliases: [`c${index}`],
+    ...definition,
+    commands: definition.commands.map((command, index) => ({
+      ...command,
       options: [{ name: `option${index}`, type: 'boolean', flags: [`--option-${index}`] }],
       commands: [
         {
