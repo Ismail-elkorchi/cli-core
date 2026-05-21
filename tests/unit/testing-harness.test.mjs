@@ -5,6 +5,7 @@ import {
   createCliHarness,
   defineCliFixture,
   foundationFixtures,
+  pluginFixtures,
   runCliScenario
 } from '../../dist/testing/index.js';
 
@@ -49,6 +50,17 @@ test('fixture registry provides deterministic snapshots', () => {
   assert.deepEqual(registry.snapshot().map((fixture) => fixture.id), ['config.layer-stack', 'runs.plan-run']);
   assert.deepEqual(registry.list('runs').map((fixture) => fixture.id), ['runs.plan-run']);
   assert.equal(registry.has('config.layer-stack'), true);
+});
+
+test('plugin fixture corpus includes required plugin cases', () => {
+  assert.deepEqual(pluginFixtures.map((fixture) => fixture.id), [
+    'plugins.compatible-plugin',
+    'plugins.version-mismatch-plugin',
+    'plugins.runtime-mismatch-plugin',
+    'plugins.hook-order-plugin-set',
+    'plugins.faulty-plugin-manifest',
+    'plugins.faulty-plugin-runtime'
+  ]);
 });
 
 test('duplicate fixture ids fail with a stable diagnostic', () => {

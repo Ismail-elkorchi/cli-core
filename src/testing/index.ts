@@ -295,7 +295,97 @@ export const configFixtures = Object.freeze([
   })
 ]);
 
-export const cliCoreFixtures = Object.freeze([...foundationFixtures, ...commandFixtures, ...configFixtures]);
+export const pluginFixtures = Object.freeze([
+  defineCliFixture({
+    id: 'plugins.compatible-plugin',
+    family: 'plugins',
+    title: 'Compatible plugin manifest',
+    capabilities: ['plugins.manifest', 'plugins.compatibility'],
+    data: {
+      manifest: {
+        name: 'ship-audit',
+        version: '1.0.0',
+        cliCore: { minVersion: '0.1.0' },
+        runtimes: ['node', 'deno', 'bun'],
+        capabilities: ['audit'],
+        hooks: [{ name: 'audit-prerun', event: 'prerun', order: 10 }]
+      }
+    }
+  }),
+  defineCliFixture({
+    id: 'plugins.version-mismatch-plugin',
+    family: 'plugins',
+    title: 'Version mismatch plugin manifest',
+    capabilities: ['plugins.compatibility', 'plugins.diagnostics'],
+    data: {
+      manifest: {
+        name: 'future-plugin',
+        version: '1.0.0',
+        cliCore: { minVersion: '99.0.0' }
+      }
+    }
+  }),
+  defineCliFixture({
+    id: 'plugins.runtime-mismatch-plugin',
+    family: 'plugins',
+    title: 'Runtime mismatch plugin manifest',
+    capabilities: ['plugins.compatibility', 'plugins.runtime'],
+    data: {
+      manifest: {
+        name: 'node-only-plugin',
+        version: '1.0.0',
+        runtimes: ['node']
+      },
+      runtime: 'deno'
+    }
+  }),
+  defineCliFixture({
+    id: 'plugins.hook-order-plugin-set',
+    family: 'plugins',
+    title: 'Hook ordering plugin set',
+    capabilities: ['plugins.hooks', 'plugins.hook-order'],
+    data: {
+      manifests: [
+        { name: 'first-plugin', version: '1.0.0', hooks: [{ name: 'prepare', event: 'prerun', before: ['second-plugin:observe'] }] },
+        { name: 'second-plugin', version: '1.0.0', hooks: [{ name: 'observe', event: 'prerun' }] }
+      ]
+    }
+  }),
+  defineCliFixture({
+    id: 'plugins.faulty-plugin-manifest',
+    family: 'plugins',
+    title: 'Faulty plugin manifest',
+    capabilities: ['plugins.manifest', 'plugins.diagnostics'],
+    data: {
+      manifest: {
+        name: '',
+        version: '',
+        hooks: [{ name: '', event: 'init' }]
+      }
+    }
+  }),
+  defineCliFixture({
+    id: 'plugins.faulty-plugin-runtime',
+    family: 'plugins',
+    title: 'Faulty plugin runtime',
+    capabilities: ['plugins.lazy-loading', 'plugins.fault-isolation'],
+    data: {
+      manifest: {
+        name: 'faulty-runtime',
+        version: '1.0.0',
+        hooks: [{ name: 'explode', event: 'prerun' }]
+      },
+      failure: 'loader throws'
+    }
+  })
+]);
+
+export const cliCoreFixtures = Object.freeze([
+  ...foundationFixtures,
+  ...commandFixtures,
+  ...configFixtures,
+  ...pluginFixtures
+]);
 
 export function defineCliFixture(definition: CliFixtureDefinition): CliFixture {
   const fixture = buildFixture(definition);

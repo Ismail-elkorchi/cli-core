@@ -6,6 +6,7 @@ export { resolveCliConfig } from './config/index.js';
 export { createHelpDocument, createVersionDocument } from './help/index.js';
 export { describeCli } from './manifest/index.js';
 export { parseCli, validateCli } from './parse/index.js';
+export { checkCliPluginCompatibility, createCliPluginHost, defineCliPluginManifest } from './plugins/index.js';
 export { suggestRepairs } from './repair/index.js';
 export type {
   CliAlias,
@@ -81,3 +82,29 @@ export type {
   ManifestPositional,
   ManifestProgram
 } from './manifest/index.js';
+export type {
+  CliPluginCompatibilityResult,
+  CliPluginCoreCompatibility,
+  CliPluginData,
+  CliPluginEffect,
+  CliPluginHookContext,
+  CliPluginHookDefinition,
+  CliPluginHookDefinitionInput,
+  CliPluginHookEvent,
+  CliPluginHookHandler,
+  CliPluginHookOutput,
+  CliPluginHookPlan,
+  CliPluginHookReference,
+  CliPluginHookResult,
+  CliPluginHookRunInput,
+  CliPluginHookRunResult,
+  CliPluginHost,
+  CliPluginHostInput,
+  CliPluginLoadResult,
+  CliPluginLoader,
+  CliPluginManifest,
+  CliPluginManifestDefinition,
+  CliPluginModule,
+  CliPluginRegistration,
+  CliPluginRuntime
+} from './plugins/index.js';

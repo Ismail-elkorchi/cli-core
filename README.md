@@ -8,9 +8,9 @@ This package is in active implementation. The current public surface includes
 stable package entrypoints, contract metadata, command program compilation,
 argv binding through `argv-flags`, help/version documents, command manifests,
 manifest import/export, config resolution with provenance, completion payloads
-and scripts, repair suggestions, and a testing harness for data-only fixture and
-entrypoint scenarios. Plugin and run behavior are not part of the current public
-surface.
+and scripts, repair suggestions, plugin manifest/host contracts, and a testing
+harness for data-only fixture and entrypoint scenarios. Run behavior is not part
+of the current public surface.
 
 ## Boundary
 
@@ -141,6 +141,45 @@ const completion = createCompletionPayload(program, { word: 'd' });
 const bash = createCompletionScript(program, 'bash');
 const installPlan = createCompletionInstallPlan(program, 'fish');
 const repairs = suggestRepairs(parseCli(program, { argv: ['deply', 'api'] }), program);
+```
+
+## Plugins
+
+Plugin APIs are manifest-first. Consumers can inspect compatibility and hook
+ordering without loading plugin code. Loaders run only when a plugin or hook is
+used, and loader or hook failures become typed diagnostics.
+
+```ts
+import {
+  checkCliPluginCompatibility,
+  createCliPluginHost,
+  defineCliPluginManifest
+} from '@ismail-elkorchi/cli-core';
+
+const manifest = defineCliPluginManifest({
+  name: 'ship-audit',
+  version: '1.0.0',
+  capabilities: ['audit'],
+  hooks: [{ name: 'audit-prerun', event: 'prerun' }]
+});
+
+const host = createCliPluginHost([
+  {
+    manifest,
+    load: () => ({
+      manifest,
+      hooks: {
+        'audit-prerun': () => ({
+          effects: [{ kind: 'audit.record', data: { ok: true } }]
+        })
+      }
+    })
+  }
+], { allowedCapabilities: ['audit'] });
+
+const compatibility = checkCliPluginCompatibility(manifest, { runtime: 'node' });
+const plan = host.planHooks('prerun');
+const run = await host.runHooks('prerun');
 ```
 
 ## Testing Harness
