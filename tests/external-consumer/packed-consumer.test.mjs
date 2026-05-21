@@ -180,7 +180,7 @@ const run = await root.runCli(program, {
   invocation,
   handlers: {
     deploy: () => ({
-      artifacts: [{ id: 'summary', kind: 'json', data: { service: 'api' } }],
+      artifacts: [{ id: 'summary', kind: 'json', payload: { service: 'api' } }],
       effects: [{ kind: 'write_file', path: 'deploy.json', content: '{"ok":true}' }]
     })
   }
@@ -191,7 +191,7 @@ const main = await adapter.runCliMain({
   argv: ['deploy', '--region', 'eu', 'api'],
   handlers: {
     deploy: () => ({
-      artifacts: [{ id: 'main-summary', kind: 'json', data: { service: 'api' } }]
+      artifacts: [{ id: 'main-summary', kind: 'json', payload: { service: 'api' } }]
     })
   }
 });
@@ -259,7 +259,7 @@ const resolved = config.resolveCliConfig(program, discovered.input);
 const completions = completion.completeCli(program, { words: ['ship', 'ch'], cursor: 2 });
 const run = await root.runCli(program, { mode: 'plan', invocation });
 const main = await adapter.runCliMain({ program, mode: 'plan', argv: ['check', 'api'] });
-const envelope = schema.createCliSchemaEnvelope({ payloadSchemaVersion: run.schemaVersion, data: run });
+const envelope = schema.createCliSchemaEnvelope({ payloadSchemaVersion: run.schemaVersion, payload: run });
 
 console.log(JSON.stringify({
   packageName: root.cliCorePackage.name,

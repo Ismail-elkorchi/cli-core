@@ -8,6 +8,7 @@ test('schema declarations expose envelopes, failure policy, and redaction contra
 
   assert.match(text, /CliSchemaEnvelope/);
   assert.match(text, /CliFailureEnvelope/);
+  assert.match(text, /readonly payload/);
   assert.match(text, /CliRedactionOptions/);
   assert.match(text, /repair-suggestions/);
   assert.match(text, /plugin-command-application/);
@@ -17,4 +18,5 @@ test('schema declarations expose envelopes, failure policy, and redaction contra
   assert.match(text, /redactCliSecrets/);
   assert.match(root, /createCliSchemaEnvelope/);
   assert.match(root, /redactCliDiagnostics/);
+  assert.doesNotMatch(text, /readonly data/);
 });

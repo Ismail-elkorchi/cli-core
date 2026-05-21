@@ -27,7 +27,7 @@ export type ExitKind =
   | 'external_error'
   | 'internal_error';
 
-export type RunData = CliDiagnosticValue;
+export type RunPayload = CliDiagnosticValue;
 
 export interface RunRequest {
   readonly mode?: RunMode;
@@ -37,9 +37,9 @@ export interface RunRequest {
   readonly handlers?: Readonly<Record<string, RunHandler>>;
   readonly effects?: readonly RunEffect[];
   readonly artifacts?: readonly RunArtifact[];
-  readonly context?: RunData;
+  readonly context?: RunPayload;
   readonly pluginHost?: CliPluginHost;
-  readonly pluginContext?: RunData;
+  readonly pluginContext?: RunPayload;
   readonly exitStatusPolicy?: ExitStatusPolicy;
   readonly redaction?: CliRedactionOptions;
   readonly cancelled?: boolean;
@@ -55,7 +55,7 @@ export interface RunHandlerContext {
   readonly mode: RunMode;
   readonly command: CliCommand;
   readonly invocation: ParsedInvocation;
-  readonly context: RunData;
+  readonly context: RunPayload;
 }
 
 export interface RunHandlerOutput {
@@ -85,7 +85,7 @@ export interface RunEvent {
   readonly runId: RunIdentifier;
   readonly sequence: number;
   readonly name: RunEventName;
-  readonly data: RunData;
+  readonly payload: RunPayload;
 }
 
 export type RunEventName =
@@ -119,20 +119,20 @@ export interface PluginRunEffect {
   readonly hookName: string;
   readonly event: CliPluginHookEvent;
   readonly effectKind: string;
-  readonly data?: RunData;
+  readonly payload?: RunPayload;
 }
 
 export interface CustomRunEffect {
   readonly kind: 'custom';
   readonly name: string;
-  readonly data?: RunData;
+  readonly payload?: RunPayload;
 }
 
 export interface RunArtifact {
   readonly id: string;
   readonly kind: string;
   readonly label?: string;
-  readonly data: RunData;
+  readonly payload: RunPayload;
 }
 
 export type ExitStatusPolicy = Partial<Record<ExitKind, number>>;
@@ -334,7 +334,7 @@ async function runPluginLifecycle(
   }
 
   const result = await request.pluginHost.runHooks(event, {
-    data: pluginHookData(request, invocation)
+    payload: pluginHookPayload(request, invocation)
   });
   diagnostics.push(...result.diagnostics);
   effects.push(...pluginRunEffects(result));
@@ -351,7 +351,7 @@ async function runPluginLifecycle(
   });
 }
 
-function pluginHookData(request: RunRequest, invocation: ParsedInvocation): RunData {
+function pluginHookPayload(request: RunRequest, invocation: ParsedInvocation): RunPayload {
   return freezeRunValue({
     run: request.pluginContext ?? null,
     commandPath: invocation.commandPath,
@@ -363,8 +363,8 @@ function pluginHookData(request: RunRequest, invocation: ParsedInvocation): RunD
 function pluginRunEffects(result: CliPluginHookRunResult): readonly PluginRunEffect[] {
   return Object.freeze(result.hooks.flatMap((hook) =>
     hook.effects.map((effect) => {
-      const optionalFields: { data?: RunData } = {};
-      if (effect.data !== undefined) optionalFields.data = freezeRunValue(effect.data) as RunData;
+      const optionalFields: { payload?: RunPayload } = {};
+      if (effect.payload !== undefined) optionalFields.payload = freezeRunValue(effect.payload) as RunPayload;
       return Object.freeze({
         kind: 'plugin' as const,
         pluginName: hook.pluginName,
@@ -492,13 +492,13 @@ class RunEventRecorder {
     this.#runId = runId;
   }
 
-  public record(name: RunEventName, data: RunData): void {
+  public record(name: RunEventName, payload: RunPayload): void {
     this.#events.push(Object.freeze({
       schemaVersion: 'cli-core.run-event.v1',
       runId: this.#runId,
       sequence: this.#events.length,
       name,
-      data: freezeRunValue(data)
+      payload: freezeRunValue(payload)
     }));
   }
 

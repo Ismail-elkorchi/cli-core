@@ -20,7 +20,7 @@ export interface CliFixtureDefinition {
   readonly title: string;
   readonly description?: string;
   readonly capabilities: readonly string[];
-  readonly data?: CliFixtureValue;
+  readonly value?: CliFixtureValue;
 }
 
 export interface CliFixture {
@@ -29,7 +29,7 @@ export interface CliFixture {
   readonly title: string;
   readonly description?: string;
   readonly capabilities: readonly string[];
-  readonly data: CliFixtureValue;
+  readonly value: CliFixtureValue;
 }
 
 export interface LargeCommandFixtureInput {
@@ -133,7 +133,7 @@ export const foundationFixtures = Object.freeze([
     title: 'Package metadata contract',
     description: 'The package name, semantic version, and contract version are importable data.',
     capabilities: ['package.metadata', 'package.contract-version'],
-    data: {
+    value: {
       name: cliCorePackage.name,
       version: cliCorePackage.version,
       contractVersion: cliCorePackage.contractVersion
@@ -145,7 +145,7 @@ export const foundationFixtures = Object.freeze([
     title: 'Public entrypoint contract',
     description: 'The root and documented subpath entrypoints can be imported by consumers.',
     capabilities: ['package.exports', 'subpath.imports'],
-    data: {
+    value: {
       entrypoints: ['root', 'adapter', 'help', 'completion', 'manifest', 'config', 'effects', 'plugins', 'repair', 'schema', 'testing']
     }
   })
@@ -157,7 +157,7 @@ export const commandFixtures = Object.freeze([
     family: 'commands',
     title: 'Minimal command program',
     capabilities: ['command.definition', 'command.compilation'],
-    data: {
+    value: {
       name: 'minimal',
       commands: [{ name: 'run' }]
     }
@@ -167,7 +167,7 @@ export const commandFixtures = Object.freeze([
     family: 'commands',
     title: 'Nested command tree',
     capabilities: ['command.paths', 'command.aliases', 'options.global', 'options.local'],
-    data: {
+    value: {
       name: 'tree',
       options: [{ name: 'verbose', type: 'boolean', flags: ['--verbose', '-v'] }],
       commands: [
@@ -195,7 +195,7 @@ export const commandFixtures = Object.freeze([
     family: 'commands',
     title: 'Repair-oriented command names',
     capabilities: ['command.lookup', 'repair.unknown-command'],
-    data: {
+    value: {
       name: 'repair',
       commands: [{ name: 'install', aliases: ['i'] }, { name: 'inspect' }, { name: 'init' }]
     }
@@ -205,7 +205,7 @@ export const commandFixtures = Object.freeze([
     family: 'commands',
     title: 'Pass-through command program',
     capabilities: ['argv.pass-through', 'options.local'],
-    data: {
+    value: {
       name: 'proxy',
       commands: [
         {
@@ -222,7 +222,7 @@ export const commandFixtures = Object.freeze([
     family: 'commands',
     title: 'Deprecated alias program',
     capabilities: ['command.aliases', 'diagnostics.deprecated-alias'],
-    data: {
+    value: {
       name: 'deprecated',
       commands: [
         {
@@ -238,7 +238,7 @@ export const commandFixtures = Object.freeze([
     family: 'commands',
     title: 'Large command program',
     capabilities: ['command.paths', 'scale.command-index'],
-    data: largeCommandFixtureValue({ commandCount: 128, programName: 'large' })
+    value: largeCommandFixtureValue({ commandCount: 128, programName: 'large' })
   })
 ]);
 
@@ -248,7 +248,7 @@ export const configFixtures = Object.freeze([
     family: 'config',
     title: 'Config layer stack',
     capabilities: ['config.precedence', 'config.provenance'],
-    data: {
+    value: {
       definition: {
         fields: [
           { name: 'mode', type: 'string', default: 'safe', env: 'SHIP_MODE' },
@@ -268,7 +268,7 @@ export const configFixtures = Object.freeze([
     family: 'config',
     title: 'Config discovery scope',
     capabilities: ['config.discovery'],
-    data: {
+    value: {
       discovery: {
         scope: 'explicit_paths',
         cwd: '/workspace',
@@ -281,7 +281,7 @@ export const configFixtures = Object.freeze([
     family: 'config',
     title: 'Config migration v1 to v2',
     capabilities: ['config.versioning', 'config.migration'],
-    data: {
+    value: {
       migration: { from: '1', to: '2', rename: { zone: 'region' } },
       input: { path: 'ship.v1.json', version: '1', values: { zone: 'eu' } }
     }
@@ -291,7 +291,7 @@ export const configFixtures = Object.freeze([
     family: 'config',
     title: 'Malformed config input',
     capabilities: ['config.diagnostics'],
-    data: {
+    value: {
       path: 'bad.json',
       text: '{'
     }
@@ -304,7 +304,7 @@ export const pluginFixtures = Object.freeze([
     family: 'plugins',
     title: 'Compatible plugin manifest',
     capabilities: ['plugins.manifest', 'plugins.compatibility'],
-    data: {
+    value: {
       manifest: {
         name: 'ship-audit',
         version: '1.0.0',
@@ -320,7 +320,7 @@ export const pluginFixtures = Object.freeze([
     family: 'plugins',
     title: 'Version mismatch plugin manifest',
     capabilities: ['plugins.compatibility', 'plugins.diagnostics'],
-    data: {
+    value: {
       manifest: {
         name: 'future-plugin',
         version: '1.0.0',
@@ -333,7 +333,7 @@ export const pluginFixtures = Object.freeze([
     family: 'plugins',
     title: 'Runtime mismatch plugin manifest',
     capabilities: ['plugins.compatibility', 'plugins.runtime'],
-    data: {
+    value: {
       manifest: {
         name: 'node-only-plugin',
         version: '1.0.0',
@@ -347,7 +347,7 @@ export const pluginFixtures = Object.freeze([
     family: 'plugins',
     title: 'Hook ordering plugin set',
     capabilities: ['plugins.hooks', 'plugins.hook-order'],
-    data: {
+    value: {
       manifests: [
         { name: 'first-plugin', version: '1.0.0', hooks: [{ name: 'prepare', event: 'prerun', before: ['second-plugin:observe'] }] },
         { name: 'second-plugin', version: '1.0.0', hooks: [{ name: 'observe', event: 'prerun' }] }
@@ -359,7 +359,7 @@ export const pluginFixtures = Object.freeze([
     family: 'plugins',
     title: 'Faulty plugin manifest',
     capabilities: ['plugins.manifest', 'plugins.diagnostics'],
-    data: {
+    value: {
       manifest: {
         name: '',
         version: '',
@@ -372,7 +372,7 @@ export const pluginFixtures = Object.freeze([
     family: 'plugins',
     title: 'Faulty plugin runtime',
     capabilities: ['plugins.lazy-loading', 'plugins.fault-isolation'],
-    data: {
+    value: {
       manifest: {
         name: 'faulty-runtime',
         version: '1.0.0',
@@ -389,7 +389,7 @@ export const runFixtures = Object.freeze([
     family: 'runs',
     title: 'Apply run',
     capabilities: ['run.apply', 'run.events', 'run.effects'],
-    data: {
+    value: {
       argv: ['deploy', 'api'],
       mode: 'apply',
       expectedExitKind: 'ok'
@@ -400,7 +400,7 @@ export const runFixtures = Object.freeze([
     family: 'runs',
     title: 'Plan run',
     capabilities: ['run.plan', 'run.effects'],
-    data: {
+    value: {
       argv: ['deploy', 'api'],
       mode: 'plan',
       effects: [{ kind: 'spawn', command: 'ship', argv: ['deploy', 'api'] }]
@@ -411,7 +411,7 @@ export const runFixtures = Object.freeze([
     family: 'runs',
     title: 'Long-running run',
     capabilities: ['run.identifiers', 'run.events'],
-    data: {
+    value: {
       runId: 'run-long',
       mode: 'apply',
       elapsedMs: 5000
@@ -422,7 +422,7 @@ export const runFixtures = Object.freeze([
     family: 'runs',
     title: 'Cancelled run',
     capabilities: ['run.cancelled', 'run.exit-status'],
-    data: {
+    value: {
       cancelled: true,
       expectedExitKind: 'cancelled'
     }
@@ -432,7 +432,7 @@ export const runFixtures = Object.freeze([
     family: 'runs',
     title: 'Timeout run',
     capabilities: ['run.timeout', 'run.exit-status'],
-    data: {
+    value: {
       timeoutMs: 100,
       elapsedMs: 101,
       expectedExitKind: 'timeout'
@@ -443,7 +443,7 @@ export const runFixtures = Object.freeze([
     family: 'runs',
     title: 'Interrupted run',
     capabilities: ['run.interrupted', 'run.exit-status'],
-    data: {
+    value: {
       interrupted: true,
       expectedExitKind: 'interrupted'
     }
@@ -478,7 +478,7 @@ export function createLargeCommandFixture(input: LargeCommandFixtureInput = {}):
     title: `Large command program (${commandCount})`,
     description: 'Generated command-surface fixture for scale-sensitive compilation, lookup, completion, repair, and manifest checks.',
     capabilities: ['command.paths', 'command.aliases', 'options.local', 'scale.command-index', 'scale.generated'],
-    data: largeCommandFixtureValue({ commandCount, programName })
+    value: largeCommandFixtureValue({ commandCount, programName })
   });
 }
 
@@ -580,7 +580,7 @@ const packageEntrypoints: readonly CliPackageEntrypoint[] = Object.freeze([
 ]);
 
 function buildFixture(definition: CliFixtureDefinition): CliFixture {
-  const fixtureData = cloneFixtureValue(definition.data ?? null);
+  const fixtureValue = cloneFixtureValue(definition.value ?? null);
   const capabilities = Object.freeze([...definition.capabilities]);
 
   if (definition.description === undefined) {
@@ -589,7 +589,7 @@ function buildFixture(definition: CliFixtureDefinition): CliFixture {
       family: definition.family,
       title: definition.title,
       capabilities,
-      data: fixtureData
+      value: fixtureValue
     };
   }
 
@@ -599,7 +599,7 @@ function buildFixture(definition: CliFixtureDefinition): CliFixture {
     title: definition.title,
     description: definition.description,
     capabilities,
-    data: fixtureData
+    value: fixtureValue
   };
 }
 
@@ -702,7 +702,7 @@ function freezeFixture(fixture: CliFixture): CliFixture {
   return Object.freeze({
     ...fixture,
     capabilities: Object.freeze([...fixture.capabilities]),
-    data: freezeFixtureValue(fixture.data)
+    value: freezeFixtureValue(fixture.value)
   });
 }
 

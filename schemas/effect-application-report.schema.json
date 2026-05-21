@@ -8,7 +8,7 @@
     "schemaVersion": { "const": "cli-core.effect-application.v1" },
     "mode": { "enum": ["plan", "apply"] },
     "ok": { "type": "boolean" },
-    "reports": { "type": "array", "items": { "type": "object", "required": ["effect", "status", "data", "diagnostics"] } },
+    "reports": { "type": "array", "items": { "type": "object", "required": ["effect", "status", "payload", "diagnostics"] } },
     "diagnostics": { "type": "array", "items": { "type": "object", "required": ["code", "severity", "message", "fields"] } }
   },
   "additionalProperties": true

@@ -22,7 +22,7 @@ export async function runCliMainExample() {
     effectMode: 'plan',
     handlers: {
       deploy: () => ({
-        artifacts: [{ id: 'deploy-summary', kind: 'json', data: { service: 'api' } }]
+        artifacts: [{ id: 'deploy-summary', kind: 'json', payload: { service: 'api' } }]
       })
     }
   });

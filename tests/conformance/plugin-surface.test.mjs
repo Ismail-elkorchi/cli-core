@@ -20,10 +20,14 @@ test('plugin declarations include manifest, host, hook, and diagnostic contracts
   const text = await readFile(new URL('../../dist/plugins/index.d.ts', import.meta.url), 'utf8');
 
   assert.match(text, /CliPluginManifest/);
+  assert.match(text, /CliPluginPayload/);
   assert.match(text, /CliPluginCommandApplication/);
   assert.match(text, /CliPluginCommandContribution/);
   assert.match(text, /CliPluginHost/);
   assert.match(text, /CliPluginHookPlan/);
   assert.match(text, /CliPluginHookRunResult/);
+  assert.match(text, /readonly payload/);
+  assert.doesNotMatch(text, /CliPluginData/);
+  assert.doesNotMatch(text, /readonly data/);
   assert.doesNotMatch(text, /internal\//);
 });

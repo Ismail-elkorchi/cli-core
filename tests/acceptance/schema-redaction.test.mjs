@@ -21,7 +21,7 @@ test('consumer can wrap run results and redact secrets through the schema subpat
   });
   const envelope = createCliSchemaEnvelope({
     payloadSchemaVersion: result.schemaVersion,
-    data: result
+    payload: result
   });
   const failure = createCliFailureEnvelope({
     kind: 'policy_denial',
@@ -33,12 +33,12 @@ test('consumer can wrap run results and redact secrets through the schema subpat
         fields: { password: 'secret' }
       }
     ],
-    data: { authorization: 'Bearer abc123' }
+    payload: { authorization: 'Bearer abc123' }
   });
 
   assert.equal(describeCliSchemas().some((schema) => schema.version === 'cli-core.run-result.v1'), true);
   assert.equal(envelope.schemaVersion, 'cli-core.schema-envelope.v1');
-  assert.equal(envelope.data.effects[0].env.SHIP_TOKEN, '[REDACTED]');
+  assert.equal(envelope.payload.effects[0].env.SHIP_TOKEN, '[REDACTED]');
   assert.equal(failure.redacted, true);
   assert.equal(failure.diagnostics[0].fields.password, '[REDACTED]');
   assert.equal(redactCliSecrets({ token: 'abc123' }).token, '[REDACTED]');

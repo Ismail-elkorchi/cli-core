@@ -41,7 +41,7 @@ test('runCliMain writes only through the supplied host and maps exit status expl
     mode: 'apply',
     handlers: {
       deploy: () => ({
-        artifacts: [{ id: 'summary', kind: 'json', data: { service: 'api' } }]
+        artifacts: [{ id: 'summary', kind: 'json', payload: { service: 'api' } }]
       })
     }
   });

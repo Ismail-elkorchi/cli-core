@@ -3,12 +3,12 @@
   "$id": "urn:ismail-elkorchi:cli-core:schema:artifact:v1",
   "title": "cli-core Artifact",
   "type": "object",
-  "required": ["id", "kind", "data"],
+  "required": ["id", "kind", "payload"],
   "properties": {
     "id": { "type": "string" },
     "kind": { "type": "string" },
     "label": { "type": "string" },
-    "data": {}
+    "payload": {}
   },
   "additionalProperties": true
 }

@@ -149,7 +149,7 @@ async function createPublicSamples() {
     effects: [{ kind: 'spawn', command: 'ship', argv: ['deploy', 'api'], env: { SHIP_TOKEN: 'abc123' } }],
     handlers: {
       deploy: () => ({
-        artifacts: [{ id: 'deploy-summary', kind: 'json', data: { service: 'api' } }],
+        artifacts: [{ id: 'deploy-summary', kind: 'json', payload: { service: 'api' } }],
         effects: [{ kind: 'write_file', path: 'deploy.json', content: '{"ok":true}' }]
       })
     }
@@ -161,8 +161,8 @@ async function createPublicSamples() {
     policy: { allowWriteFile: true }
   });
   const diagnostic = createUnsupportedSchemaDiagnostic('cli-core.old.v1');
-  const envelope = createCliSchemaEnvelope({ payloadSchemaVersion: run.schemaVersion, data: run });
-  const failure = createCliFailureEnvelope({ kind: 'internal_error', diagnostics: [diagnostic], data: { token: 'abc123' } });
+  const envelope = createCliSchemaEnvelope({ payloadSchemaVersion: run.schemaVersion, payload: run });
+  const failure = createCliFailureEnvelope({ kind: 'internal_error', diagnostics: [diagnostic], payload: { token: 'abc123' } });
   const redaction = redactCliSecretsWithReport({ password: 'secret', safe: 'visible' });
 
   return new Map([

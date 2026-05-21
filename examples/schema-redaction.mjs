@@ -19,7 +19,7 @@ export async function runSchemaRedactionExample() {
   });
   const envelope = createCliSchemaEnvelope({
     payloadSchemaVersion: run.schemaVersion,
-    data: run
+    payload: run
   });
   const failure = createCliFailureEnvelope({
     kind: 'policy_denial',

@@ -21,6 +21,21 @@ Low-level flag tokenization, coercion, and flag issue semantics are delegated to
 `argv-flags`; `cli-core` binds those parsed values to command, positional,
 config, repair, and run surfaces.
 
+## How It Differs
+
+Common JavaScript CLI frameworks usually center on terminal text, process
+execution, or framework-owned command classes. `cli-core` centers on public
+payloads that other tools can inspect: compiled programs, parsed invocations,
+config provenance, help and manifest documents, completion responses, repair
+suggestions, plugin diagnostics, run events, effects, artifacts, schemas, and
+test fixtures.
+
+This does not make `cli-core` a drop-in substitute for Commander, Yargs, oclif,
+Clipanion, CAC, or Cliffy. It is a command-core layer for CLIs that need
+behavior to be planned, replayed, validated, redacted, and adapted by humans,
+CI, editors, terminal frontends, automation, and coding agents without scraping
+terminal output.
+
 ## Quickstart
 
 Use `defineCli` to compile command definitions into an immutable program, then
@@ -230,7 +245,7 @@ const host = createCliPluginHost([
       manifest,
       hooks: {
         'audit-prerun': () => ({
-          effects: [{ kind: 'audit.record', data: { ok: true } }]
+          effects: [{ kind: 'audit.record', payload: { ok: true } }]
         })
       }
     })
@@ -273,7 +288,7 @@ const apply = await runCli(program, {
   invocation,
   handlers: {
     deploy: () => ({
-      artifacts: [{ id: 'deploy-summary', kind: 'json', data: { service: 'api' } }]
+      artifacts: [{ id: 'deploy-summary', kind: 'json', payload: { service: 'api' } }]
     })
   }
 });
@@ -358,7 +373,7 @@ const run = await runCli(program, {
 const schemas = describeCliSchemas();
 const envelope = createCliSchemaEnvelope({
   payloadSchemaVersion: run.schemaVersion,
-  data: run
+  payload: run
 });
 const failure = createCliFailureEnvelope({
   kind: 'policy_denial',

@@ -16,19 +16,19 @@ test('fixture definitions are cloned and immutable', () => {
     family: 'commands',
     title: 'Minimal program',
     capabilities: ['command.definition'],
-    data: {
+    value: {
       command: 'minimal'
     }
   };
 
   const fixture = defineCliFixture(source);
   source.capabilities.push('mutated');
-  source.data.command = 'changed';
+  source.value.command = 'changed';
 
   assert.deepEqual(fixture.capabilities, ['command.definition']);
-  assert.deepEqual(fixture.data, { command: 'minimal' });
+  assert.deepEqual(fixture.value, { command: 'minimal' });
   assert.throws(() => {
-    fixture.data.command = 'changed';
+    fixture.value.command = 'changed';
   }, TypeError);
 });
 

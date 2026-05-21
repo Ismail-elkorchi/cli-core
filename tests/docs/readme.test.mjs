@@ -18,6 +18,7 @@ test('README documents current public surface without unsupported claims', async
 
   assert.match(readme, /typed command-core package/);
   assert.match(readme, /API Overview/);
+  assert.match(readme, /How It Differs/);
   assert.match(readme, /CLI Adapter/);
   assert.match(readme, /Security Model/);
   assert.match(readme, /Limitations/);
@@ -46,8 +47,10 @@ test('README documents current public surface without unsupported claims', async
   assert.match(readme, /test:pressure/);
   assert.match(readme, /10,000-command scale mode/);
   assert.match(readme, /not parity claims/);
+  assert.match(readme, /planned, replayed, validated, redacted, and adapted/);
   assert.doesNotMatch(readme, /feature-complete/i);
   assert.doesNotMatch(readme, /drop-in replacement/i);
+  assert.doesNotMatch(readme, /replaces all/i);
 });
 
 test('command model example executes against the built package', async () => {

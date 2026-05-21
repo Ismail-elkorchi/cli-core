@@ -12,7 +12,7 @@
     "pluginName": { "type": "string" },
     "hookName": { "type": "string" },
     "name": { "type": "string" },
-    "data": {}
+    "payload": {}
   },
   "additionalProperties": true
 }

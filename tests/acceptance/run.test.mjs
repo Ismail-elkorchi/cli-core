@@ -18,7 +18,7 @@ test('consumer can parse an invocation and run it through plan and apply modes',
     invocation,
     handlers: {
       deploy: () => ({
-        artifacts: [{ id: 'summary', kind: 'json', data: { deployed: true } }]
+        artifacts: [{ id: 'summary', kind: 'json', payload: { deployed: true } }]
       })
     }
   });

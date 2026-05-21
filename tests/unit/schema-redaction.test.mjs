@@ -32,14 +32,14 @@ test('schema registry exposes stable public schema versions', () => {
 test('schema envelopes wrap payloads with package and schema metadata', () => {
   const envelope = createCliSchemaEnvelope({
     payloadSchemaVersion: 'cli-core.run-result.v1',
-    data: { token: 'secret-value', visible: true }
+    payload: { token: 'secret-value', visible: true }
   });
 
   assert.equal(envelope.schemaVersion, 'cli-core.schema-envelope.v1');
   assert.equal(envelope.packageName, '@ismail-elkorchi/cli-core');
   assert.equal(envelope.payloadSchemaVersion, 'cli-core.run-result.v1');
-  assert.equal(envelope.data.token, '[REDACTED]');
-  assert.equal(envelope.data.visible, true);
+  assert.equal(envelope.payload.token, '[REDACTED]');
+  assert.equal(envelope.payload.visible, true);
 });
 
 test('redaction reports sensitive keys, string patterns, and opt-out behavior', () => {
@@ -72,7 +72,7 @@ test('failure envelopes redact diagnostics and classify unsupported schemas as d
         fields: { accessToken: 'abc123' }
       }
     ],
-    data: { password: 'secret' }
+    payload: { password: 'secret' }
   });
 
   assert.equal(unsupported.code, 'CLI_SCHEMA_UNSUPPORTED');
@@ -80,7 +80,7 @@ test('failure envelopes redact diagnostics and classify unsupported schemas as d
   assert.equal(failure.redacted, true);
   assert.equal(failure.diagnostics[1].message, 'handler failed [REDACTED]');
   assert.equal(failure.diagnostics[1].fields.accessToken, '[REDACTED]');
-  assert.equal(failure.data.password, '[REDACTED]');
+  assert.equal(failure.payload.password, '[REDACTED]');
 });
 
 test('failure helpers map exit kinds and diagnostics to typed failure kinds', () => {
@@ -115,7 +115,7 @@ test('runCli redacts run effects, artifacts, events, and diagnostics by default'
     effects: [{ kind: 'spawn', command: 'ship', argv: ['deploy'], env: { SHIP_TOKEN: 'abc123' } }],
     handlers: {
       deploy: () => ({
-        artifacts: [{ id: 'summary', kind: 'json', data: { password: 'secret' } }],
+        artifacts: [{ id: 'summary', kind: 'json', payload: { password: 'secret' } }],
         diagnostics: [
           {
             code: 'CLI_RUN_HANDLER_FAILED',
@@ -135,7 +135,7 @@ test('runCli redacts run effects, artifacts, events, and diagnostics by default'
   });
 
   assert.equal(result.effects[0].env.SHIP_TOKEN, '[REDACTED]');
-  assert.equal(result.artifacts[0].data.password, '[REDACTED]');
+  assert.equal(result.artifacts[0].payload.password, '[REDACTED]');
   assert.equal(result.diagnostics[0].message, '[REDACTED]');
   assert.equal(result.diagnostics[0].fields.token, '[REDACTED]');
   assert.equal(unredacted.effects[0].env.SHIP_TOKEN, 'abc123');

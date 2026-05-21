@@ -40,7 +40,7 @@ test('node runtime can load and exercise public entrypoints', async () => {
     host: memoryHost.host,
     policy: { allowWriteFile: true }
   });
-  const envelope = schema.createCliSchemaEnvelope({ payloadSchemaVersion: run.schemaVersion, data: run });
+  const envelope = schema.createCliSchemaEnvelope({ payloadSchemaVersion: run.schemaVersion, payload: run });
   const harness = testing.createCliHarness({ entrypoints: { root, adapter, schema, testing } });
   const scenario = await testing.runCliScenario(harness, {
     id: 'runtime.node.entrypoints',

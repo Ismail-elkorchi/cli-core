@@ -354,7 +354,7 @@ function buildProgram(
   aliasIndex: readonly CliCommandAliasIndexEntry[],
   diagnostics: readonly CliDiagnostic[]
 ): CliProgram {
-  const common = {
+  const baseProgram = {
     schemaVersion: 'cli-core.program.v1' as const,
     name: definition.name,
     config: definition.config,
@@ -367,7 +367,7 @@ function buildProgram(
   const optionalFields: { version?: string; description?: string } = {};
   if (definition.version !== undefined) optionalFields.version = definition.version;
   if (definition.description !== undefined) optionalFields.description = definition.description;
-  return { ...common, ...optionalFields };
+  return { ...baseProgram, ...optionalFields };
 }
 
 function freezeCommand(command: CliCommand): CliCommand {

@@ -37,7 +37,7 @@ const effectReport = await effects.applyCliEffects({
   host: memoryHost.host,
   policy: { allowWriteFile: true }
 });
-const envelope = schema.createCliSchemaEnvelope({ payloadSchemaVersion: run.schemaVersion, data: run });
+const envelope = schema.createCliSchemaEnvelope({ payloadSchemaVersion: run.schemaVersion, payload: run });
 const harness = testing.createCliHarness({ entrypoints: { root, adapter, schema, testing } });
 const scenario = await testing.runCliScenario(harness, {
   id: 'runtime.bun.entrypoints',
