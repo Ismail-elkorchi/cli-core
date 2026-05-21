@@ -8,6 +8,7 @@ export { describeCli } from './manifest/index.js';
 export { parseCli, validateCli } from './parse/index.js';
 export { checkCliPluginCompatibility, createCliPluginHost, defineCliPluginManifest } from './plugins/index.js';
 export { suggestRepairs } from './repair/index.js';
+export { runCli } from './run/index.js';
 export type {
   CliAlias,
   CliAliasDefinition,
@@ -108,3 +109,22 @@ export type {
   CliPluginRegistration,
   CliPluginRuntime
 } from './plugins/index.js';
+export type {
+  CustomRunEffect,
+  ExitKind,
+  ExitStatusPolicy,
+  FileRunEffect,
+  RunArtifact,
+  RunData,
+  RunEffect,
+  RunEvent,
+  RunEventName,
+  RunHandler,
+  RunHandlerContext,
+  RunHandlerOutput,
+  RunIdentifier,
+  RunMode,
+  RunRequest,
+  RunResult,
+  SpawnRunEffect
+} from './run/index.js';

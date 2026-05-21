@@ -6,6 +6,7 @@ import { runConfigResolutionExample } from '../../examples/config-resolution.mjs
 import { runCommandModelExample } from '../../examples/command-model.mjs';
 import { runHelpManifestExample } from '../../examples/help-manifest.mjs';
 import { runPluginsExample } from '../../examples/plugins.mjs';
+import { runExecutionExample } from '../../examples/run.mjs';
 import { runTestingHarnessExample } from '../../examples/testing-harness.mjs';
 
 test('README documents current public surface without feature-complete claims', async () => {
@@ -18,6 +19,7 @@ test('README documents current public surface without feature-complete claims', 
   assert.match(readme, /createCompletionPayload/);
   assert.match(readme, /suggestRepairs/);
   assert.match(readme, /createCliPluginHost/);
+  assert.match(readme, /runCli/);
   assert.match(readme, /createCliHarness/);
   assert.doesNotMatch(readme, /feature-complete/i);
 });
@@ -66,4 +68,13 @@ test('plugins example executes against the built package', async () => {
   assert.equal(compatibility.ok, true);
   assert.equal(plan.hooks[0].id, 'ship-audit:audit-prerun');
   assert.equal(run.ok, true);
+});
+
+test('run example executes against the built package', async () => {
+  const { plan, apply } = await runExecutionExample();
+
+  assert.equal(plan.mode, 'plan');
+  assert.equal(plan.effects[0].kind, 'spawn');
+  assert.equal(apply.mode, 'apply');
+  assert.equal(apply.artifacts[0].id, 'deploy-summary');
 });

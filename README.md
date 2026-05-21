@@ -8,9 +8,10 @@ This package is in active implementation. The current public surface includes
 stable package entrypoints, contract metadata, command program compilation,
 argv binding through `argv-flags`, help/version documents, command manifests,
 manifest import/export, config resolution with provenance, completion payloads
-and scripts, repair suggestions, plugin manifest/host contracts, and a testing
-harness for data-only fixture and entrypoint scenarios. Run behavior is not part
-of the current public surface.
+and scripts, repair suggestions, plugin manifest/host contracts, run result
+envelopes, events, effects, artifacts, exit status policy, and a testing harness
+for data-only fixture and entrypoint scenarios. Schema/redaction and full
+runtime matrix behavior are not part of the current public surface.
 
 ## Boundary
 
@@ -180,6 +181,40 @@ const host = createCliPluginHost([
 const compatibility = checkCliPluginCompatibility(manifest, { runtime: 'node' });
 const plan = host.planHooks('prerun');
 const run = await host.runHooks('prerun');
+```
+
+## Run Planning And Apply
+
+`runCli` returns a replayable result envelope. Plan mode records intended
+effects without invoking handlers. Apply mode invokes an explicit handler for the
+matched command and returns effects, artifacts, diagnostics, ordered events, and
+an exit status selected from the exit policy. It does not call `process.exit` or
+write to stdout/stderr.
+
+```ts
+import { defineCli, parseCli, runCli } from '@ismail-elkorchi/cli-core';
+
+const program = defineCli({
+  name: 'ship',
+  commands: [{ name: 'deploy', positionals: [{ name: 'service' }] }]
+});
+
+const invocation = parseCli(program, { argv: ['deploy', 'api'] });
+const plan = await runCli(program, {
+  mode: 'plan',
+  invocation,
+  effects: [{ kind: 'spawn', command: 'ship', argv: ['deploy', 'api'] }]
+});
+
+const apply = await runCli(program, {
+  mode: 'apply',
+  invocation,
+  handlers: {
+    deploy: () => ({
+      artifacts: [{ id: 'deploy-summary', kind: 'json', data: { service: 'api' } }]
+    })
+  }
+});
 ```
 
 ## Testing Harness

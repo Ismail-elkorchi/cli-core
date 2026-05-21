@@ -19,7 +19,7 @@ for humans, CI, automation, and coding agents.
 ## Source Layout
 
 - `src/index.ts` is the root public entrypoint.
-- Feature-owned subpaths live under `src/{help,completion,manifest,config,plugins,repair,testing}`.
+- Feature-owned modules live under `src/{help,completion,manifest,config,plugins,repair,run,testing}`.
 - Internal code may live under `src/internal`, but public consumers must never
   import from it.
 
