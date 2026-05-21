@@ -27,6 +27,7 @@ test('testing subpath exposes harness and fixture contracts', async () => {
   assert.equal(typeof module.runCliScenario, 'function');
   assert.equal(typeof module.defineCliFixture, 'function');
   assert.equal(Array.isArray(module.foundationFixtures), true);
+  assert.equal(Array.isArray(module.pluginFixtures), true);
 });
 
 test('public declaration files do not expose internal module paths', async () => {

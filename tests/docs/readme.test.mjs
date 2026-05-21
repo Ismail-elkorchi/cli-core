@@ -5,6 +5,7 @@ import { runCompletionRepairExample } from '../../examples/completion-repair.mjs
 import { runConfigResolutionExample } from '../../examples/config-resolution.mjs';
 import { runCommandModelExample } from '../../examples/command-model.mjs';
 import { runHelpManifestExample } from '../../examples/help-manifest.mjs';
+import { runPluginsExample } from '../../examples/plugins.mjs';
 import { runTestingHarnessExample } from '../../examples/testing-harness.mjs';
 
 test('README documents current public surface without feature-complete claims', async () => {
@@ -16,6 +17,7 @@ test('README documents current public surface without feature-complete claims', 
   assert.match(readme, /describeCli/);
   assert.match(readme, /createCompletionPayload/);
   assert.match(readme, /suggestRepairs/);
+  assert.match(readme, /createCliPluginHost/);
   assert.match(readme, /createCliHarness/);
   assert.doesNotMatch(readme, /feature-complete/i);
 });
@@ -56,4 +58,12 @@ test('completion and repair example executes against the built package', () => {
   assert.match(script.script, /complete -F/);
   assert.equal(installPlan.steps[0].action, 'write_file');
   assert.equal(repairs[0].code, 'REPAIR_UNKNOWN_COMMAND');
+});
+
+test('plugins example executes against the built package', async () => {
+  const { compatibility, plan, run } = await runPluginsExample();
+
+  assert.equal(compatibility.ok, true);
+  assert.equal(plan.hooks[0].id, 'ship-audit:audit-prerun');
+  assert.equal(run.ok, true);
 });
