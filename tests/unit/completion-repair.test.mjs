@@ -2,16 +2,18 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   completeCli,
+  createCompletionPayload,
+  defineCli,
+  parseCli
+} from '../../dist/index.js';
+import {
   createCompletionCommand,
   createCompletionInstallPlan,
-  createCompletionPayload,
   createCompletionRequest,
   createCompletionScript,
-  defineCli,
-  handleCompletionRequest,
-  parseCli,
-  suggestRepairs
-} from '../../dist/index.js';
+  handleCompletionRequest
+} from '../../dist/completion/index.js';
+import { suggestRepairs } from '../../dist/repair/index.js';
 
 const program = defineCli({
   name: 'ship',

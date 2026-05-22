@@ -1,17 +1,19 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  defineCli,
+  runCli
+} from '../../dist/index.js';
+import {
   createCliFailureEnvelope,
   createCliSchemaEnvelope,
   createUnsupportedSchemaDiagnostic,
-  defineCli,
   describeCliSchemas,
   exitKindToFailureKind,
   failureKindForDiagnostics,
   isCliSchemaVersion,
-  redactCliSecretsWithReport,
-  runCli
-} from '../../dist/index.js';
+  redactCliSecretsWithReport
+} from '../../dist/schema/index.js';
 
 test('schema registry exposes stable public schema versions', () => {
   const schemas = describeCliSchemas();

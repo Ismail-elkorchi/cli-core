@@ -1,4 +1,5 @@
-import { createCliPluginHost, defineCli, parseCli, runCli } from '@ismail-elkorchi/cli-core';
+import { defineCli, parseCli, runCli } from '@ismail-elkorchi/cli-core';
+import { createCliPluginHost } from '@ismail-elkorchi/cli-core/plugins';
 
 export async function runExecutionExample() {
   const program = defineCli({

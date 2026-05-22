@@ -4,7 +4,7 @@ import {
   applyCliEffects,
   createMemoryEffectHost,
   planCliEffects
-} from '../../dist/index.js';
+} from '../../dist/effects/index.js';
 
 test('planCliEffects reports effects without applying a host', () => {
   const memory = createMemoryEffectHost();

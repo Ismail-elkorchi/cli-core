@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createHelpDocument, createVersionDocument, defineCli, describeCli } from '../../dist/index.js';
+import { createHelpDocument, defineCli, describeCli } from '../../dist/index.js';
+import { createVersionDocument } from '../../dist/help/index.js';
 import { exportCommandManifest, importCommandManifest } from '../../dist/manifest/index.js';
 
 const program = defineCli({

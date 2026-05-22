@@ -1,18 +1,20 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
-  applyCliPluginCommands,
-  checkCliPluginCompatibility,
   completeCli,
   createCompletionPayload,
-  createCliPluginHost,
   createHelpDocument,
-  defineCliPluginManifest,
   parseCli,
-  runCli,
-  suggestRepairs
+  runCli
 } from '../../dist/index.js';
 import { describeCli } from '../../dist/manifest/index.js';
+import {
+  applyCliPluginCommands,
+  checkCliPluginCompatibility,
+  createCliPluginHost,
+  defineCliPluginManifest
+} from '../../dist/plugins/index.js';
+import { suggestRepairs } from '../../dist/repair/index.js';
 
 test('consumer can validate a plugin manifest and run declared hooks lazily', async () => {
   let loaded = false;

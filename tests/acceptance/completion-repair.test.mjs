@@ -2,13 +2,15 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   completeCli,
-  createCompletionInstallPlan,
   createCompletionPayload,
-  createCompletionScript,
   defineCli,
-  parseCli,
-  suggestRepairs
+  parseCli
 } from '../../dist/index.js';
+import {
+  createCompletionInstallPlan,
+  createCompletionScript
+} from '../../dist/completion/index.js';
+import { suggestRepairs } from '../../dist/repair/index.js';
 
 test('consumer can derive completion payloads, scripts, install plans, and repair suggestions', () => {
   const program = defineCli({

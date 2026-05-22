@@ -5,10 +5,10 @@ import {
   defineCli,
   describeCli,
   parseCli,
-  redactCliSecrets,
-  runCli,
-  suggestRepairs
+  runCli
 } from '../../dist/index.js';
+import { suggestRepairs } from '../../dist/repair/index.js';
+import { redactCliSecrets } from '../../dist/schema/index.js';
 import { createLargeCommandDefinition } from '../../dist/testing/index.js';
 
 test('scale-sensitive command, completion, repair, run, and redaction paths stay within a conservative budget', async () => {

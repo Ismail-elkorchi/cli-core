@@ -1,14 +1,16 @@
 import {
   completeCli,
+  createCompletionPayload,
+  defineCli,
+  parseCli
+} from '@ismail-elkorchi/cli-core';
+import {
   createCompletionCommand,
   createCompletionInstallPlan,
-  createCompletionPayload,
   createCompletionRequest,
-  createCompletionScript,
-  defineCli,
-  parseCli,
-  suggestRepairs
-} from '@ismail-elkorchi/cli-core';
+  createCompletionScript
+} from '@ismail-elkorchi/cli-core/completion';
+import { suggestRepairs } from '@ismail-elkorchi/cli-core/repair';
 
 export function runCompletionRepairExample() {
   const program = defineCli({

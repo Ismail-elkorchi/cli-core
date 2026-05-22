@@ -1,9 +1,9 @@
 import {
   createHelpDocument,
-  createVersionDocument,
   defineCli,
   describeCli
 } from '@ismail-elkorchi/cli-core';
+import { createVersionDocument } from '@ismail-elkorchi/cli-core/help';
 import {
   exportCommandManifest,
   importCommandManifest

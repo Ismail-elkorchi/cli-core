@@ -4,9 +4,9 @@ import {
   defineCli,
   describeCli,
   findCliCommand,
-  parseCli,
-  suggestRepairs
+  parseCli
 } from '../../dist/index.js';
+import { suggestRepairs } from '../../dist/repair/index.js';
 import { createLargeCommandDefinition, createLargeCommandFixture } from '../../dist/testing/index.js';
 
 export function runLargeCommandSurfaceCase(commandCount) {

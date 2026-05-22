@@ -7,8 +7,6 @@ test('root and config subpath expose config resolution', async () => {
   const config = await import('../../dist/config/index.js');
 
   assert.equal(typeof root.resolveCliConfig, 'function');
-  assert.equal(typeof root.discoverCliConfigInput, 'function');
-  assert.equal(typeof root.createMemoryConfigDiscoveryHost, 'function');
   assert.equal(typeof config.resolveCliConfig, 'function');
   assert.equal(typeof config.discoverCliConfigInput, 'function');
   assert.equal(typeof config.createMemoryConfigDiscoveryHost, 'function');
@@ -22,6 +20,6 @@ test('config declarations include discovery host contracts', async () => {
   assert.match(text, /ConfigDiscoveryHostResult/);
   assert.match(text, /ConfigDiscoveryRequest/);
   assert.match(text, /ConfigDiscoveryCollection/);
-  assert.match(root, /createMemoryConfigDiscoveryHost/);
+  assert.doesNotMatch(root, /createMemoryConfigDiscoveryHost/);
   assert.doesNotMatch(text, /internal\//);
 });

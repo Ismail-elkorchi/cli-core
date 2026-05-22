@@ -1,8 +1,8 @@
+import { defineCli } from '@ismail-elkorchi/cli-core';
 import {
   createCliMain,
-  createNodeCliAdapter,
-  defineCli
-} from '@ismail-elkorchi/cli-core';
+  createNodeCliAdapter
+} from '@ismail-elkorchi/cli-core/adapter';
 
 export async function runCliMainExample() {
   const program = defineCli({

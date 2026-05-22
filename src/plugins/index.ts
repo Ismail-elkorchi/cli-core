@@ -1,5 +1,6 @@
 import {
   defineCli,
+  findCliCommandChildren,
   type CliAliasInput,
   type CliCommand,
   type CliCommandDefinition,
@@ -449,9 +450,7 @@ function definitionFromProgram(program: CliProgram): CliDefinition {
   if (program.description !== undefined) fields.description = program.description;
   if (program.config !== undefined) fields.config = program.config;
   fields.options = program.root.inheritedOptions.map(optionToDefinition);
-  fields.commands = program.commands
-    .filter((command) => command.parentId === program.root.id)
-    .map((command) => commandToDefinition(command, program));
+  fields.commands = findCliCommandChildren(program, program.root.id).map((command) => commandToDefinition(command, program));
   return freezeDefinition({ name: program.name, ...fields });
 }
 
@@ -478,9 +477,7 @@ function commandToDefinition(command: CliCommand, program: CliProgram): CliComma
   if (command.positionals.length > 0) fields.positionals = command.positionals.map(positionalToDefinition);
   if (command.options.length > 0) fields.options = command.options.map(optionToDefinition);
   if (command.allowPassThrough) fields.allowPassThrough = command.allowPassThrough;
-  const childCommands = program.commands
-    .filter((candidate) => candidate.parentId === command.id)
-    .map((candidate) => commandToDefinition(candidate, program));
+  const childCommands = findCliCommandChildren(program, command.id).map((candidate) => commandToDefinition(candidate, program));
   if (childCommands.length > 0) fields.commands = childCommands;
   return cloneCommandDefinition({ name: command.name, ...fields }, command.source);
 }

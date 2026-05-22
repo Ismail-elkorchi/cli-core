@@ -1,10 +1,5 @@
 # AGENTS
 
-## Mission
-
-Build `@ismail-elkorchi/cli-core` as a typed, replayable command-core package
-for humans, CI, automation, and coding agents.
-
 ## Boundaries
 
 - Keep command semantics, config, manifests, completion, plugins, diagnostics,
@@ -34,4 +29,4 @@ for humans, CI, automation, and coding agents.
 - `npm run check`
 
 Use targeted tests while developing; reserve broad checks for PR gates and
-release-readiness work.
+larger release checks.

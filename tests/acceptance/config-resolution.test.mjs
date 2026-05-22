@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
-  createMemoryConfigDiscoveryHost,
   defineCli,
-  discoverCliConfigInput,
   parseCli,
   resolveCliConfig
 } from '../../dist/index.js';
+import {
+  createMemoryConfigDiscoveryHost,
+  discoverCliConfigInput
+} from '../../dist/config/index.js';
 
 test('consumer can parse argv and pass option values into config resolution', () => {
   const program = defineCli({

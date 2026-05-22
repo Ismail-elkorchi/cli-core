@@ -5,33 +5,43 @@ import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import test from 'node:test';
 import {
-  applyCliEffects,
-  applyCliPluginCommands,
   completeCli,
-  createCliFailureEnvelope,
-  createCliSchemaEnvelope,
-  createCompletionCommand,
-  createCompletionInstallPlan,
   createCompletionPayload,
-  createCompletionRequest,
-  createCompletionScript,
   createHelpDocument,
-  createMemoryConfigDiscoveryHost,
-  createMemoryEffectHost,
-  createUnsupportedSchemaDiagnostic,
-  createVersionDocument,
   defineCli,
-  defineCliPluginManifest,
   describeCli,
-  describeCliSchemas,
-  discoverCliConfigInput,
   parseCli,
-  redactCliSecretsWithReport,
   resolveCliConfig,
   runCli,
-  suggestRepairs,
   validateCli
 } from '../../dist/index.js';
+import {
+  createCompletionCommand,
+  createCompletionInstallPlan,
+  createCompletionRequest,
+  createCompletionScript
+} from '../../dist/completion/index.js';
+import {
+  createMemoryConfigDiscoveryHost,
+  discoverCliConfigInput
+} from '../../dist/config/index.js';
+import {
+  applyCliEffects,
+  createMemoryEffectHost
+} from '../../dist/effects/index.js';
+import { createVersionDocument } from '../../dist/help/index.js';
+import {
+  applyCliPluginCommands,
+  defineCliPluginManifest
+} from '../../dist/plugins/index.js';
+import { suggestRepairs } from '../../dist/repair/index.js';
+import {
+  createCliFailureEnvelope,
+  createCliSchemaEnvelope,
+  createUnsupportedSchemaDiagnostic,
+  describeCliSchemas,
+  redactCliSecretsWithReport
+} from '../../dist/schema/index.js';
 
 const execFileAsync = promisify(execFile);
 const repoRoot = new URL('../..', import.meta.url);

@@ -1,5 +1,6 @@
 import {
   findCliCommand,
+  findCliCommandChildren,
   type CliCommand,
   type CliCommandSource,
   type CliOption,
@@ -56,7 +57,7 @@ export interface VersionDocument {
 
 export function createHelpDocument(program: CliProgram, commandPath: readonly string[] = []): HelpDocument {
   const command = findCliCommand(program, commandPath) ?? program.root;
-  const childCommands = program.commands.filter((candidate) => candidate.parentId === command.id);
+  const childCommands = findCliCommandChildren(program, command.id);
   return Object.freeze({
     schemaVersion: 'cli-core.help.v1',
     programName: program.name,

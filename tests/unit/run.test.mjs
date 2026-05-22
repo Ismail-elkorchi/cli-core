@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createCliPluginHost, defineCli, runCli } from '../../dist/index.js';
+import { defineCli, runCli } from '../../dist/index.js';
+import { createCliPluginHost } from '../../dist/plugins/index.js';
 
 const program = defineCli({
   name: 'ship',

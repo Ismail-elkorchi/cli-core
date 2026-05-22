@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
-  createMemoryConfigDiscoveryHost,
   defineCli,
-  discoverCliConfigInput,
   resolveCliConfig
 } from '../../dist/index.js';
+import {
+  createMemoryConfigDiscoveryHost,
+  discoverCliConfigInput
+} from '../../dist/config/index.js';
 
 test('resolveCliConfig applies precedence and provenance', () => {
   const program = defineCli({
@@ -52,7 +54,7 @@ test('resolveCliConfig applies data migrations and deprecation diagnostics', () 
 
   assert.equal(resolution.values.region, 'eu');
   assert.equal(resolution.values.legacy, 'old');
-  assert.equal(resolution.diagnostics[0].code, 'CLI_ARGV_FLAG_ISSUE');
+  assert.equal(resolution.diagnostics[0].code, 'CLI_CONFIG_FIELD_DEPRECATED');
   assert.equal(resolution.diagnostics[0].severity, 'warning');
 });
 

@@ -2,12 +2,12 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   createCliMain,
-  createMemoryEffectHost,
   createNodeCliAdapter,
-  defineCli,
   renderRunResultText,
   runCliMain
-} from '../../dist/index.js';
+} from '../../dist/adapter/index.js';
+import { defineCli } from '../../dist/index.js';
+import { createMemoryEffectHost } from '../../dist/effects/index.js';
 
 const program = defineCli({
   name: 'ship',

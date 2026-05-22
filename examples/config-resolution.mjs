@@ -1,10 +1,12 @@
 import {
-  createMemoryConfigDiscoveryHost,
   defineCli,
-  discoverCliConfigInput,
   parseCli,
   resolveCliConfig
 } from '@ismail-elkorchi/cli-core';
+import {
+  createMemoryConfigDiscoveryHost,
+  discoverCliConfigInput
+} from '@ismail-elkorchi/cli-core/config';
 
 export async function runConfigResolutionExample() {
   const program = defineCli({

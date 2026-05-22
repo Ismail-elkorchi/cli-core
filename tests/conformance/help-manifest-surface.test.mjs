@@ -11,5 +11,6 @@ test('help and manifest subpaths expose document APIs', async () => {
   assert.equal(typeof manifest.describeCli, 'function');
   assert.equal(typeof manifest.exportCommandManifest, 'function');
   assert.equal(typeof manifest.importCommandManifest, 'function');
+  assert.equal(typeof root.createHelpDocument, 'function');
   assert.equal(typeof root.describeCli, 'function');
 });

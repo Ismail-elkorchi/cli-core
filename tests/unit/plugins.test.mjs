@@ -5,7 +5,7 @@ import {
   checkCliPluginCompatibility,
   createCliPluginHost,
   defineCliPluginManifest
-} from '../../dist/index.js';
+} from '../../dist/plugins/index.js';
 
 test('checkCliPluginCompatibility reports version and runtime mismatches as diagnostics', () => {
   const version = checkCliPluginCompatibility({

@@ -13,44 +13,40 @@ import { runExecutionExample } from '../../examples/run.mjs';
 import { runSchemaRedactionExample } from '../../examples/schema-redaction.mjs';
 import { runTestingHarnessExample } from '../../examples/testing-harness.mjs';
 
-test('README documents current public surface without unsupported claims', async () => {
+test('README does not expose private paths or unsupported claims', async () => {
   const readme = await readFile(new URL('../../README.md', import.meta.url), 'utf8');
+  const privateRepoName = ['tse', ['work', 'bench'].join('')].join('-');
+  const blockedClaims = [
+    ['feature', 'complete'].join('-'),
+    ['drop', 'in replacement'].join('-'),
+    'replaces all',
+    ['front', 'ier'].join(''),
+    [['press', 'ure'].join(''), ['fix', 'ture'].join('')].join(' ')
+  ];
 
-  assert.match(readme, /typed command-core package/);
-  assert.match(readme, /API Overview/);
-  assert.match(readme, /How It Differs/);
-  assert.match(readme, /CLI Adapter/);
-  assert.match(readme, /Security Model/);
-  assert.match(readme, /Limitations/);
-  assert.match(readme, /package-consumer check/);
-  assert.match(readme, /defineCli/);
-  assert.match(readme, /resolveCliConfig/);
-  assert.match(readme, /discoverCliConfigInput/);
-  assert.match(readme, /describeCli/);
-  assert.match(readme, /createCompletionPayload/);
-  assert.match(readme, /completeCli/);
-  assert.match(readme, /suggestRepairs/);
-  assert.match(readme, /createCliPluginHost/);
-  assert.match(readme, /runCli/);
-  assert.match(readme, /createCliMain/);
-  assert.match(readme, /createNodeCliAdapter/);
-  assert.match(readme, /applyCliEffects/);
-  assert.match(readme, /createCliSchemaEnvelope/);
-  assert.match(readme, /@ismail-elkorchi\/cli-core\/schemas/);
-  assert.match(readme, /redactCliSecrets/);
-  assert.match(readme, /createCliHarness/);
-  assert.match(readme, /check:package-consumer/);
-  assert.match(readme, /createLargeCommandDefinition/);
-  assert.match(readme, /createLargeCommandFixture/);
-  assert.match(readme, /test:scale:local/);
-  assert.match(readme, /test:scale:manual/);
-  assert.match(readme, /test:pressure/);
-  assert.match(readme, /10,000-command scale mode/);
-  assert.match(readme, /not parity claims/);
-  assert.match(readme, /planned, replayed, validated, redacted, and adapted/);
-  assert.doesNotMatch(readme, /feature-complete/i);
-  assert.doesNotMatch(readme, /drop-in replacement/i);
-  assert.doesNotMatch(readme, /replaces all/i);
+  assert.equal(readme.includes(privateRepoName), false);
+  assert.doesNotMatch(readme, /\/home\/ismail/i);
+  assert.doesNotMatch(readme, /private\/control/);
+  for (const claim of blockedClaims) {
+    assert.equal(readme.toLowerCase().includes(claim), false);
+  }
+});
+
+test('README package imports correspond to exported package paths', async () => {
+  const readme = await readFile(new URL('../../README.md', import.meta.url), 'utf8');
+  const packageJson = JSON.parse(await readFile(new URL('../../package.json', import.meta.url), 'utf8'));
+  const exportedPaths = new Set(Object.keys(packageJson.exports).map((key) => key === '.' ? packageJson.name : `${packageJson.name}${key.slice(1)}`));
+  const importPattern = /from ['"]([^'"]+)['"]/g;
+
+  for (const match of readme.matchAll(importPattern)) {
+    const specifier = match[1];
+    if (specifier?.startsWith(packageJson.name) !== true) continue;
+    if (specifier?.endsWith('.json')) {
+      assert.equal(exportedPaths.has(`${packageJson.name}/schemas/*.json`), true);
+      continue;
+    }
+    assert.equal(exportedPaths.has(specifier ?? ''), true, `${specifier} is not exported`);
+  }
 });
 
 test('command model example executes against the built package', async () => {

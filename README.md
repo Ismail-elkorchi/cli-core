@@ -1,46 +1,22 @@
-# cli-core
+# @ismail-elkorchi/cli-core
 
 Typed command-core primitives for TypeScript and JavaScript CLIs.
 
-## What It Is
+`cli-core` compiles command definitions, parses invocations through
+`argv-flags`, resolves explicit configuration input, returns structured help and
+manifest documents, produces completion payloads, applies plugin command
+contributions, plans or runs command handlers, reports effects and artifacts,
+redacts secrets, and provides a small testing harness. It does not own prompts,
+shell loops, raw terminal control, full-screen terminal UI, or hidden process
+writes.
 
-`cli-core` is a typed command-core package for CLIs that need replayable,
-machine-readable behavior. It compiles command definitions, parses invocations
-through `argv-flags`, resolves explicit config input, describes help/version and
-manifest documents, generates completion payloads and scripts, suggests repairs,
-checks plugin manifests, plans or applies command runs, emits typed effects and
-artifacts, redacts secrets, and provides data-only testing fixtures.
+## Install
 
-## Boundary
-
-`cli-core` owns command-core data contracts above low-level argv token parsing.
-It does not own prompts, shell loops, raw terminal control, full-screen terminal
-interfaces, or hidden process writes.
-
-Low-level flag tokenization, coercion, and flag issue semantics are delegated to
-`argv-flags`; `cli-core` binds those parsed values to command, positional,
-config, repair, and run surfaces.
-
-## How It Differs
-
-Common JavaScript CLI frameworks usually center on terminal text, process
-execution, or framework-owned command classes. `cli-core` centers on public
-payloads that other tools can inspect: compiled programs, parsed invocations,
-config provenance, help and manifest documents, completion responses, repair
-suggestions, plugin diagnostics, run events, effects, artifacts, schemas, and
-test fixtures.
-
-This does not make `cli-core` a drop-in substitute for Commander, Yargs, oclif,
-Clipanion, CAC, or Cliffy. It is a command-core layer for CLIs that need
-behavior to be planned, replayed, validated, redacted, and adapted by humans,
-CI, editors, terminal frontends, automation, and coding agents without scraping
-terminal output.
+```sh
+npm install @ismail-elkorchi/cli-core
+```
 
 ## Quickstart
-
-Use `defineCli` to compile command definitions into an immutable program, then
-use `parseCli` to match a command path, bind global and local options, bind
-positionals, and preserve tokens after `--`.
 
 ```ts
 import { defineCli, parseCli, validateCli } from '@ismail-elkorchi/cli-core';
@@ -64,73 +40,52 @@ const invocation = parseCli(program, {
 const validation = await validateCli(program, invocation);
 ```
 
-## API Overview
+## API Entrypoints
 
-- Root: `defineCli`, `parseCli`, `resolveCliConfig`, `validateCli`, `runCli`,
-  `describeCli`, plus shared public types.
-- `adapter`: explicit CLI entrypoint adapters for argv/stdout/stderr/exit-code
-  wiring.
-- `help`: structured help and version documents.
-- `completion`: completion payloads, shell scripts, and install plans as data.
-- `manifest`: command manifest export/import.
-- `config`: config resolution inputs, provenance, migrations, and explanations.
-- `effects`: explicit policy-controlled effect planning/application hosts and
-  reports.
-- `plugins`: plugin manifests, compatibility checks, lazy loading, hook plans,
-  hook execution results, and plugin diagnostics.
-- `repair`: stable repair suggestions for parse diagnostics.
-- `schema`: schema descriptors/envelopes, failure envelopes, and redaction.
-- `schemas`: concrete JSON Schema artifacts for public machine-readable
-  documents.
-- `testing`: fixture registry and data-only scenario harness.
+- `@ismail-elkorchi/cli-core`: core program, parse, validation, config, help,
+  manifest, completion payload, and run APIs.
+- `@ismail-elkorchi/cli-core/adapter`: explicit argv/stdout/stderr/exit-code
+  adapter helpers.
+- `@ismail-elkorchi/cli-core/completion`: completion bridge, protocol, scripts,
+  and install-plan data.
+- `@ismail-elkorchi/cli-core/config`: config resolution and explicit discovery
+  hosts.
+- `@ismail-elkorchi/cli-core/effects`: effect planning and policy-controlled
+  effect application.
+- `@ismail-elkorchi/cli-core/help`: help and version document builders.
+- `@ismail-elkorchi/cli-core/manifest`: command manifest export/import.
+- `@ismail-elkorchi/cli-core/plugins`: plugin manifests, command application,
+  compatibility checks, lazy loading, and hook execution.
+- `@ismail-elkorchi/cli-core/repair`: repair suggestions for parse diagnostics.
+- `@ismail-elkorchi/cli-core/schema`: schema descriptors, envelopes, failure
+  envelopes, and redaction helpers.
+- `@ismail-elkorchi/cli-core/schemas`: JSON Schema artifact index.
+- `@ismail-elkorchi/cli-core/schemas/*.json`: individual JSON Schema artifacts.
+- `@ismail-elkorchi/cli-core/testing`: fixture registry and scenario harness.
 
-## Command Model
+## Core Examples
 
-## Help And Manifests
-
-`cli-core` exposes help, version, and manifest data as structured documents.
-Rendering those documents to a terminal, file, or service is left to consumers.
+### Define And Parse
 
 ```ts
-import {
-  createHelpDocument,
-  createVersionDocument,
-  defineCli,
-  describeCli
-} from '@ismail-elkorchi/cli-core';
-import {
-  exportCommandManifest,
-  importCommandManifest
-} from '@ismail-elkorchi/cli-core/manifest';
+import { defineCli, parseCli } from '@ismail-elkorchi/cli-core';
 
 const program = defineCli({
   name: 'ship',
-  version: '2.0.0',
-  commands: [{ name: 'status', aliases: ['st'], description: 'Show service status.' }]
+  commands: [{ name: 'status', aliases: ['st'] }]
 });
 
-const help = createHelpDocument(program);
-const version = createVersionDocument(program);
-const manifest = importCommandManifest(exportCommandManifest(describeCli(program)));
+const invocation = parseCli(program, { argv: ['st'] });
 ```
 
-## Config Resolution
-
-Config resolution is explicit and replayable. `resolveCliConfig` consumes only
-the `ConfigInput` passed by the caller. Host-driven discovery helpers can gather
-file and environment inputs through an explicit host, then hand that data to the
-pure resolver. Values are layered as built-in defaults, workspace defaults,
-config file values, environment values, then argv values. The result includes
-selected values, provenance entries, explanations, and discovery metadata.
+### Config
 
 ```ts
+import { defineCli, parseCli, resolveCliConfig } from '@ismail-elkorchi/cli-core';
 import {
   createMemoryConfigDiscoveryHost,
-  defineCli,
-  discoverCliConfigInput,
-  parseCli,
-  resolveCliConfig
-} from '@ismail-elkorchi/cli-core';
+  discoverCliConfigInput
+} from '@ismail-elkorchi/cli-core/config';
 
 const program = defineCli({
   name: 'ship',
@@ -145,7 +100,7 @@ const program = defineCli({
 
 const invocation = parseCli(program, { argv: ['deploy', '--profile', 'prod'] });
 const memory = createMemoryConfigDiscoveryHost({
-  files: { '/workspace/.shiprc.json': { profile: 'file' } },
+  files: { '/workspace/.shiprc.json': { profile: 'file', dryRun: true } },
   env: { SHIP_PROFILE: 'env' }
 });
 const discovered = await discoverCliConfigInput(program, {
@@ -157,116 +112,78 @@ const discovered = await discoverCliConfigInput(program, {
 });
 const config = resolveCliConfig(program, {
   ...discovered.input,
-  workspaceDefaults: { profile: 'workspace' },
   argv: invocation.options.values
 });
 ```
 
-## Completion And Repair
-
-Completion APIs return machine-readable candidates, bridge responses from shell
-words/current cursor state, and shell-specific script documents. The bridge uses
-the same `__complete` protocol described by generated scripts, and stops
-completion once a pass-through boundary is reached. Install plans are data
-envelopes describing file/profile changes; they do not write files or mutate
-shell configuration.
-
-Repair APIs map parse diagnostics to stable suggestion codes. When callers pass
-the compiled program, unknown command and unknown option repairs can include a
-nearby replacement candidate.
+### Help And Manifest
 
 ```ts
+import { createHelpDocument, defineCli, describeCli } from '@ismail-elkorchi/cli-core';
 import {
-  completeCli,
-  createCompletionCommand,
-  createCompletionInstallPlan,
-  createCompletionPayload,
-  createCompletionRequest,
-  createCompletionScript,
-  defineCli,
-  parseCli,
-  suggestRepairs
-} from '@ismail-elkorchi/cli-core';
+  exportCommandManifest,
+  importCommandManifest
+} from '@ismail-elkorchi/cli-core/manifest';
 
 const program = defineCli({
   name: 'ship',
-  commands: [
-    {
-      name: 'deploy',
-      aliases: ['d'],
-      options: [{ name: 'region', type: 'string', flags: ['--region'] }],
-      positionals: [{ name: 'service' }]
-    }
-  ]
+  version: '2.0.0',
+  commands: [{ name: 'status', description: 'Show service status.' }]
 });
 
-const completion = createCompletionPayload(program, { word: 'd' });
-const bridge = completeCli(program, createCompletionRequest({ words: ['ship', '__complete', 'deploy', '--r'] }));
-const command = createCompletionCommand(program);
-const bash = createCompletionScript(program, 'bash');
-const installPlan = createCompletionInstallPlan(program, 'fish');
-const repairs = suggestRepairs(parseCli(program, { argv: ['deply', 'api'] }), program);
+const help = createHelpDocument(program);
+const manifest = importCommandManifest(exportCommandManifest(describeCli(program)));
 ```
 
-## Plugins
-
-Plugin APIs are manifest-first. Consumers can inspect compatibility, apply
-compatible plugin command contributions, and plan hook ordering without loading
-plugin code. Rejected plugin commands produce diagnostics before they affect
-parsing. Accepted plugin commands preserve provenance in the compiled program,
-help documents, completion candidates, and command manifests. Loaders run only
-when a plugin or hook is used, and loader or hook failures become typed
-diagnostics.
+### Completion Payload
 
 ```ts
+import { completeCli, createCompletionPayload, defineCli } from '@ismail-elkorchi/cli-core';
+
+const program = defineCli({
+  name: 'ship',
+  commands: [{ name: 'deploy', options: [{ name: 'region', type: 'string', flags: ['--region'] }] }]
+});
+
+const payload = createCompletionPayload(program, { word: 'd' });
+const response = completeCli(program, { words: ['ship', '__complete', 'deploy', '--r'] });
+```
+
+The completion subpath also exposes protocol, script, and install-plan data.
+Generated scripts are templates that invoke the completion protocol; consumers
+should test their own shell integration before installing them for users.
+
+### Plugins
+
+```ts
+import { defineCli } from '@ismail-elkorchi/cli-core';
 import {
   applyCliPluginCommands,
   checkCliPluginCompatibility,
   createCliPluginHost,
   defineCliPluginManifest
-} from '@ismail-elkorchi/cli-core';
+} from '@ismail-elkorchi/cli-core/plugins';
 
 const manifest = defineCliPluginManifest({
   name: 'ship-audit',
   version: '1.0.0',
   capabilities: ['audit'],
-  commands: [{ name: 'audit', aliases: ['a'], description: 'Inspect deployment history.' }],
+  commands: [{ name: 'audit', aliases: ['a'] }],
   hooks: [{ name: 'audit-prerun', event: 'prerun' }]
 });
-const application = applyCliPluginCommands({
-  name: 'ship',
-  commands: [{ name: 'status' }]
-}, [manifest], { allowedCapabilities: ['audit'] });
 
-const host = createCliPluginHost([
-  {
-    manifest,
-    load: () => ({
-      manifest,
-      hooks: {
-        'audit-prerun': () => ({
-          effects: [{ kind: 'audit.record', payload: { ok: true } }]
-        })
-      }
-    })
-  }
-], { allowedCapabilities: ['audit'] });
-
-const compatibility = checkCliPluginCompatibility(manifest, { runtime: 'node' });
-const program = application.program;
-const plan = host.planHooks('prerun');
-const run = await host.runHooks('prerun');
+const application = applyCliPluginCommands(
+  defineCli({ name: 'ship', commands: [{ name: 'status' }] }),
+  [manifest],
+  { allowedCapabilities: ['audit'] }
+);
+const host = createCliPluginHost([{ manifest, load: () => ({ manifest }) }], {
+  allowedCapabilities: ['audit']
+});
+const compatibility = checkCliPluginCompatibility(manifest, { allowedCapabilities: ['audit'] });
 ```
 
-## Run Planning And Apply
-
-`runCli` returns a replayable result envelope. Plan mode records intended
-effects without invoking handlers. Apply mode invokes an explicit handler for the
-matched command and returns effects, artifacts, diagnostics, ordered events, and
-an exit status selected from the exit policy. It does not call `process.exit` or
-write to stdout/stderr. A request can include an explicit plugin host; lifecycle
-hook effects and diagnostics are then folded into the same `RunResult` without
-global plugin state.
+### Run
 
 ```ts
 import { defineCli, parseCli, runCli } from '@ismail-elkorchi/cli-core';
@@ -275,15 +192,9 @@ const program = defineCli({
   name: 'ship',
   commands: [{ name: 'deploy', positionals: [{ name: 'service' }] }]
 });
-
 const invocation = parseCli(program, { argv: ['deploy', 'api'] });
-const plan = await runCli(program, {
-  mode: 'plan',
-  invocation,
-  effects: [{ kind: 'spawn', command: 'ship', argv: ['deploy', 'api'] }]
-});
 
-const apply = await runCli(program, {
+const result = await runCli(program, {
   mode: 'apply',
   invocation,
   handlers: {
@@ -294,119 +205,17 @@ const apply = await runCli(program, {
 });
 ```
 
-## CLI Adapter
-
-The adapter subpath shows how a real CLI entrypoint can connect argv,
-stdout/stderr, and exit status while keeping core behavior explicit. Adapter
-hosts are caller supplied; `cli-core` still does not read global process state,
-call `process.exit`, or write output from `runCli`.
-
-```ts
-import {
-  createCliMain,
-  createNodeCliAdapter,
-  defineCli
-} from '@ismail-elkorchi/cli-core';
-
-const program = defineCli({
-  name: 'ship',
-  commands: [{ name: 'deploy', positionals: [{ name: 'service' }] }]
-});
-
-const main = createCliMain({
-  program,
-  mode: 'plan',
-  effects: [{ kind: 'spawn', command: 'ship', argv: ['deploy'] }]
-});
-
-await main(createNodeCliAdapter(process));
-```
-
-## Effect Application
-
-Run effects are still data by default. Consumers that want to apply effects must
-call the explicit effects API with a host and policy. The memory host is useful
-for tests and adapters because it records file and spawn effects without touching
-the real filesystem or launching processes.
-
-```ts
-import { applyCliEffects, createMemoryEffectHost } from '@ismail-elkorchi/cli-core/effects';
-
-const memory = createMemoryEffectHost();
-const report = await applyCliEffects({
-  effects: [{ kind: 'write_file', path: 'deploy.json', content: '{"ok":true}' }],
-  host: memory.host,
-  policy: { allowWriteFile: true }
-});
-```
-
-## Schema And Redaction
-
-Schema helpers expose stable schema/version descriptors and wrappers for
-machine-readable payloads. The package also ships concrete JSON Schema files
-under `@ismail-elkorchi/cli-core/schemas` and
-`@ismail-elkorchi/cli-core/schemas/*.json` for manifests, parse results,
-config, completion, repair, plugin, run, effect, artifact, diagnostic, failure,
-and redaction documents. Failure envelopes and run results redact secret-like
-keys and common token patterns by default. Redaction is data-only; consumers
-choose where to store, log, or display the redacted envelopes.
-
-```ts
-import { defineCli, parseCli, runCli } from '@ismail-elkorchi/cli-core';
-import {
-  createCliFailureEnvelope,
-  createCliSchemaEnvelope,
-  describeCliSchemas,
-  redactCliSecrets
-} from '@ismail-elkorchi/cli-core/schema';
-import schemaIndex from '@ismail-elkorchi/cli-core/schemas' with { type: 'json' };
-import manifestSchema from '@ismail-elkorchi/cli-core/schemas/command-manifest.schema.json' with { type: 'json' };
-
-const program = defineCli({ name: 'ship', commands: [{ name: 'deploy' }] });
-const invocation = parseCli(program, { argv: ['deploy'] });
-const run = await runCli(program, {
-  mode: 'plan',
-  invocation,
-  effects: [{ kind: 'spawn', command: 'ship', argv: ['deploy'], env: { SHIP_TOKEN: 'abc123' } }]
-});
-
-const schemas = describeCliSchemas();
-const envelope = createCliSchemaEnvelope({
-  payloadSchemaVersion: run.schemaVersion,
-  payload: run
-});
-const failure = createCliFailureEnvelope({
-  kind: 'policy_denial',
-  diagnostics: run.diagnostics
-});
-const redacted = redactCliSecrets({ password: 'secret', safe: 'visible' });
-const manifestArtifact = schemaIndex.artifacts.find((artifact) => artifact.version === manifestSchema.properties.schemaVersion.const);
-```
-
-## Testing Harness
-
-The testing subpath provides immutable fixture registration and a data-only
-scenario runner. Scenario results contain stable diagnostic codes instead of
-throwing for expected CLI behavior checks.
+### Testing Harness
 
 ```ts
 import * as testing from '@ismail-elkorchi/cli-core/testing';
 
 const harness = testing.createCliHarness({
-  entrypoints: {
-    testing
-  }
+  entrypoints: { testing }
 });
-
 const result = await testing.runCliScenario(harness, {
   id: 'example.testing-harness',
   steps: [
-    {
-      kind: 'entrypoint-load',
-      name: 'testing entrypoint exposes the scenario runner',
-      entrypoint: 'testing',
-      expectedExports: ['createCliHarness', 'runCliScenario']
-    },
     {
       kind: 'fixture-available',
       name: 'foundation fixture exists',
@@ -417,84 +226,47 @@ const result = await testing.runCliScenario(harness, {
 });
 ```
 
-## Scale And Pressure Fixtures
+## Security And Side Effects
 
-The testing subpath includes `createLargeCommandDefinition` and
-`createLargeCommandFixture` for generated command surfaces. Local scale checks
-use 128 commands by default; `test:scale:manual` generates a 10,000-command
-surface for manual or scheduled proof without making the default gate slow. The
-scale lane checks compilation, indexed command lookup, parsing, manifest
-generation, completion filtering, and repair candidate selection with
-conservative budgets.
-
-The pressure lane records ecosystem pressure from Commander, Yargs, oclif,
-Clipanion, CAC, and Cliffy as fixtures. These are not parity claims. They
-protect cli-core decisions such as pass-through data preservation,
-manifest-first plugin extension, structured completion, explicit config
-discovery, variadic positional binding, and adapter-owned output/exit behavior.
-
-## Entry Points
-
-The package publishes the root entrypoint plus these subpaths:
-
-- `@ismail-elkorchi/cli-core/help`
-- `@ismail-elkorchi/cli-core/adapter`
-- `@ismail-elkorchi/cli-core/completion`
-- `@ismail-elkorchi/cli-core/manifest`
-- `@ismail-elkorchi/cli-core/config`
-- `@ismail-elkorchi/cli-core/effects`
-- `@ismail-elkorchi/cli-core/plugins`
-- `@ismail-elkorchi/cli-core/repair`
-- `@ismail-elkorchi/cli-core/schema`
-- `@ismail-elkorchi/cli-core/schemas`
-- `@ismail-elkorchi/cli-core/schemas/*.json`
-- `@ismail-elkorchi/cli-core/testing`
+Core APIs return structured objects. They do not call `process.exit`, write to
+stdout or stderr, mutate shell profiles, read implicit config files, install
+completions, or execute spawn/file effects. Config discovery, CLI adapters, and
+effect application require caller-supplied hosts. Spawn effects use argv arrays
+and do not imply shell interpolation. Run results, failure envelopes, and schema
+envelopes redact secret-like keys and common token patterns by default.
 
 ## Runtime Support
 
-The local and CI runtime subset loads the root package and every public subpath
-in Node, Deno, and Bun, then exercises a data-only command scenario. This is a
-runtime smoke contract, not a full runtime matrix or performance claim.
-
-The package-consumer check creates a temporary outside-repository project,
-packs this package, installs the tarball, imports root and subpath entrypoints
-by package name, and runs a vertical Node consumer scenario. It also runs a
-packed Bun import smoke when Bun is available. Deno remains covered by the local
-runtime smoke; local tarball installation for Deno is not a default gate.
-
-## Security Model
-
-The package returns data. It does not call `process.exit`, write to stdout or
-stderr, mutate shell profiles, read implicit config files, install completions,
-or execute spawn/file effects for consumers. Spawn effects use argv arrays and
-do not imply shell interpolation. Run results, failure envelopes, and schema
-envelopes redact secret-like keys and common token patterns by default.
+The package is built as ESM and requires Node `>=24`. The repository keeps smoke
+tests for Node, Deno, and Bun imports. These checks are not exhaustive operating
+system, shell, filesystem, or package-manager compatibility guarantees.
 
 ## Limitations
 
-- Runtime checks are a Node/Deno/Bun smoke subset, not exhaustive operating
-  system, shell, filesystem, or package-manager compatibility proof.
-- Benchmark tests use conservative regression budgets for representative large
-  data paths; they are not throughput guarantees. The 10,000-command scale mode
-  is manual or scheduled, not part of the default local check.
-- Competitor pressure fixtures document design pressure and cli-core decisions;
-  they do not claim drop-in behavior or full parity with other CLI frameworks.
+- Low-level argv tokenization, coercion, and flag issue semantics are delegated
+  to `argv-flags`.
 - Config resolution consumes explicit input. File discovery and environment
   capture happen only through caller-supplied discovery hosts.
-- Completion install plans describe changes as data. Consumers decide whether
-  and how to write files or update shell profiles.
-- Plugin APIs validate manifests, apply compatible command contributions, and
-  isolate loader/hook faults.
+- Completion scripts and install plans are data. Consumers decide whether and
+  how to write files or update shell profiles.
+- JSON Schema artifacts describe the public payload shapes shipped by this
+  package; consumers should validate their own extension data separately.
 - Adapter APIs write stdout/stderr and set exit status only through an explicit
   caller-supplied host.
+- This package is not a prompt library, shell framework, terminal UI, or process
+  supervisor.
 
-## Verification
+## Verification Commands
 
 ```sh
-npm run check
-npm run check:package-consumer
-npm run test:scale:local
-npm run test:pressure
+npm run lint
+npm run typecheck
+npm run test:unit
+npm run test:acceptance
+npm run test:conformance
+npm run test:docs
+npm run check:exports
+npm run check:leakage
 ```
 
 The `precommit` and `prepush` scripts are manual verification commands. This
