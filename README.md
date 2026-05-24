@@ -275,6 +275,8 @@ npm run test:examples
 npm run test:integration
 npm run test:security
 npm run test:package
+npm run test:runtime:os
+npm run test:shells
 npm run check:exports
 npm run check:leakage
 ```
