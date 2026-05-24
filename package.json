@@ -74,7 +74,7 @@
     "test:package": "npm run build && node --test tests/package/*.test.mjs",
     "test:unit": "npm run test:core",
     "test:property": "npm run test:core",
-    "test:acceptance": "npm run test:integration",
+    "test:acceptance": "npm run build && node --test tests/integration/*.test.mjs",
     "test:conformance": "npm run test:contracts",
     "test:benchmarks": "npm run build && node --test tests/manual/scale-sensitive.test.mjs",
     "test:runtime:node": "npm run build && node --test tests/integration/runtime-node.test.mjs",

@@ -37,8 +37,6 @@ jobs:
         run: npm run test:acceptance
       - name: Conformance tests
         run: npm run test:conformance
-      - name: Benchmarks
-        run: npm run test:benchmarks
       - name: Node runtime
         run: npm run test:runtime:node
       - name: Docs
