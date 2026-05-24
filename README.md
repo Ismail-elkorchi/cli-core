@@ -277,9 +277,15 @@ npm run test:security
 npm run test:package
 npm run test:runtime:os
 npm run test:shells
+npm run test:mutation:dry
+npm run test:mutation:file -- src/config/path.ts
+npm run test:mutation:all
 npm run check:exports
 npm run check:leakage
 ```
 
-The `precommit` and `prepush` scripts are manual verification commands. This
-package does not install Git hooks.
+Mutation commands are manual investigation tools for test-oracle strength; start
+with `test:mutation:dry` when changing their configuration and use targeted file
+or source-area commands before running the full mutation set. The `precommit`
+and `prepush` scripts are manual verification commands. This package does not
+install Git hooks.
