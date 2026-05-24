@@ -1,0 +1,35 @@
+{
+  "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "testRunner": "command",
+  "commandRunner": {
+    "command": "node scripts/run-mutation-tests.mjs"
+  },
+  "buildCommand": "npm run build",
+  "mutate": [
+    "src/**/*.ts",
+    "!src/package.ts"
+  ],
+  "ignorePatterns": [
+    "/dist",
+    "/tests/integration",
+    "/tests/manual",
+    "/tests/package",
+    "/tests/runtime-os",
+    "/tests/shells"
+  ],
+  "coverageAnalysis": "off",
+  "concurrency": "50%",
+  "timeoutMS": 10000,
+  "dryRunTimeoutMinutes": 2,
+  "reporters": [
+    "clear-text",
+    "progress",
+    "html"
+  ],
+  "thresholds": {
+    "high": 80,
+    "low": 60,
+    "break": 50
+  },
+  "cleanTempDir": "always"
+}

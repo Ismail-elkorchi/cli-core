@@ -77,6 +77,23 @@
     "test:runtime:deno": "npm run build && deno run tests/integration/runtime-deno-smoke.mjs",
     "test:runtime:bun": "npm run build && bun tests/integration/runtime-bun-smoke.mjs",
     "test:shells": "npm run build && node --test tests/shells/*.test.mjs",
+    "test:mutation:dry": "stryker run --dryRunOnly",
+    "test:mutation:file": "node scripts/run-mutation.mjs file",
+    "test:mutation:config": "node scripts/run-mutation.mjs config",
+    "test:mutation:command": "node scripts/run-mutation.mjs command",
+    "test:mutation:parse": "node scripts/run-mutation.mjs parse",
+    "test:mutation:help": "node scripts/run-mutation.mjs help",
+    "test:mutation:manifest": "node scripts/run-mutation.mjs manifest",
+    "test:mutation:completion": "node scripts/run-mutation.mjs completion",
+    "test:mutation:repair": "node scripts/run-mutation.mjs repair",
+    "test:mutation:plugins": "node scripts/run-mutation.mjs plugins",
+    "test:mutation:run": "node scripts/run-mutation.mjs run",
+    "test:mutation:effects": "node scripts/run-mutation.mjs effects",
+    "test:mutation:schema": "node scripts/run-mutation.mjs schema",
+    "test:mutation:adapter": "node scripts/run-mutation.mjs adapter",
+    "test:mutation:testing": "node scripts/run-mutation.mjs testing",
+    "test:mutation:diagnostics": "node scripts/run-mutation.mjs diagnostics",
+    "test:mutation:all": "stryker run",
     "test:scale:local": "npm run build && node --test tests/manual/large-command-surface.local.test.mjs",
     "test:scale:manual": "npm run build && node --test tests/manual/large-command-surface.manual.test.mjs",
     "check:exports": "node scripts/check-exports.mjs",
@@ -114,8 +131,12 @@
   "dependencies": {
     "argv-flags": "^1.0.4"
   },
+  "overrides": {
+    "qs": "6.15.2"
+  },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@stryker-mutator/core": "^9.6.1",
     "@types/node": "^25.9.1",
     "@typescript-eslint/eslint-plugin": "^8.59.4",
     "@typescript-eslint/parser": "^8.59.4",

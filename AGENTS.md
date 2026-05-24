@@ -31,7 +31,12 @@
 - `npm run test:package`
 - `npm run test:runtime:os`
 - `npm run test:shells`
+- `npm run test:mutation:dry`
+- `npm run test:mutation:file -- src/config/path.ts`
+- `npm run test:mutation:all`
 - `npm run check`
 
 Use targeted tests while developing; reserve broad checks for PR gates and
-larger release checks.
+larger release checks. Mutation testing is a manual investigation tool; run dry
+mode for setup changes, then targeted file or source-area commands before the
+full mutation set.
