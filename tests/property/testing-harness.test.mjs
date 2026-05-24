@@ -5,7 +5,7 @@ import { createCliFixtureRegistry } from '../../dist/testing/index.js';
 test('registry snapshots are independent immutable views', () => {
   const registry = createCliFixtureRegistry([
     {
-      id: 'commands.tree-program',
+      id: 'local.tree-program',
       family: 'commands',
       title: 'Tree program',
       capabilities: ['command.tree']

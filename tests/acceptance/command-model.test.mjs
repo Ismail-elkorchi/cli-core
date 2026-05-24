@@ -38,10 +38,10 @@ test('consumer can compile, parse, validate, and record a command scenario throu
         expectedExports: ['defineCli', 'parseCli', 'validateCli']
       },
       {
-        kind: 'fixture-available',
-        name: 'tree command fixture is registered',
-        fixtureId: 'commands.tree-program',
-        expectedFamily: 'commands'
+        kind: 'entrypoint-load',
+        name: 'testing exposes scenario APIs',
+        entrypoint: 'testing',
+        expectedExports: ['createCliHarness', 'runCliScenario']
       }
     ]
   });

@@ -211,16 +211,24 @@ const result = await runCli(program, {
 import * as testing from '@ismail-elkorchi/cli-core/testing';
 
 const harness = testing.createCliHarness({
-  entrypoints: { testing }
+  entrypoints: { testing },
+  fixtures: [
+    {
+      id: 'example.local-fixture',
+      family: 'examples',
+      title: 'Local fixture',
+      capabilities: ['example']
+    }
+  ]
 });
 const result = await testing.runCliScenario(harness, {
   id: 'example.testing-harness',
   steps: [
     {
       kind: 'fixture-available',
-      name: 'foundation fixture exists',
-      fixtureId: 'foundation.package-metadata',
-      expectedFamily: 'foundation'
+      name: 'caller-provided fixture exists',
+      fixtureId: 'example.local-fixture',
+      expectedFamily: 'examples'
     }
   ]
 });

@@ -8,7 +8,15 @@ test('consumer can run a public harness scenario against package entrypoints and
     entrypoints: {
       root,
       testing
-    }
+    },
+    fixtures: [
+      {
+        id: 'example.local-fixture',
+        family: 'examples',
+        title: 'Local fixture',
+        capabilities: ['example']
+      }
+    ]
   });
 
   const result = await testing.runCliScenario(harness, {
@@ -29,9 +37,9 @@ test('consumer can run a public harness scenario against package entrypoints and
       },
       {
         kind: 'fixture-available',
-        name: 'foundation entrypoint fixture is registered',
-        fixtureId: 'foundation.entrypoints',
-        expectedFamily: 'foundation'
+        name: 'caller-provided fixture is available',
+        fixtureId: 'example.local-fixture',
+        expectedFamily: 'examples'
       }
     ]
   });

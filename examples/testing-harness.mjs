@@ -4,7 +4,15 @@ export async function runTestingHarnessExample() {
   const harness = testing.createCliHarness({
     entrypoints: {
       testing
-    }
+    },
+    fixtures: [
+      {
+        id: 'example.local-fixture',
+        family: 'examples',
+        title: 'Local fixture',
+        capabilities: ['example']
+      }
+    ]
   });
 
   return testing.runCliScenario(harness, {
@@ -18,9 +26,9 @@ export async function runTestingHarnessExample() {
       },
       {
         kind: 'fixture-available',
-        name: 'foundation fixture exists',
-        fixtureId: 'foundation.package-metadata',
-        expectedFamily: 'foundation'
+        name: 'caller-provided fixture exists',
+        fixtureId: 'example.local-fixture',
+        expectedFamily: 'examples'
       }
     ]
   });

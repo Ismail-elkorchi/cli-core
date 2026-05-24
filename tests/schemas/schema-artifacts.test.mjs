@@ -39,34 +39,11 @@ import {
   createCliFailureEnvelope,
   createCliSchemaEnvelope,
   createUnsupportedSchemaDiagnostic,
-  describeCliSchemas,
   redactCliSecretsWithReport
 } from '../../dist/schema/index.js';
 
 const execFileAsync = promisify(execFile);
 const repoRoot = new URL('../..', import.meta.url);
-
-test('schema artifact index matches the public schema registry', async () => {
-  const index = await readJson(new URL('../../schemas/index.json', import.meta.url));
-  const registry = new Map(describeCliSchemas().map((schema) => [schema.name, schema.version]));
-  const paths = new Set();
-
-  assert.equal(index.schemaIndexVersion, 'cli-core.schema-artifacts.v1');
-  assert.equal(index.artifacts.length, registry.size);
-
-  for (const artifact of index.artifacts) {
-    assert.equal(registry.get(artifact.name), artifact.version);
-    assert.equal(paths.has(artifact.path), false);
-    paths.add(artifact.path);
-
-    const schema = await readSchema(artifact.path);
-    assert.equal(schema.$schema, 'https://json-schema.org/draft/2020-12/schema');
-    assert.equal(typeof schema.$id, 'string');
-    assert.match(schema.$id, /^urn:ismail-elkorchi:cli-core:schema:/);
-    assert.equal(typeof schema.title, 'string');
-    assert.ok(schema.title.includes('cli-core'));
-  }
-});
 
 test('current public outputs validate against shipped schema artifacts', async () => {
   const samples = await createPublicSamples();

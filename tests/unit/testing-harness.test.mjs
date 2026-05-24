@@ -4,9 +4,6 @@ import {
   createCliFixtureRegistry,
   createCliHarness,
   defineCliFixture,
-  foundationFixtures,
-  pluginFixtures,
-  runFixtures,
   runCliScenario
 } from '../../dist/testing/index.js';
 
@@ -53,28 +50,6 @@ test('fixture registry provides deterministic snapshots', () => {
   assert.equal(registry.has('config.layer-stack'), true);
 });
 
-test('plugin fixture corpus includes required plugin cases', () => {
-  assert.deepEqual(pluginFixtures.map((fixture) => fixture.id), [
-    'plugins.compatible-plugin',
-    'plugins.version-mismatch-plugin',
-    'plugins.runtime-mismatch-plugin',
-    'plugins.hook-order-plugin-set',
-    'plugins.faulty-plugin-manifest',
-    'plugins.faulty-plugin-runtime'
-  ]);
-});
-
-test('run fixture corpus includes required run cases', () => {
-  assert.deepEqual(runFixtures.map((fixture) => fixture.id), [
-    'runs.apply-run',
-    'runs.plan-run',
-    'runs.long-running-run',
-    'runs.cancelled-run',
-    'runs.timeout-run',
-    'runs.interrupted-run'
-  ]);
-});
-
 test('duplicate fixture ids fail with a stable diagnostic', () => {
   assert.throws(
     () => {
@@ -101,8 +76,7 @@ test('scenario runner reports fixture and entrypoint diagnostics as data', async
   const harness = createCliHarness({
     entrypoints: {
       testing: await import('../../dist/testing/index.js')
-    },
-    fixtures: foundationFixtures
+    }
   });
 
   const result = await runCliScenario(harness, {

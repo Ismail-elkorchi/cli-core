@@ -48,7 +48,7 @@ test('node runtime can load and exercise public entrypoints', async () => {
       { kind: 'entrypoint-load', name: 'root entrypoint', entrypoint: 'root', expectedExports: ['defineCli', 'runCli'] },
       { kind: 'entrypoint-load', name: 'adapter entrypoint', entrypoint: 'adapter', expectedExports: ['runCliMain'] },
       { kind: 'entrypoint-load', name: 'schema entrypoint', entrypoint: 'schema', expectedExports: ['describeCliSchemas'] },
-      { kind: 'fixture-available', name: 'large fixture', fixtureId: 'commands.large-program', expectedFamily: 'commands' }
+      { kind: 'entrypoint-load', name: 'testing entrypoint', entrypoint: 'testing', expectedExports: ['createCliHarness', 'runCliScenario'] }
     ]
   });
 
