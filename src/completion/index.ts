@@ -402,7 +402,18 @@ function scriptFor(programName: string, shell: CompletionShell, commandName: str
   const functionName = `${safeShellIdentifier(programName)}_completion`;
   if (shell === 'fish') return `complete -c ${shellName} -f -a "(${shellName} ${trigger} (commandline -opc))"\n`;
   if (shell === 'pwsh') return `Register-ArgumentCompleter -Native -CommandName ${powerShellString(programName)} -ScriptBlock { & ${powerShellString(programName)} ${powerShellString(commandName)} @args }\n`;
-  if (shell === 'zsh') return `#compdef ${safePathSegment(programName)}\n_arguments '*: :(${shellName} ${trigger} "$words[@]")'\n`;
+  if (shell === 'zsh') {
+    return `#compdef ${safePathSegment(programName)}
+_${functionName}() {
+  local completions
+  completions="$(${shellName} ${trigger} "$words[@]")"
+  local -a candidates
+  candidates=("\${(@f)completions}")
+  compadd -- "\${candidates[@]}"
+}
+compdef _${functionName} ${shellName}
+`;
+  }
   return `_${functionName}() { COMPREPLY=( $(${shellName} ${trigger} "\${COMP_WORDS[@]}") ); }\ncomplete -F _${functionName} ${shellName}\n`;
 }
 

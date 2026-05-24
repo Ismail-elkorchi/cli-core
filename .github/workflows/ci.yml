@@ -71,3 +71,63 @@ jobs:
         run: npm run test:runtime:deno
       - name: Bun runtime
         run: npm run test:runtime:bun
+
+  os-runtime:
+    name: ci / os-runtime (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - name: Setup Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install
+        run: npm ci
+      - name: OS runtime smoke
+        run: npm run test:runtime:os
+      - name: Packed package consumer
+        run: npm run test:package
+
+  shells:
+    name: ci / shells (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: ubuntu
+            os: ubuntu-latest
+            expected: bash,zsh,fish,pwsh
+            install: sudo apt-get update && sudo apt-get install -y zsh fish
+          - name: macos
+            os: macos-latest
+            expected: bash,zsh,pwsh
+            install: if ! command -v pwsh >/dev/null 2>&1; then brew install --cask powershell; fi
+          - name: windows
+            os: windows-latest
+            expected: pwsh,cmd
+            install: ''
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - name: Setup Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install shell dependencies
+        if: matrix.install != ''
+        shell: bash
+        run: ${{ matrix.install }}
+      - name: Install
+        run: npm ci
+      - name: Shell smoke
+        run: npm run test:shells
+        env:
+          CLI_CORE_EXPECT_SHELLS: ${{ matrix.expected }}

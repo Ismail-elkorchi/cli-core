@@ -29,6 +29,8 @@
 - `npm run test:integration`
 - `npm run test:security`
 - `npm run test:package`
+- `npm run test:runtime:os`
+- `npm run test:shells`
 - `npm run check`
 
 Use targeted tests while developing; reserve broad checks for PR gates and
