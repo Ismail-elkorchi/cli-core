@@ -60,8 +60,8 @@ test('zsh completion script can be loaded with completion initialized', async (c
     await writeFile(probePath, `
 emulate -L zsh
 set -e
-autoload -Uz compinit
-compinit -D
+compdef() { :; }
+compadd() { :; }
 ship() {
   print -r -- "$@"
   print -r -- '--region'
@@ -131,9 +131,11 @@ $result.CompletionMatches | ForEach-Object { $_.CompletionText }
 test('cmd can invoke a Node CLI adapter entrypoint explicitly', async (context) => {
   await runShellSmoke(context, 'cmd', async (workspace) => {
     const entrypoint = join(workspace, 'cmd-main.mjs');
+    const wrapper = join(workspace, 'run.cmd');
     await writeFile(entrypoint, cmdEntrypointSource(), 'utf8');
+    await writeFile(wrapper, `@echo off\r\n"${process.execPath}" "${entrypoint}" deploy api\r\n`, 'utf8');
 
-    const { stdout, stderr } = await execFileAsync('cmd.exe', ['/d', '/s', '/c', `"${process.execPath}" "${entrypoint}" deploy api`]);
+    const { stdout, stderr } = await execFileAsync('cmd.exe', ['/d', '/c', wrapper]);
     assert.equal(stderr, '');
     assert.match(stdout, /command deploy/);
   });

@@ -24,7 +24,7 @@ test('packed package installs and runs from an outside Node consumer', async (co
     private: true,
     type: 'module'
   }, null, 2)}\n`);
-  await execFileAsync(platformCommand('npm'), ['install', '--ignore-scripts', '--no-audit', '--no-fund', join(workspace, pack.filename)], {
+  await execNpm(['install', '--ignore-scripts', '--no-audit', '--no-fund', join(workspace, pack.filename)], {
     cwd: workspace
   });
   await writeFile(join(workspace, 'consumer.mjs'), consumerScenarioSource());
@@ -66,7 +66,7 @@ test('packed package can be imported by Bun from an outside consumer when Bun is
     private: true,
     type: 'module'
   }, null, 2)}\n`);
-  await execFileAsync(platformCommand('npm'), ['install', '--ignore-scripts', '--no-audit', '--no-fund', join(workspace, pack.filename)], {
+  await execNpm(['install', '--ignore-scripts', '--no-audit', '--no-fund', join(workspace, pack.filename)], {
     cwd: workspace
   });
   await writeFile(join(workspace, 'consumer-bun.mjs'), bunConsumerSource());
@@ -84,11 +84,27 @@ test('packed package can be imported by Bun from an outside consumer when Bun is
 });
 
 async function packPackage(destination) {
-  const { stdout } = await execFileAsync(platformCommand('npm'), ['pack', '--json', '--pack-destination', destination], {
+  const { stdout } = await execNpm(['pack', '--json', '--pack-destination', destination], {
     cwd: repoRoot
   });
   const [pack] = JSON.parse(stdout);
   return pack;
+}
+
+async function execNpm(args, options) {
+  if (process.platform !== 'win32') {
+    return execFileAsync('npm', args, options);
+  }
+
+  return execFileAsync('cmd.exe', ['/d', '/c', ['npm', ...args.map(cmdArgument)].join(' ')], options);
+}
+
+function cmdArgument(value) {
+  const text = String(value);
+  if (!/[\s&()^|<>"]/.test(text)) {
+    return text;
+  }
+  return `"${text.replaceAll('"', '""')}"`;
 }
 
 function assertPackageFiles(files) {
