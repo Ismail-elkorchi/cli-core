@@ -167,6 +167,23 @@ test('discoverCliConfigInput reports malformed config files as diagnostics', asy
   assert.equal(collection.diagnostics[0].fields.path, '/repo/bad.json');
 });
 
+test('discoverCliConfigInput rejects unsupported config value types', async () => {
+  const program = defineCli({ name: 'ship', config: { fields: [] } });
+  const memory = createMemoryConfigDiscoveryHost({
+    files: { '/repo/bad.json': { profile: ['one', 2] } }
+  });
+
+  const collection = await discoverCliConfigInput(program, {
+    host: memory.host,
+    scope: 'explicit_paths',
+    explicitPaths: ['/repo/bad.json']
+  });
+
+  assert.equal(collection.ok, false);
+  assert.equal(collection.files.length, 0);
+  assert.equal(collection.diagnostics[0].code, 'CLI_CONFIG_FILE_INVALID');
+});
+
 test('resolveCliConfig remains pure with respect to ambient environment', async () => {
   const previous = process.env.SHIP_PROFILE;
   process.env.SHIP_PROFILE = 'ambient';

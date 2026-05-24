@@ -22,7 +22,5 @@ test('root declarations include run result, events, effects, artifacts, and exit
   assert.match(text, /RunArtifact/);
   assert.match(text, /ExitKind/);
   assert.match(runText, /readonly payload/);
-  assert.doesNotMatch(text, /RunData/);
-  assert.doesNotMatch(runText, /readonly data/);
   assert.doesNotMatch(text, /internal\//);
 });

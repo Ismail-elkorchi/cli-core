@@ -55,6 +55,20 @@ test('defineCli reports duplicate command paths and alias conflicts as diagnosti
   ]);
 });
 
+test('defineCli reports duplicate command aliases as diagnostics', () => {
+  const program = defineCli({
+    name: 'dupe-alias',
+    commands: [
+      { name: 'install', aliases: ['i'] },
+      { name: 'inspect', aliases: ['i'] }
+    ]
+  });
+
+  assert.equal(program.diagnostics.length, 1);
+  assert.equal(program.diagnostics[0].code, 'CLI_DUPLICATE_COMMAND_ALIAS');
+  assert.deepEqual(program.diagnostics[0].fields.path, ['i']);
+});
+
 test('parseCli binds command aliases, global options, local options, and positionals', async () => {
   const program = defineCli(treeDefinition);
   const invocation = parseCli(program, {
@@ -82,11 +96,24 @@ test('parseCli returns structured diagnostics for unknown commands and missing i
   const program = defineCli(treeDefinition);
   const unknown = parseCli(program, { argv: ['ship'] });
   const missing = parseCli(program, { argv: ['deploy', 'production'] });
+  const unknownOption = parseCli(program, { argv: ['build', '--missing'] });
 
   assert.equal(unknown.ok, false);
   assert.equal(unknown.diagnostics[0].code, 'CLI_UNKNOWN_COMMAND');
   assert.equal(missing.ok, false);
   assert.equal(missing.diagnostics[0].code, 'CLI_MISSING_POSITIONAL');
+  assert.equal(unknownOption.ok, false);
+  assert.equal(unknownOption.diagnostics[0].code, 'CLI_UNKNOWN_OPTION');
+  assert.deepEqual(unknownOption.options.unknown, ['--missing']);
+});
+
+test('validateCli preserves parse failures as semantic validation failures', async () => {
+  const program = defineCli(treeDefinition);
+  const invocation = parseCli(program, { argv: ['ship'] });
+  const validation = await validateCli(program, invocation);
+
+  assert.equal(validation.ok, false);
+  assert.equal(validation.diagnostics[0].code, 'CLI_UNKNOWN_COMMAND');
 });
 
 test('parseCli preserves pass-through tokens after the double dash boundary', () => {

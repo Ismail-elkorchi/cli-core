@@ -58,6 +58,30 @@ test('current public outputs validate against shipped schema artifacts', async (
   }
 });
 
+test('schema artifacts reject malformed public documents', async () => {
+  const manifestSchema = await readSchema('./command-manifest.schema.json');
+  const missingCommands = {
+    schemaVersion: 'cli-core.manifest.v1',
+    package: { name: '@ismail-elkorchi/cli-core', version: '0.1.0', contractVersion: '0.1.0' },
+    program: { name: 'ship' },
+    diagnostics: []
+  };
+  const wrongSchemaVersion = {
+    ...missingCommands,
+    schemaVersion: 'cli-core.manifest.v0',
+    commands: []
+  };
+
+  assert.equal(
+    validateJsonSchema(manifestSchema, missingCommands).some((error) => error.includes('$.commands')),
+    true
+  );
+  assert.equal(
+    validateJsonSchema(manifestSchema, wrongSchemaVersion).some((error) => error.includes('schemaVersion')),
+    true
+  );
+});
+
 test('npm pack dry-run includes concrete schema artifacts', async () => {
   const index = await readJson(new URL('../../schemas/index.json', import.meta.url));
   const { stdout } = await execFileAsync('npm', ['pack', '--dry-run', '--json'], {
