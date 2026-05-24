@@ -36,6 +36,7 @@ export function createMemoryConfigDiscoveryHost(
 function memoryFileContent(value: string | Readonly<Record<string, ConfigValue>> | ConfigFileInput): string {
   if (typeof value === 'string') return value;
   if ('values' in value && 'path' in value) {
+    // Stryker disable next-line ConditionalExpression: JSON.stringify omits undefined fields, so the unversioned fixture branch is equivalent to an undefined version property.
     return JSON.stringify(value.version === undefined ? { values: value.values } : { version: value.version, values: value.values });
   }
   return JSON.stringify(value);

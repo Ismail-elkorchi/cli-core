@@ -99,13 +99,13 @@ function configCandidatePaths(
   scope: ConfigDiscoveryScope
 ): readonly string[] {
   if (scope === 'none') return Object.freeze([]);
-  if (scope === 'explicit_paths') return Object.freeze([...(request.explicitPaths ?? [])]);
+  if (scope === 'explicit_paths') return uniquePaths(request.explicitPaths ?? []);
   const cwd = request.cwd ?? '.';
   const filenames = request.filenames ?? defaultConfigFilenames(program.name);
   if (scope === 'cwd_only') {
-    return Object.freeze(filenames.map((filename) => joinWithHost(request.host, cwd, filename)));
+    return uniquePaths(filenames.map((filename) => joinWithHost(request.host, cwd, filename)));
   }
-  return Object.freeze(
+  return uniquePaths(
     candidateDirectories(request.host, cwd, request.root).flatMap((directory) =>
       filenames.map((filename) => joinWithHost(request.host, directory, filename))
     )
@@ -201,4 +201,8 @@ function isConfigValue(value: unknown): value is ConfigValue {
   if (typeof value === 'boolean' || typeof value === 'number' || typeof value === 'string') return true;
   if (Array.isArray(value)) return value.every((item) => typeof item === 'string');
   return isRecord(value) && Object.values(value).every(isConfigValue);
+}
+
+function uniquePaths(paths: readonly string[]): readonly string[] {
+  return Object.freeze([...new Set(paths)]);
 }
