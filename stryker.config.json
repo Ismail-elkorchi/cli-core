@@ -10,12 +10,7 @@
     "!src/package.ts"
   ],
   "ignorePatterns": [
-    "/dist",
-    "/tests/integration",
-    "/tests/manual",
-    "/tests/package",
-    "/tests/runtime-os",
-    "/tests/shells"
+    "/dist"
   ],
   "coverageAnalysis": "off",
   "concurrency": "50%",
