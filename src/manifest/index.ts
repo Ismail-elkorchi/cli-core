@@ -78,11 +78,34 @@ export function exportCommandManifest(manifest: CommandManifest): string {
 }
 
 export function importCommandManifest(input: string | CommandManifest): CommandManifest {
-  const parsed = typeof input === 'string' ? JSON.parse(input) as CommandManifest : input;
-  if (parsed.schemaVersion !== 'cli-core.manifest.v1') {
+  const parsed = typeof input === 'string' ? JSON.parse(input) as unknown : input;
+  assertCommandManifestShape(parsed);
+  return freezeManifest(parsed);
+}
+
+function assertCommandManifestShape(input: unknown): asserts input is CommandManifest {
+  if (!isRecord(input)) {
+    throw new TypeError('Command manifest must be an object.');
+  }
+  if (input.schemaVersion !== 'cli-core.manifest.v1') {
     throw new TypeError('Unsupported command manifest schemaVersion.');
   }
-  return freezeManifest(parsed);
+  if (!isRecord(input.package)) {
+    throw new TypeError('Command manifest package must be an object.');
+  }
+  if (!isRecord(input.program)) {
+    throw new TypeError('Command manifest program must be an object.');
+  }
+  if (!Array.isArray(input.commands)) {
+    throw new TypeError('Command manifest commands must be an array.');
+  }
+  if (!Array.isArray(input.diagnostics)) {
+    throw new TypeError('Command manifest diagnostics must be an array.');
+  }
+}
+
+function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 function toManifestCommand(command: CliCommand): ManifestCommand {
