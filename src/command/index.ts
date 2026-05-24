@@ -1,5 +1,5 @@
 import type { FlagSpec, FlagType, FlagValue } from 'argv-flags';
-import type { ConfigDefinition } from '../config/index.js';
+import type { ConfigDefinition } from '../config/types.js';
 import { createCliDiagnostic, type CliDiagnostic } from '../diagnostics.js';
 
 export type CliOptionType = FlagType;
@@ -125,6 +125,15 @@ export interface CliCommandAliasIndexEntry {
   readonly deprecated?: boolean | string;
 }
 
+interface CliCommandLookupIndex {
+  readonly byPath: ReadonlyMap<string, CliCommand>;
+  readonly byAliasPath: ReadonlyMap<string, CliCommandAliasIndexEntry>;
+  readonly byId: ReadonlyMap<string, CliCommand>;
+  readonly childrenByParentId: ReadonlyMap<string, readonly CliCommand[]>;
+}
+
+const commandLookupIndexes = new WeakMap<CliProgram, CliCommandLookupIndex>();
+
 export function defineCli(definition: CliDefinition): CliProgram {
   const diagnostics: CliDiagnostic[] = [];
   const globalOptions = Object.freeze((definition.options ?? []).map((option) => compileOption(option, 'global')));
@@ -151,24 +160,29 @@ export function defineCli(definition: CliDefinition): CliProgram {
   const pathIndex = buildPathIndex(commands, diagnostics);
   const aliasIndex = buildAliasIndex(commands, pathIndex, diagnostics);
   const program = buildProgram(definition, root, commands, pathIndex, aliasIndex, diagnostics);
-  return freezeProgram(program);
+  const frozenProgram = freezeProgram(program);
+  commandLookupIndexes.set(frozenProgram, createCommandLookupIndex(frozenProgram));
+  return frozenProgram;
 }
 
 export function findCliCommand(program: CliProgram, path: readonly string[]): CliCommand | undefined {
-  const commandId = findCommandId(program.pathIndex, path);
-  if (commandId === undefined) return undefined;
-  return program.commands.find((command) => command.id === commandId);
+  return commandLookup(program).byPath.get(pathKey(path));
 }
 
 export function findCliCommandByAlias(
   program: CliProgram,
   path: readonly string[]
 ): { readonly command: CliCommand; readonly alias: CliCommandAliasIndexEntry } | undefined {
-  const alias = program.aliasIndex.find((entry) => samePath(entry.path, path));
+  const lookup = commandLookup(program);
+  const alias = lookup.byAliasPath.get(pathKey(path));
   if (alias === undefined) return undefined;
-  const command = program.commands.find((candidate) => candidate.id === alias.commandId);
+  const command = lookup.byId.get(alias.commandId);
   if (command === undefined) return undefined;
   return { command, alias };
+}
+
+export function findCliCommandChildren(program: CliProgram, parentId: string): readonly CliCommand[] {
+  return commandLookup(program).childrenByParentId.get(parentId) ?? Object.freeze([]);
 }
 
 export function createOptionSchema(options: readonly CliOption[]): Record<string, FlagSpec> {
@@ -308,11 +322,12 @@ function buildAliasIndex(
 ): readonly CliCommandAliasIndexEntry[] {
   const entries: CliCommandAliasIndexEntry[] = [];
   const seen = new Map<string, CliCommandAliasIndexEntry>();
+  const commandPaths = new Map(pathIndex.map((entry) => [pathKey(entry.path), entry]));
 
   for (const command of commands) {
     for (const alias of command.aliases) {
       const key = pathKey(alias.path);
-      const commandPath = pathIndex.find((entry) => samePath(entry.path, alias.path));
+      const commandPath = commandPaths.get(key);
       if (commandPath !== undefined) {
         diagnostics.push(
           createCliDiagnostic('CLI_ALIAS_CONFLICTS_WITH_COMMAND', 'error', 'Command alias conflicts with a command path.', {
@@ -403,16 +418,35 @@ function freezeProgram(program: CliProgram): CliProgram {
   });
 }
 
-function findCommandId(index: readonly CliCommandPathIndexEntry[], path: readonly string[]): string | undefined {
-  return index.find((entry) => samePath(entry.path, path))?.commandId;
+function commandLookup(program: CliProgram): CliCommandLookupIndex {
+  const existing = commandLookupIndexes.get(program);
+  if (existing !== undefined) return existing;
+  const rebuilt = createCommandLookupIndex(program);
+  commandLookupIndexes.set(program, rebuilt);
+  return rebuilt;
 }
 
-function samePath(left: readonly string[], right: readonly string[]): boolean {
-  if (left.length !== right.length) return false;
-  for (let index = 0; index < left.length; index += 1) {
-    if (left.at(index) !== right.at(index)) return false;
+function createCommandLookupIndex(program: CliProgram): CliCommandLookupIndex {
+  const byId = new Map(program.commands.map((command) => [command.id, command]));
+  const byPath = new Map<string, CliCommand>();
+  for (const entry of program.pathIndex) {
+    const command = byId.get(entry.commandId);
+    if (command !== undefined) byPath.set(pathKey(entry.path), command);
   }
-  return true;
+  const byAliasPath = new Map(program.aliasIndex.map((entry) => [pathKey(entry.path), entry]));
+  const children = new Map<string, CliCommand[]>();
+  for (const command of program.commands) {
+    if (command.parentId === undefined) continue;
+    const existing = children.get(command.parentId) ?? [];
+    existing.push(command);
+    children.set(command.parentId, existing);
+  }
+  return Object.freeze({
+    byPath,
+    byAliasPath,
+    byId,
+    childrenByParentId: new Map([...children].map(([parentId, items]) => [parentId, Object.freeze([...items])]))
+  });
 }
 
 function pathKey(path: readonly string[]): string {

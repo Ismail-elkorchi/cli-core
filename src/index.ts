@@ -1,59 +1,15 @@
 export { cliCorePackage } from './package.js';
 export type { CliCorePackage } from './package.js';
-export {
-  createCliMain,
-  createNodeCliAdapter,
-  renderRunResultText,
-  runCliMain
-} from './adapter/index.js';
 export { defineCli, findCliCommand, findCliCommandByAlias } from './command/index.js';
 export {
   completeCli,
-  createCompletionCommand,
-  createCompletionInstallPlan,
-  createCompletionPayload,
-  createCompletionRequest,
-  createCompletionScript,
-  handleCompletionRequest
+  createCompletionPayload
 } from './completion/index.js';
-export { createMemoryConfigDiscoveryHost, discoverCliConfigInput, resolveCliConfig } from './config/index.js';
-export { applyCliEffects, createMemoryEffectHost, planCliEffects } from './effects/index.js';
-export { createHelpDocument, createVersionDocument } from './help/index.js';
+export { resolveCliConfig } from './config/index.js';
+export { createHelpDocument } from './help/index.js';
 export { describeCli } from './manifest/index.js';
 export { parseCli, validateCli } from './parse/index.js';
-export {
-  applyCliPluginCommands,
-  checkCliPluginCompatibility,
-  createCliPluginHost,
-  defineCliPluginManifest
-} from './plugins/index.js';
-export { suggestRepairs } from './repair/index.js';
 export { runCli } from './run/index.js';
-export {
-  createCliFailureEnvelope,
-  createCliSchemaEnvelope,
-  createUnsupportedSchemaDiagnostic,
-  describeCliSchemas,
-  exitKindToFailureKind,
-  failureKindForDiagnostics,
-  isCliSchemaVersion,
-  redactCliDiagnostic,
-  redactCliDiagnostics,
-  redactCliSecrets,
-  redactCliSecretsWithReport
-} from './schema/index.js';
-export type {
-  CliMain,
-  CliMainEffectMode,
-  CliMainHost,
-  CliMainRenderer,
-  CliMainRequest,
-  CliMainResult,
-  CliMainText,
-  CliTextWriter,
-  CliWritableStream,
-  NodeCliProcessLike
-} from './adapter/index.js';
 export type {
   CliAlias,
   CliAliasDefinition,
@@ -74,18 +30,9 @@ export type {
 } from './command/index.js';
 export type {
   CompletionInput,
-  CompletionInstallPlan,
-  CompletionInstallStep,
   CompletionItem,
   CompletionPayload,
-  CompletionCommand,
-  CompletionCommandProtocol,
-  CompletionProtocolInput,
-  CompletionRequest,
-  CompletionRequestInput,
-  CompletionResponse,
-  CompletionScript,
-  CompletionShell
+  CompletionResponse
 } from './completion/index.js';
 export type {
   ParsedAlias,
@@ -97,17 +44,8 @@ export type {
   SemanticValidationResult,
   ValidationContext
 } from './parse/index.js';
-export type { RepairSuggestion } from './repair/index.js';
 export type {
   ConfigDefinition,
-  ConfigDiscoveryCollection,
-  ConfigDiscoveryEnvironmentInput,
-  ConfigDiscoveryHost,
-  ConfigDiscoveryHostResult,
-  ConfigDiscoveryInput,
-  ConfigDiscoveryRequest,
-  ConfigDiscoveryResult,
-  ConfigDiscoveryScope,
   ConfigExplanation,
   ConfigFieldDefinition,
   ConfigFileInput,
@@ -117,21 +55,8 @@ export type {
   ConfigResolutionEntry,
   ConfigSource,
   ConfigValue,
-  ConfigValueType,
-  MemoryConfigDiscoveryHost,
-  MemoryConfigDiscoveryHostInput
+  ConfigValueType
 } from './config/index.js';
-export type {
-  CliEffectHost,
-  EffectApplicationItemReport,
-  EffectApplicationMode,
-  EffectApplicationPolicy,
-  EffectApplicationReport,
-  EffectApplicationRequest,
-  EffectHostResult,
-  MemoryEffectHost,
-  MemorySpawnRecord
-} from './effects/index.js';
 export type {
   CliDiagnostic,
   CliDiagnosticCode,
@@ -155,35 +80,6 @@ export type {
   ManifestProgram
 } from './manifest/index.js';
 export type {
-  CliPluginCompatibilityResult,
-  CliPluginCommandApplication,
-  CliPluginCommandApplicationInput,
-  CliPluginCommandContribution,
-  CliPluginCoreCompatibility,
-  CliPluginPayload,
-  CliPluginEffect,
-  CliPluginHookContext,
-  CliPluginHookDefinition,
-  CliPluginHookDefinitionInput,
-  CliPluginHookEvent,
-  CliPluginHookHandler,
-  CliPluginHookOutput,
-  CliPluginHookPlan,
-  CliPluginHookReference,
-  CliPluginHookResult,
-  CliPluginHookRunInput,
-  CliPluginHookRunResult,
-  CliPluginHost,
-  CliPluginHostInput,
-  CliPluginLoadResult,
-  CliPluginLoader,
-  CliPluginManifest,
-  CliPluginManifestDefinition,
-  CliPluginModule,
-  CliPluginRegistration,
-  CliPluginRuntime
-} from './plugins/index.js';
-export type {
   CustomRunEffect,
   ExitKind,
   ExitStatusPolicy,
@@ -203,17 +99,3 @@ export type {
   RunResult,
   SpawnRunEffect
 } from './run/index.js';
-export type {
-  CliFailureEnvelope,
-  CliFailureEnvelopeInput,
-  CliFailureKind,
-  CliRedactionMatch,
-  CliRedactionOptions,
-  CliRedactionReason,
-  CliRedactionResult,
-  CliSchemaDescriptor,
-  CliSchemaEnvelope,
-  CliSchemaEnvelopeInput,
-  CliSchemaName,
-  CliSchemaVersion
-} from './schema/index.js';

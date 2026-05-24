@@ -1,10 +1,6 @@
 import type { CliDiagnostic } from '../diagnostics.js';
-import { cliCorePackage } from '../package.js';
 import type { ParsedInvocation } from '../parse/index.js';
 import type { CliProgram } from '../command/index.js';
-
-export { cliCorePackage };
-export type { CliCorePackage } from '../package.js';
 
 export interface RepairSuggestion {
   readonly code: 'REPAIR_UNKNOWN_COMMAND' | 'REPAIR_UNKNOWN_OPTION' | 'REPAIR_MISSING_INPUT' | 'REPAIR_DEPRECATED_ALIAS' | 'REPAIR_PASS_THROUGH';

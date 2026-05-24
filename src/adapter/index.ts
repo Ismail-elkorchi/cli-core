@@ -7,7 +7,6 @@ import {
   type EffectApplicationPolicy,
   type EffectApplicationReport
 } from '../effects/index.js';
-import { cliCorePackage } from '../package.js';
 import type { CliPluginHost } from '../plugins/index.js';
 import {
   runCli,
@@ -20,9 +19,6 @@ import {
   type RunResult
 } from '../run/index.js';
 import type { CliRedactionOptions } from '../schema/index.js';
-
-export { cliCorePackage };
-export type { CliCorePackage } from '../package.js';
 
 export type CliMainEffectMode = 'none' | 'plan' | 'apply';
 

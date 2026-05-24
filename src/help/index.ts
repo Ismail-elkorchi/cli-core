@@ -1,15 +1,12 @@
 import {
   findCliCommand,
+  findCliCommandChildren,
   type CliCommand,
   type CliCommandSource,
   type CliOption,
   type CliPositional,
   type CliProgram
 } from '../command/index.js';
-import { cliCorePackage } from '../package.js';
-
-export { cliCorePackage };
-export type { CliCorePackage } from '../package.js';
 
 export interface HelpDocument {
   readonly schemaVersion: 'cli-core.help.v1';
@@ -56,7 +53,7 @@ export interface VersionDocument {
 
 export function createHelpDocument(program: CliProgram, commandPath: readonly string[] = []): HelpDocument {
   const command = findCliCommand(program, commandPath) ?? program.root;
-  const childCommands = program.commands.filter((candidate) => candidate.parentId === command.id);
+  const childCommands = findCliCommandChildren(program, command.id);
   return Object.freeze({
     schemaVersion: 'cli-core.help.v1',
     programName: program.name,

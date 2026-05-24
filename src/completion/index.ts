@@ -1,9 +1,11 @@
-import type { CliCommand, CliCommandSource, CliProgram } from '../command/index.js';
+import {
+  findCliCommand,
+  findCliCommandChildren,
+  type CliCommand,
+  type CliCommandSource,
+  type CliProgram
+} from '../command/index.js';
 import type { CliDiagnostic } from '../diagnostics.js';
-import { cliCorePackage } from '../package.js';
-
-export { cliCorePackage };
-export type { CliCorePackage } from '../package.js';
 
 export type CompletionShell = 'bash' | 'zsh' | 'fish' | 'pwsh';
 
@@ -109,8 +111,8 @@ export interface CompletionInstallStep {
 export function createCompletionPayload(program: CliProgram, input: CompletionInput = {}): CompletionPayload {
   const commandPath = input.commandPath ?? [];
   const word = input.word ?? '';
-  const command = program.commands.find((candidate) => samePath(candidate.path, commandPath)) ?? program.root;
-  const childCommands = program.commands.filter((candidate) => candidate.parentId === command.id);
+  const command = findCliCommand(program, commandPath) ?? program.root;
+  const childCommands = findCliCommandChildren(program, command.id);
   const includeHidden = input.includeHidden ?? false;
   const items: CompletionItem[] = [
     ...childCommands.map(commandCompletion),
@@ -195,13 +197,6 @@ export function completeCli(
   const context = resolveCompletionContext(program, normalized.committedWords);
   const items = completionBridgeItems(program, context.command, normalized.currentWord, normalized.includeHidden);
   return completionResponse(request, normalized, items);
-}
-
-export function handleCompletionRequest(
-  program: CliProgram,
-  input: CompletionRequestInput | CompletionRequest | readonly string[] = {}
-): CompletionResponse {
-  return completeCli(program, input);
 }
 
 export function createCompletionInstallPlan(program: CliProgram, shell: CompletionShell): CompletionInstallPlan {
@@ -356,7 +351,7 @@ function resolveCompletionContext(program: CliProgram, words: readonly string[])
 }
 
 function findChildCommand(program: CliProgram, command: CliCommand, token: string): CliCommand | undefined {
-  const children = program.commands.filter((candidate) => candidate.parentId === command.id);
+  const children = findCliCommandChildren(program, command.id);
   return children.find((candidate) => candidate.name === token || candidate.aliases.some((alias) => alias.name === token));
 }
 
@@ -376,7 +371,7 @@ function completionBridgeItems(
 }
 
 function childCommandItems(program: CliProgram, command: CliCommand, word: string): readonly CompletionItem[] {
-  const children = program.commands.filter((candidate) => candidate.parentId === command.id);
+  const children = findCliCommandChildren(program, command.id);
   return Object.freeze([
     ...children.map(commandCompletion),
     ...children.flatMap(childAliasCompletion)
@@ -457,10 +452,6 @@ function completionEnableStep(programName: string, shell: CompletionShell, scrip
     content: `source ${scriptPath.replaceAll(' ', '\\ ')}`,
     description: `Enable bash completion for ${programName}.`
   };
-}
-
-function samePath(left: readonly string[], right: readonly string[]): boolean {
-  return left.length === right.length && left.every((segment, index) => segment === right.at(index));
 }
 
 function isCompletionRequest(input: CompletionRequestInput | CompletionRequest | readonly string[]): input is CompletionRequest {

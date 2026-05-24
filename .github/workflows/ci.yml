@@ -29,20 +29,20 @@ jobs:
         run: npm run typecheck
       - name: Build
         run: npm run build
-      - name: Unit tests
-        run: npm run test:unit
-      - name: Property tests
-        run: npm run test:property
-      - name: Acceptance tests
-        run: npm run test:acceptance
-      - name: Conformance tests
-        run: npm run test:conformance
-      - name: Benchmarks
-        run: npm run test:benchmarks
+      - name: Core tests
+        run: npm run test:core
+      - name: Contract tests
+        run: npm run test:contracts
+      - name: Example tests
+        run: npm run test:examples
+      - name: Integration tests
+        run: npm run build && node --test tests/integration/*.test.mjs
+      - name: Security tests
+        run: npm run test:security
+      - name: Package tests
+        run: npm run test:package
       - name: Node runtime
         run: npm run test:runtime:node
-      - name: Docs
-        run: npm run test:docs
       - name: Export check
         run: npm run check:exports
       - name: Public leakage check

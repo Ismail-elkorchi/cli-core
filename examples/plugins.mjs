@@ -3,7 +3,7 @@ import {
   checkCliPluginCompatibility,
   createCliPluginHost,
   defineCliPluginManifest
-} from '@ismail-elkorchi/cli-core';
+} from '@ismail-elkorchi/cli-core/plugins';
 
 export async function runPluginsExample() {
   const manifest = defineCliPluginManifest({

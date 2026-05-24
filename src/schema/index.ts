@@ -6,9 +6,6 @@ import {
 } from '../diagnostics.js';
 import { cliCorePackage } from '../package.js';
 
-export { cliCorePackage };
-export type { CliCorePackage } from '../package.js';
-
 export type CliSchemaName =
   | 'program'
   | 'invocation'
@@ -297,6 +294,7 @@ export function failureKindForDiagnostics(diagnostics: readonly CliDiagnostic[])
   if (codes.includes('CLI_RUN_INTERRUPTED')) return 'interruption';
   if (codes.includes('CLI_RUN_TIMEOUT')) return 'timeout';
   if (codes.includes('CLI_ARGV_FLAG_ISSUE')) return 'config';
+  if (codes.some((code) => code.startsWith('CLI_CONFIG_'))) return 'config';
   if (codes.includes('CLI_UNKNOWN_COMMAND') || codes.includes('CLI_UNKNOWN_OPTION') || codes.includes('CLI_MISSING_POSITIONAL')) {
     return 'parse';
   }
