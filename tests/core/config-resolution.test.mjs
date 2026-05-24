@@ -31,8 +31,23 @@ test('resolveCliConfig applies precedence and provenance', () => {
 
   assert.equal(resolution.ok, true);
   assert.deepEqual(resolution.values, { mode: 'argv', retries: 3, trace: false });
+  assert.deepEqual(resolution.entries.map((item) => [item.key, item.source.kind, item.source.precedence]), [
+    ['mode', 'argv', 4],
+    ['retries', 'environment', 3],
+    ['trace', 'built_in_default', 0]
+  ]);
+  assert.deepEqual(
+    resolution.explanations.find((item) => item.key === 'mode')?.candidates.map((source) => source.kind),
+    ['built_in_default', 'workspace_default', 'config_file', 'environment', 'argv']
+  );
+  assert.deepEqual(
+    resolution.explanations.find((item) => item.key === 'mode')?.candidates.map((source) => source.label),
+    ['built-in default', 'workspace default', '.shiprc.json', 'SHIP_MODE', 'argv']
+  );
   assert.equal(resolution.explanations.find((item) => item.key === 'mode')?.selected.kind, 'argv');
+  assert.equal(resolution.explanations.find((item) => item.key === 'mode')?.selected.label, 'argv');
   assert.equal(resolution.explanations.find((item) => item.key === 'retries')?.selected.kind, 'environment');
+  assert.equal(resolution.explanations.find((item) => item.key === 'trace')?.selected.kind, 'built_in_default');
 });
 
 test('resolveCliConfig applies data migrations and deprecation diagnostics', () => {
@@ -56,6 +71,423 @@ test('resolveCliConfig applies data migrations and deprecation diagnostics', () 
   assert.equal(resolution.values.legacy, 'old');
   assert.equal(resolution.diagnostics[0].code, 'CLI_CONFIG_FIELD_DEPRECATED');
   assert.equal(resolution.diagnostics[0].severity, 'warning');
+  assert.deepEqual(resolution.diagnostics[0].fields, { field: 'legacy', reason: 'Use region.' });
+});
+
+test('resolveCliConfig validates layer keys and value types before selection', () => {
+  const program = defineCli({
+    name: 'ship',
+    config: {
+      fields: [
+        { name: 'mode', type: 'string' },
+        { name: 'retries', type: 'number' },
+        { name: 'enabled', type: 'boolean' },
+        { name: 'tags', type: 'array' },
+        { name: 'metadata', type: 'object' },
+        { name: 'settings', type: 'object' },
+        { name: 'matrix', type: 'object' },
+        { name: 'objectText', type: 'object' },
+        { name: 'mixed', type: 'object' }
+      ]
+    }
+  });
+  const unsafeArgv = Object.fromEntries([
+    ['__proto__', 'polluted'],
+    ['enabled', 'true'],
+    ['retries', Number.NaN],
+    ['tags', [1, 'stable']],
+    ['settings', null],
+    ['matrix', []],
+    ['objectText', 'text'],
+    ['mixed', { ok: 'yes', bad: ['one', 2] }]
+  ]);
+
+  const resolution = resolveCliConfig(program, {
+    workspaceDefaults: { mode: 3 },
+    configFiles: [{ path: 'ship.json', values: { unknown: 'value', metadata: { owner: 'ops' } } }],
+    argv: unsafeArgv
+  });
+
+  assert.equal(resolution.ok, false);
+  assert.deepEqual(resolution.values, { metadata: { owner: 'ops' } });
+  assert.equal(Object.prototype.polluted, undefined);
+  assert.deepEqual(resolution.diagnostics.map((diagnostic) => diagnostic.code), [
+    'CLI_CONFIG_VALUE_INVALID',
+    'CLI_CONFIG_KEY_UNKNOWN',
+    'CLI_CONFIG_KEY_UNKNOWN',
+    'CLI_CONFIG_VALUE_INVALID',
+    'CLI_CONFIG_VALUE_INVALID',
+    'CLI_CONFIG_VALUE_INVALID',
+    'CLI_CONFIG_VALUE_INVALID',
+    'CLI_CONFIG_VALUE_INVALID',
+    'CLI_CONFIG_VALUE_INVALID',
+    'CLI_CONFIG_VALUE_INVALID'
+  ]);
+  assert.deepEqual(resolution.diagnostics.map((diagnostic) => diagnostic.fields.field ?? diagnostic.fields.key), [
+    'mode',
+    'unknown',
+    '__proto__',
+    'enabled',
+    'retries',
+    'tags',
+    'settings',
+    'matrix',
+    'objectText',
+    'mixed'
+  ]);
+  assert.deepEqual(resolution.diagnostics.map((diagnostic) => diagnostic.fields.actualType ?? diagnostic.fields.path), [
+    'number',
+    'ship.json',
+    '',
+    'string',
+    'nan',
+    'array',
+    'null',
+    'array',
+    'string',
+    'object'
+  ]);
+  assert.deepEqual(resolution.diagnostics.map((diagnostic) => diagnostic.severity), [
+    'error',
+    'error',
+    'error',
+    'error',
+    'error',
+    'error',
+    'error',
+    'error',
+    'error',
+    'error'
+  ]);
+  assert.equal(resolution.diagnostics[0].fields.path, '');
+});
+
+test('resolveCliConfig accepts valid non-env layer values by declared type', () => {
+  const program = defineCli({
+    name: 'ship',
+    config: {
+      fields: [
+        { name: 'enabled', type: 'boolean' },
+        { name: 'retries', type: 'number' },
+        { name: 'tags', type: 'array' },
+        { name: 'metadata', type: 'object' }
+      ]
+    }
+  });
+
+  const resolution = resolveCliConfig(program, {
+    workspaceDefaults: {
+      enabled: true,
+      retries: 3,
+      tags: ['stable', 'ci'],
+      metadata: {
+        owner: 'ops',
+        enabled: true,
+        retries: 3,
+        empty: null,
+        nested: { region: 'eu' },
+        labels: ['api', 'worker']
+      }
+    }
+  });
+
+  assert.equal(resolution.ok, true);
+  assert.deepEqual(resolution.values, {
+    enabled: true,
+    retries: 3,
+    tags: ['stable', 'ci'],
+    metadata: {
+      owner: 'ops',
+      enabled: true,
+      retries: 3,
+      empty: null,
+      nested: { region: 'eu' },
+      labels: ['api', 'worker']
+    }
+  });
+  assert.deepEqual(resolution.entries.map((item) => item.source.kind), [
+    'workspace_default',
+    'workspace_default',
+    'workspace_default',
+    'workspace_default'
+  ]);
+});
+
+test('resolveCliConfig coerces valid environment values by declared type', () => {
+  const program = defineCli({
+    name: 'ship',
+    config: {
+      fields: [
+        { name: 'enabled', type: 'boolean', env: 'SHIP_ENABLED' },
+        { name: 'disabled', type: 'boolean', env: 'SHIP_DISABLED' },
+        { name: 'offText', type: 'boolean', env: 'SHIP_OFF_TEXT' },
+        { name: 'retries', type: 'number', env: 'SHIP_RETRIES' },
+        { name: 'tags', type: 'array', env: 'SHIP_TAGS' },
+        { name: 'emptyTags', type: 'array', env: 'SHIP_EMPTY_TAGS' },
+        { name: 'metadata', type: 'object', env: 'SHIP_METADATA' }
+      ]
+    }
+  });
+
+  const resolution = resolveCliConfig(program, {
+    env: {
+      SHIP_ENABLED: 'true',
+      SHIP_DISABLED: '0',
+      SHIP_OFF_TEXT: 'false',
+      SHIP_RETRIES: '4.5',
+      SHIP_TAGS: 'stable,ci',
+      SHIP_EMPTY_TAGS: '',
+      SHIP_METADATA: '{"owner":"ops","nested":{"enabled":true}}'
+    }
+  });
+
+  assert.equal(resolution.ok, true);
+  assert.deepEqual(resolution.values, {
+    enabled: true,
+    disabled: false,
+    offText: false,
+    retries: 4.5,
+    tags: ['stable', 'ci'],
+    emptyTags: [],
+    metadata: { owner: 'ops', nested: { enabled: true } }
+  });
+  assert.deepEqual(resolution.explanations.map((item) => item.selected.kind), [
+    'environment',
+    'environment',
+    'environment',
+    'environment',
+    'environment',
+    'environment',
+    'environment'
+  ]);
+});
+
+test('resolveCliConfig reports invalid environment coercions as typed diagnostics', () => {
+  const program = defineCli({
+    name: 'ship',
+    config: {
+      fields: [
+        { name: 'enabled', type: 'boolean', env: 'SHIP_ENABLED' },
+        { name: 'retries', type: 'number', env: 'SHIP_RETRIES' },
+        { name: 'spaced', type: 'number', env: 'SHIP_SPACED' },
+        { name: 'metadata', type: 'object', env: 'SHIP_METADATA' },
+        { name: 'metadataArray', type: 'object', env: 'SHIP_METADATA_ARRAY' }
+      ]
+    }
+  });
+
+  const resolution = resolveCliConfig(program, {
+    env: {
+      SHIP_ENABLED: 'yes',
+      SHIP_RETRIES: '',
+      SHIP_SPACED: '   ',
+      SHIP_METADATA: 'not-json',
+      SHIP_METADATA_ARRAY: '[]'
+    }
+  });
+
+  assert.equal(resolution.ok, false);
+  assert.deepEqual(resolution.values, {});
+  assert.deepEqual(resolution.diagnostics.map((diagnostic) => diagnostic.code), [
+    'CLI_CONFIG_VALUE_INVALID',
+    'CLI_CONFIG_VALUE_INVALID',
+    'CLI_CONFIG_VALUE_INVALID',
+    'CLI_CONFIG_VALUE_INVALID',
+    'CLI_CONFIG_VALUE_INVALID'
+  ]);
+  assert.deepEqual(resolution.diagnostics.map((diagnostic) => diagnostic.fields.field), [
+    'enabled',
+    'retries',
+    'spaced',
+    'metadata',
+    'metadataArray'
+  ]);
+  assert.deepEqual(resolution.diagnostics.map((diagnostic) => diagnostic.fields.source), [
+    'environment',
+    'environment',
+    'environment',
+    'environment',
+    'environment'
+  ]);
+});
+
+test('resolveCliConfig does not warn for deprecated fields that are not selected', () => {
+  const program = defineCli({
+    name: 'ship',
+    config: {
+      fields: [
+        { name: 'active', type: 'string' },
+        { name: 'legacy', type: 'string', deprecated: true }
+      ]
+    }
+  });
+
+  const resolution = resolveCliConfig(program, {
+    argv: { active: 'current' }
+  });
+
+  assert.equal(resolution.ok, true);
+  assert.deepEqual(resolution.values, { active: 'current' });
+  assert.deepEqual(resolution.diagnostics, []);
+});
+
+test('resolveCliConfig ignores environment entries for fields without env bindings', () => {
+  const program = defineCli({
+    name: 'ship',
+    config: {
+      fields: [{ name: 'mode', type: 'string' }]
+    }
+  });
+
+  const resolution = resolveCliConfig(program, {
+    env: { undefined: 'ambient' }
+  });
+
+  assert.equal(resolution.ok, true);
+  assert.deepEqual(resolution.values, {});
+  assert.deepEqual(resolution.diagnostics, []);
+});
+
+test('resolveCliConfig reports selected boolean deprecations with an empty reason', () => {
+  const program = defineCli({
+    name: 'ship',
+    config: {
+      fields: [{ name: 'legacy', type: 'string', deprecated: true }]
+    }
+  });
+
+  const resolution = resolveCliConfig(program, {
+    argv: { legacy: 'old' }
+  });
+
+  assert.equal(resolution.ok, true);
+  assert.equal(resolution.diagnostics[0].code, 'CLI_CONFIG_FIELD_DEPRECATED');
+  assert.deepEqual(resolution.diagnostics[0].fields, { field: 'legacy', reason: '' });
+});
+
+test('resolveCliConfig applies migration rename remove defaults in order', () => {
+  const program = defineCli({
+    name: 'ship',
+    config: {
+      version: '3',
+      fields: [
+        { name: 'region', type: 'string' },
+        { name: 'retries', type: 'number' },
+        { name: 'mode', type: 'string' }
+      ],
+      migrations: [
+        { from: '1', to: '2', rename: { zone: 'region' }, defaults: { retries: 2 } },
+        { from: '2', to: '3', remove: ['obsolete'], defaults: { mode: 'safe' } }
+      ]
+    }
+  });
+
+  const resolution = resolveCliConfig(program, {
+    configFiles: [{ path: 'ship.v1.json', version: '1', values: { zone: 'eu', obsolete: 'drop' } }]
+  });
+
+  assert.equal(resolution.ok, true);
+  assert.equal(resolution.version, '3');
+  assert.deepEqual(resolution.values, { region: 'eu', retries: 2, mode: 'safe' });
+  assert.deepEqual(resolution.entries.map((item) => item.source.path), ['ship.v1.json', 'ship.v1.json', 'ship.v1.json']);
+});
+
+test('resolveCliConfig keeps migrated values ahead of migration defaults', () => {
+  const program = defineCli({
+    name: 'ship',
+    config: {
+      fields: [
+        { name: 'mode', type: 'string' },
+        { name: 'region', type: 'string' }
+      ],
+      migrations: [{ from: '1', to: '2', rename: { zone: 'region' }, defaults: { mode: 'safe', region: 'us' } }]
+    }
+  });
+
+  const resolution = resolveCliConfig(program, {
+    configFiles: [{ path: 'ship.v1.json', version: '1', values: { zone: 'eu', mode: 'fast' } }]
+  });
+
+  assert.equal(resolution.ok, true);
+  assert.deepEqual(resolution.values, { region: 'eu', mode: 'fast' });
+});
+
+test('resolveCliConfig ignores migration renames when the source key is absent', () => {
+  const program = defineCli({
+    name: 'ship',
+    config: {
+      fields: [{ name: 'region', type: 'string' }],
+      migrations: [{ from: '1', to: '2', rename: { zone: 'region' } }]
+    }
+  });
+
+  const resolution = resolveCliConfig(program, {
+    configFiles: [{ path: 'ship.v1.json', version: '1', values: {} }]
+  });
+
+  assert.equal(resolution.ok, true);
+  assert.deepEqual(resolution.values, {});
+  assert.deepEqual(resolution.diagnostics, []);
+});
+
+test('resolveCliConfig reports unmatched migrated keys and unchanged migration versions', () => {
+  const unmatchedProgram = defineCli({
+    name: 'ship',
+    config: {
+      fields: [{ name: 'region', type: 'string' }],
+      migrations: [{ from: '2', to: '3', rename: { zone: 'region' } }]
+    }
+  });
+  const unchangedProgram = defineCli({
+    name: 'ship',
+    config: {
+      fields: [{ name: 'mode', type: 'string' }],
+      migrations: [
+        { from: '0', to: '1', defaults: { mode: 'legacy' } },
+        { from: '1', to: '1', defaults: { mode: 'safe' } }
+      ]
+    }
+  });
+
+  const unmatched = resolveCliConfig(unmatchedProgram, {
+    configFiles: [{ path: 'ship.v1.json', version: '1', values: { zone: 'eu' } }]
+  });
+  const unchanged = resolveCliConfig(unchangedProgram, {
+    configFiles: [{ path: 'ship.v1.json', version: '1', values: {} }]
+  });
+
+  assert.equal(unmatched.ok, false);
+  assert.deepEqual(unmatched.values, {});
+  assert.equal(unmatched.diagnostics[0].code, 'CLI_CONFIG_KEY_UNKNOWN');
+  assert.deepEqual(unmatched.diagnostics[0].fields, { key: 'zone', source: 'config_file', path: 'ship.v1.json' });
+  assert.equal(unchanged.ok, true);
+  assert.equal(unchanged.values.mode, 'safe');
+  assert.equal(unchanged.diagnostics[0].code, 'CLI_CONFIG_MIGRATION_UNCHANGED');
+  assert.equal(unchanged.diagnostics[0].severity, 'warning');
+  assert.deepEqual(unchanged.diagnostics[0].fields, { path: 'ship.v1.json', version: '1' });
+});
+
+test('resolveCliConfig works without a config definition', () => {
+  const resolution = resolveCliConfig(defineCli({ name: 'empty' }));
+
+  assert.equal(resolution.ok, true);
+  assert.equal(resolution.version, undefined);
+  assert.deepEqual(resolution.values, {});
+  assert.deepEqual(resolution.entries, []);
+  assert.deepEqual(resolution.explanations, []);
+  assert.deepEqual(resolution.discovery, { scope: 'none', cwd: undefined, searchedPaths: [] });
+});
+
+test('resolveCliConfig reports file input against a program without config fields', () => {
+  const resolution = resolveCliConfig(defineCli({ name: 'empty' }), {
+    configFiles: [{ path: 'ship.json', values: { mode: 'file' } }],
+    env: { undefined: 'ignored' }
+  });
+
+  assert.equal(resolution.ok, false);
+  assert.deepEqual(resolution.values, {});
+  assert.equal(resolution.diagnostics[0].code, 'CLI_CONFIG_KEY_UNKNOWN');
+  assert.deepEqual(resolution.diagnostics[0].fields, { key: 'mode', source: 'config_file', path: 'ship.json' });
 });
 
 test('resolveCliConfig records discovery scope without reading files', () => {

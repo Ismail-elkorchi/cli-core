@@ -23,18 +23,19 @@ export function migrateConfigFile(
 }
 
 function applyMigration(values: Readonly<Record<string, ConfigValue>>, migration: ConfigMigration): Record<string, ConfigValue> {
-  const next: Record<string, ConfigValue> = { ...values };
+  const next = new Map<string, ConfigValue>(Object.entries(values));
   for (const [from, to] of Object.entries(migration.rename ?? {})) {
-    if (next[from] !== undefined) {
-      next[to] = next[from];
-      delete next[from];
+    if (next.has(from)) {
+      const value = next.get(from)!;
+      next.delete(from);
+      next.set(to, value);
     }
   }
   for (const removed of migration.remove ?? []) {
-    delete next[removed];
+    next.delete(removed);
   }
   for (const [key, value] of Object.entries(migration.defaults ?? {})) {
-    if (next[key] === undefined) next[key] = value;
+    if (!next.has(key)) next.set(key, value);
   }
-  return next;
+  return Object.fromEntries(next.entries());
 }
