@@ -173,7 +173,7 @@ export function createCompletionRequest(input: CompletionRequestInput | readonly
   const requestInput: CompletionRequestInput = isCompletionWordArray(input) ? { words: input } : input;
   const words = Object.freeze([...(requestInput.words ?? [])]);
   const cursor = clampCursor(requestInput.cursor ?? words.length, words.length);
-  const currentWord = requestInput.currentWord ?? words.at(Math.max(0, cursor - 1)) ?? '';
+  const currentWord = requestInput.currentWord ?? (cursor > 0 ? words.at(cursor - 1) : undefined) ?? '';
   return Object.freeze({
     schemaVersion: 'cli-core.completion-request.v1' as const,
     words,
@@ -302,7 +302,6 @@ interface NormalizedCompletionWords {
 
 interface CompletionContext {
   readonly command: CliCommand;
-  readonly consumed: number;
 }
 
 function normalizeCompletionWords(program: CliProgram, request: CompletionRequest): NormalizedCompletionWords {
@@ -339,15 +338,13 @@ function protocolPrefixLength(program: CliProgram, request: CompletionRequest): 
 
 function resolveCompletionContext(program: CliProgram, words: readonly string[]): CompletionContext {
   let command = program.root;
-  let consumed = 0;
   for (const token of words) {
     if (token.startsWith('-')) break;
     const next = findChildCommand(program, command, token);
     if (next === undefined) break;
     command = next;
-    consumed += 1;
   }
-  return Object.freeze({ command, consumed });
+  return Object.freeze({ command });
 }
 
 function findChildCommand(program: CliProgram, command: CliCommand, token: string): CliCommand | undefined {
@@ -425,13 +422,6 @@ function completionPath(programName: string, shell: CompletionShell): string {
   return `~/.bash_completion.d/${pathName}`;
 }
 
-function completionDirectory(shell: CompletionShell): string {
-  if (shell === 'fish') return '~/.config/fish/completions';
-  if (shell === 'pwsh') return '$HOME/.config/powershell/completions';
-  if (shell === 'zsh') return '~/.zsh/completions';
-  return '~/.bash_completion.d';
-}
-
 function completionEnableStep(programName: string, shell: CompletionShell, scriptPath: string): CompletionInstallStep {
   if (shell === 'fish') {
     return {
@@ -453,7 +443,7 @@ function completionEnableStep(programName: string, shell: CompletionShell, scrip
     return {
       action: 'add_to_profile',
       path: '~/.zshrc',
-      content: `fpath=(${completionDirectory(shell).replaceAll(' ', '\\ ')} $fpath)\nautoload -U compinit\ncompinit`,
+      content: 'fpath=(~/.zsh/completions $fpath)\nautoload -U compinit\ncompinit',
       description: `Enable zsh completion for ${programName}.`
     };
   }
