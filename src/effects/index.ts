@@ -4,12 +4,8 @@ import {
   type CliDiagnostic,
   type CliDiagnosticValue
 } from '../diagnostics.js';
-import { cliCorePackage } from '../package.js';
 import type { FileRunEffect, RunEffect, RunPayload, SpawnRunEffect } from '../run/index.js';
 import { redactCliDiagnostics, redactCliSecrets, type CliRedactionOptions } from '../schema/index.js';
-
-export { cliCorePackage };
-export type { CliCorePackage } from '../package.js';
 
 export type EffectApplicationMode = 'plan' | 'apply';
 

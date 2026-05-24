@@ -5,13 +5,9 @@ import {
   type CliDiagnostic,
   type CliDiagnosticValue
 } from '../diagnostics.js';
-import { cliCorePackage } from '../package.js';
 import { parseCli, type ParsedInvocation } from '../parse/index.js';
 import type { CliPluginHookEvent, CliPluginHookRunResult, CliPluginHost } from '../plugins/index.js';
 import { redactCliDiagnostics, redactCliSecrets, type CliRedactionOptions } from '../schema/index.js';
-
-export { cliCorePackage };
-export type { CliCorePackage } from '../package.js';
 
 export type RunMode = 'plan' | 'apply';
 

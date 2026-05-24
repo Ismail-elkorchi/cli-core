@@ -2,9 +2,6 @@ import type { CliCommand, CliCommandSource, CliOption, CliPositional, CliProgram
 import type { CliDiagnostic } from '../diagnostics.js';
 import { cliCorePackage } from '../package.js';
 
-export { cliCorePackage };
-export type { CliCorePackage } from '../package.js';
-
 export interface CommandManifest {
   readonly schemaVersion: 'cli-core.manifest.v1';
   readonly package: {

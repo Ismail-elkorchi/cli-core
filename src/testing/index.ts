@@ -1,8 +1,4 @@
 import type { CliDefinition } from '../command/index.js';
-import { cliCorePackage } from '../package.js';
-
-export { cliCorePackage };
-export type { CliCorePackage } from '../package.js';
 
 export type CliFixtureValue =
   | null
@@ -12,7 +8,7 @@ export type CliFixtureValue =
   | readonly CliFixtureValue[]
   | { readonly [key: string]: CliFixtureValue };
 
-export type CliFixtureFamily = 'foundation' | 'commands' | 'config' | 'plugins' | 'runs';
+export type CliFixtureFamily = 'commands' | 'config' | 'plugins' | 'runs';
 
 export interface CliFixtureDefinition {
   readonly id: string;
@@ -125,31 +121,6 @@ export interface CliScenarioResult {
   readonly steps: readonly CliScenarioStepResult[];
   readonly diagnostics: readonly CliTestDiagnostic[];
 }
-
-export const foundationFixtures = Object.freeze([
-  defineCliFixture({
-    id: 'foundation.package-metadata',
-    family: 'foundation',
-    title: 'Package metadata contract',
-    description: 'The package name, semantic version, and contract version are importable data.',
-    capabilities: ['package.metadata', 'package.contract-version'],
-    value: {
-      name: cliCorePackage.name,
-      version: cliCorePackage.version,
-      contractVersion: cliCorePackage.contractVersion
-    }
-  }),
-  defineCliFixture({
-    id: 'foundation.entrypoints',
-    family: 'foundation',
-    title: 'Public entrypoint contract',
-    description: 'The root and documented subpath entrypoints can be imported by consumers.',
-    capabilities: ['package.exports', 'subpath.imports'],
-    value: {
-      entrypoints: ['root', 'adapter', 'help', 'completion', 'manifest', 'config', 'effects', 'plugins', 'repair', 'schema', 'testing']
-    }
-  })
-]);
 
 export const commandFixtures = Object.freeze([
   defineCliFixture({
@@ -451,7 +422,6 @@ export const runFixtures = Object.freeze([
 ]);
 
 export const cliCoreFixtures = Object.freeze([
-  ...foundationFixtures,
   ...commandFixtures,
   ...configFixtures,
   ...pluginFixtures,

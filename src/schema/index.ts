@@ -6,9 +6,6 @@ import {
 } from '../diagnostics.js';
 import { cliCorePackage } from '../package.js';
 
-export { cliCorePackage };
-export type { CliCorePackage } from '../package.js';
-
 export type CliSchemaName =
   | 'program'
   | 'invocation'

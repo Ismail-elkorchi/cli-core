@@ -1,8 +1,3 @@
-import { cliCorePackage } from '../package.js';
-
-export { cliCorePackage };
-export type { CliCorePackage } from '../package.js';
-
 export { discoverCliConfigInput } from './discovery.js';
 export { createMemoryConfigDiscoveryHost } from './memory-host.js';
 export { resolveCliConfig } from './resolve.js';

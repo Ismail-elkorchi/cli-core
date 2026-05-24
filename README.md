@@ -269,10 +269,12 @@ system, shell, filesystem, or package-manager compatibility guarantees.
 ```sh
 npm run lint
 npm run typecheck
-npm run test:unit
-npm run test:acceptance
-npm run test:conformance
-npm run test:docs
+npm run test:core
+npm run test:contracts
+npm run test:examples
+npm run test:integration
+npm run test:security
+npm run test:package
 npm run check:exports
 npm run check:leakage
 ```

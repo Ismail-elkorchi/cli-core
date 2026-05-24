@@ -6,10 +6,6 @@ import {
   type CliProgram
 } from '../command/index.js';
 import type { CliDiagnostic } from '../diagnostics.js';
-import { cliCorePackage } from '../package.js';
-
-export { cliCorePackage };
-export type { CliCorePackage } from '../package.js';
 
 export type CompletionShell = 'bash' | 'zsh' | 'fish' | 'pwsh';
 
@@ -201,13 +197,6 @@ export function completeCli(
   const context = resolveCompletionContext(program, normalized.committedWords);
   const items = completionBridgeItems(program, context.command, normalized.currentWord, normalized.includeHidden);
   return completionResponse(request, normalized, items);
-}
-
-export function handleCompletionRequest(
-  program: CliProgram,
-  input: CompletionRequestInput | CompletionRequest | readonly string[] = {}
-): CompletionResponse {
-  return completeCli(program, input);
 }
 
 export function createCompletionInstallPlan(program: CliProgram, shell: CompletionShell): CompletionInstallPlan {

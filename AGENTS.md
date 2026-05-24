@@ -23,9 +23,12 @@
 - `npm run build`
 - `npm run lint`
 - `npm run typecheck`
-- `npm run test:unit`
-- `npm run test:acceptance`
-- `npm run test:conformance`
+- `npm run test:core`
+- `npm run test:contracts`
+- `npm run test:examples`
+- `npm run test:integration`
+- `npm run test:security`
+- `npm run test:package`
 - `npm run check`
 
 Use targeted tests while developing; reserve broad checks for PR gates and

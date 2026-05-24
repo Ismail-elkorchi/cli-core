@@ -10,8 +10,7 @@ import {
   createCompletionCommand,
   createCompletionInstallPlan,
   createCompletionRequest,
-  createCompletionScript,
-  handleCompletionRequest
+  createCompletionScript
 } from '../../dist/completion/index.js';
 import { suggestRepairs } from '../../dist/repair/index.js';
 
@@ -71,7 +70,7 @@ test('completion bridge protocol normalizes hidden completion requests', () => {
   const command = createCompletionCommand(program);
   const script = createCompletionScript(program, 'bash');
   const request = createCompletionRequest({ words: ['ship', '__complete', 'deploy', '--r'] });
-  const response = handleCompletionRequest(program, request);
+  const response = completeCli(program, request);
 
   assert.equal(command.name, '__complete');
   assert.equal(script.protocol.commandName, command.protocol.commandName);

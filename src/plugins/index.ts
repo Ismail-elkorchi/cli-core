@@ -19,9 +19,6 @@ import {
 } from '../diagnostics.js';
 import { cliCorePackage } from '../package.js';
 
-export { cliCorePackage };
-export type { CliCorePackage } from '../package.js';
-
 export type CliPluginRuntime = 'node' | 'deno' | 'bun';
 
 export type CliPluginHookEvent =

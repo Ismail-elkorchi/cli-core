@@ -7,10 +7,6 @@ import {
   type CliPositional,
   type CliProgram
 } from '../command/index.js';
-import { cliCorePackage } from '../package.js';
-
-export { cliCorePackage };
-export type { CliCorePackage } from '../package.js';
 
 export interface HelpDocument {
   readonly schemaVersion: 'cli-core.help.v1';
