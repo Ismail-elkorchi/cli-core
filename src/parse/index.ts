@@ -100,12 +100,24 @@ export async function validateCli(
   invocation: ParsedInvocation,
   context: ValidationContext = {}
 ): Promise<SemanticValidationResult> {
-  const diagnostics = Object.freeze([...program.diagnostics, ...invocation.diagnostics]);
+  const diagnostics = uniqueDiagnostics([...program.diagnostics, ...invocation.diagnostics]);
   const warningsAreAllowed = context.allowWarnings ?? true;
+  const hasWarningDiagnostics = diagnostics.some((item) => item.severity === 'warning');
   return Object.freeze({
-    ok: !hasErrorDiagnostics(diagnostics) && (warningsAreAllowed || diagnostics.every((item) => item.severity !== 'warning')),
+    ok: !hasErrorDiagnostics(diagnostics) && (warningsAreAllowed || !hasWarningDiagnostics),
     diagnostics
   });
+}
+
+function uniqueDiagnostics(diagnostics: readonly CliDiagnostic[]): readonly CliDiagnostic[] {
+  const seen = new Set<CliDiagnostic>();
+  const unique: CliDiagnostic[] = [];
+  for (const diagnostic of diagnostics) {
+    if (seen.has(diagnostic)) continue;
+    seen.add(diagnostic);
+    unique.push(diagnostic);
+  }
+  return Object.freeze(unique);
 }
 
 function splitPassThrough(argv: readonly string[]): { readonly leading: readonly string[]; readonly passThrough: readonly string[] } {
