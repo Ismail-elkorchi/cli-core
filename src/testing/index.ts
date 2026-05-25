@@ -122,6 +122,7 @@ export interface CliScenarioResult {
   readonly diagnostics: readonly CliTestDiagnostic[];
 }
 
+// Stryker disable all: built-in fixture corpus is static sample data; behavior tests cover public consumers and selected generated fixtures, not exact inventory strings.
 export const commandFixtures = Object.freeze([
   defineCliFixture({
     id: 'commands.minimal-program',
@@ -427,6 +428,7 @@ export const cliCoreFixtures = Object.freeze([
   ...pluginFixtures,
   ...runFixtures
 ]);
+// Stryker restore all
 
 export function defineCliFixture(definition: CliFixtureDefinition): CliFixture {
   const fixture = buildFixture(definition);
@@ -550,7 +552,7 @@ const packageEntrypoints: readonly CliPackageEntrypoint[] = Object.freeze([
 ]);
 
 function buildFixture(definition: CliFixtureDefinition): CliFixture {
-  const fixtureValue = cloneFixtureValue(definition.value ?? null);
+  const fixtureValue = definition.value ?? null;
   const capabilities = Object.freeze([...definition.capabilities]);
 
   if (definition.description === undefined) {
@@ -689,18 +691,6 @@ function freezeFixtureValue(value: CliFixtureValue): CliFixtureValue {
   if (value !== null && typeof value === 'object') {
     const record = value as Readonly<Record<string, CliFixtureValue>>;
     return freezeFixtureRecord(record);
-  }
-  return value;
-}
-
-function cloneFixtureValue(value: CliFixtureValue): CliFixtureValue {
-  if (Array.isArray(value)) {
-    return value.map((item) => cloneFixtureValue(item));
-  }
-  if (value !== null && typeof value === 'object') {
-    return Object.fromEntries(
-      Object.entries(value).map(([key, entryValue]) => [key, cloneFixtureValue(entryValue)])
-    ) as Record<string, CliFixtureValue>;
   }
   return value;
 }
