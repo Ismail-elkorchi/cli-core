@@ -13,7 +13,7 @@ import {
   createCompletionRequest,
   createCompletionScript
 } from '../../dist/completion/index.js';
-import { createRepairSuggestionResult, suggestRepairs } from '../../dist/repair/index.js';
+import { createRepairSuggestionResult } from '../../dist/repair/index.js';
 
 const program = defineCli({
   name: 'ship',
@@ -259,54 +259,54 @@ test('completion bridge stops at pass-through boundaries', () => {
   assert.deepEqual(atSeparator.payload.items.map((item) => item.value), ['--verbose', '--region']);
 });
 
-test('suggestRepairs maps invocation diagnostics to stable suggestions', () => {
-  const command = suggestRepairs(parseCli(program, { argv: ['deply'] }), program);
+test('createRepairSuggestionResult maps invocation diagnostics to stable suggestions', () => {
   const commandResult = createRepairSuggestionResult(parseCli(program, { argv: ['deply'] }), program);
-  const commandWithoutProgram = suggestRepairs(parseCli(program, { argv: ['deply'] }));
-  const farCommand = suggestRepairs(parseCli(program, { argv: ['zzzzzzzz'] }), program);
-  const missing = suggestRepairs(parseCli(program, { argv: ['deploy'] }), program);
-  const deprecated = suggestRepairs(parseCli(program, { argv: ['d', 'api'] }), program);
-  const unknown = suggestRepairs(parseCli(program, { argv: ['deploy', '--regin', 'api'] }), program);
-  const hidden = suggestRepairs(parseCli(program, { argv: ['deploy', '--secre', 'api'] }), program);
-  const passThrough = suggestRepairs(parseCli(defineCli({ name: 'proxy', commands: [{ name: 'run' }] }), {
+  const command = commandResult.suggestions;
+  const commandWithoutProgram = createRepairSuggestionResult(parseCli(program, { argv: ['deply'] })).suggestions;
+  const farCommand = createRepairSuggestionResult(parseCli(program, { argv: ['zzzzzzzz'] }), program).suggestions;
+  const missing = createRepairSuggestionResult(parseCli(program, { argv: ['deploy'] }), program).suggestions;
+  const deprecated = createRepairSuggestionResult(parseCli(program, { argv: ['d', 'api'] }), program).suggestions;
+  const unknown = createRepairSuggestionResult(parseCli(program, { argv: ['deploy', '--regin', 'api'] }), program).suggestions;
+  const hidden = createRepairSuggestionResult(parseCli(program, { argv: ['deploy', '--secre', 'api'] }), program).suggestions;
+  const passThrough = createRepairSuggestionResult(parseCli(defineCli({ name: 'proxy', commands: [{ name: 'run' }] }), {
     argv: ['run', '--', '--foreign']
-  }));
-  const filteredDeprecated = suggestRepairs({
+  })).suggestions;
+  const filteredDeprecated = createRepairSuggestionResult({
     diagnostics: [
       createCliDiagnostic('CLI_DEPRECATED_ALIAS', 'warning', 'Deprecated alias.', {
         commandPath: ['deploy', 1, 'logs']
       })
     ]
-  });
-  const malformedDeprecated = suggestRepairs({
+  }).suggestions;
+  const malformedDeprecated = createRepairSuggestionResult({
     diagnostics: [
       createCliDiagnostic('CLI_DEPRECATED_ALIAS', 'warning', 'Deprecated alias.', {
         commandPath: 'deploy'
       })
     ]
-  });
-  const mixedUnknownCommand = suggestRepairs({
+  }).suggestions;
+  const mixedUnknownCommand = createRepairSuggestionResult({
     diagnostics: [
       createCliDiagnostic('CLI_UNKNOWN_COMMAND', 'error', 'Unknown command.', {
         commandPath: ['deploy', 1, 'tail']
       })
     ]
-  }, program);
-  const malformedUnknownCommand = suggestRepairs({
+  }, program).suggestions;
+  const malformedUnknownCommand = createRepairSuggestionResult({
     diagnostics: [
       createCliDiagnostic('CLI_UNKNOWN_COMMAND', 'error', 'Unknown command.', {
         commandPath: 'deploy'
       })
     ]
-  }, program);
-  const malformedUnknownOption = suggestRepairs({
+  }, program).suggestions;
+  const malformedUnknownOption = createRepairSuggestionResult({
     command: undefined,
     diagnostics: [
       createCliDiagnostic('CLI_UNKNOWN_OPTION', 'error', 'Unknown option.', {
         option: 1
       })
     ]
-  });
+  }).suggestions;
 
   assert.equal(command[0].code, 'REPAIR_UNKNOWN_COMMAND');
   assert.equal(command[0].title, 'Unknown command');

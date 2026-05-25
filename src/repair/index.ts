@@ -26,10 +26,6 @@ export interface RepairSuggestionResult {
   readonly diagnostics: readonly CliDiagnostic[];
 }
 
-export function suggestRepairs(invocation: ParsedInvocation, program?: CliProgram): readonly RepairSuggestion[] {
-  return createRepairSuggestionResult(invocation, program).suggestions;
-}
-
 export function createRepairSuggestionResult(invocation: ParsedInvocation, program?: CliProgram): RepairSuggestionResult {
   const suggestions = Object.freeze(invocation.diagnostics
     .flatMap((diagnostic) => toRepairSuggestion(diagnostic, invocation, program))

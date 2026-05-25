@@ -14,7 +14,7 @@ import {
   createCliPluginHost,
   defineCliPluginManifest
 } from '../../dist/plugins/index.js';
-import { suggestRepairs } from '../../dist/repair/index.js';
+import { createRepairSuggestionResult } from '../../dist/repair/index.js';
 
 test('consumer can validate a plugin manifest and run declared hooks lazily', async () => {
   let loaded = false;
@@ -78,7 +78,7 @@ test('plugin-added commands flow through help, manifest, completion, parse, repa
   const completion = createCompletionPayload(program, { word: 'a' });
   const bridge = completeCli(program, { words: ['ship', 'a'], cursor: 2 });
   const invocation = parseCli(program, { argv: ['a', '--json', 'api'] });
-  const repairs = suggestRepairs(parseCli(program, { argv: ['audt'] }), program);
+  const repairs = createRepairSuggestionResult(parseCli(program, { argv: ['audt'] }), program).suggestions;
   const run = await runCli(program, { mode: 'plan', invocation });
 
   assert.equal(application.ok, true);

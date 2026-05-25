@@ -10,7 +10,7 @@ import {
   createCompletionRequest,
   createCompletionScript
 } from '@ismail-elkorchi/cli-core/completion';
-import { suggestRepairs } from '@ismail-elkorchi/cli-core/repair';
+import { createRepairSuggestionResult } from '@ismail-elkorchi/cli-core/repair';
 
 export function runCompletionRepairExample() {
   const program = defineCli({
@@ -33,6 +33,6 @@ export function runCompletionRepairExample() {
     command: createCompletionCommand(program),
     script: createCompletionScript(program, 'bash'),
     installPlan: createCompletionInstallPlan(program, 'fish'),
-    repairs: suggestRepairs(invocation, program)
+    repairs: createRepairSuggestionResult(invocation, program).suggestions
   };
 }

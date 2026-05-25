@@ -7,7 +7,7 @@ import {
   parseCli,
   runCli
 } from '../../dist/index.js';
-import { suggestRepairs } from '../../dist/repair/index.js';
+import { createRepairSuggestionResult } from '../../dist/repair/index.js';
 import { redactCliSecrets } from '../../dist/schema/index.js';
 import { createLargeCommandDefinition } from '../../dist/testing/index.js';
 
@@ -19,7 +19,7 @@ test('scale-sensitive command, completion, repair, run, and redaction paths stay
   }));
   const completion = measure(metrics, 'complete-root-prefix', () => createCompletionPayload(program, { word: 'command-12' }));
   const unknown = measure(metrics, 'parse-unknown-command', () => parseCli(program, { argv: ['command-12x'] }));
-  const repairs = measure(metrics, 'repair-unknown-command', () => suggestRepairs(unknown, program));
+  const repairs = measure(metrics, 'repair-unknown-command', () => createRepairSuggestionResult(unknown, program).suggestions);
   const manifest = measure(metrics, 'manifest-large-program', () => describeCli(program));
   const redacted = measure(metrics, 'redact-large-payload', () => redactCliSecrets(secretPayload(128)));
   const run = await measureAsync(metrics, 'plan-large-effect-set', () => runCli(program, {

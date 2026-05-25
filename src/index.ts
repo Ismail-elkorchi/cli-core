@@ -1,6 +1,6 @@
 export { cliCorePackage } from './package.js';
 export type { CliCorePackage } from './package.js';
-export { defineCli, findCliCommand, findCliCommandByAlias } from './command/index.js';
+export { defineCli } from './command/index.js';
 export {
   completeCli,
   createCompletionPayload

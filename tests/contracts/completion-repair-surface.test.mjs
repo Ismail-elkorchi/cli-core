@@ -14,7 +14,7 @@ test('completion and repair subpaths expose machine-readable APIs', async () => 
   assert.equal(typeof completion.createCompletionScript, 'function');
   assert.equal(typeof completion.createCompletionInstallPlan, 'function');
   assert.equal(typeof root.completeCli, 'function');
-  assert.equal(typeof repair.suggestRepairs, 'function');
+  assert.equal(typeof repair.suggestRepairs, 'undefined');
   assert.equal(typeof repair.createRepairSuggestionResult, 'function');
   assert.equal(typeof root.createCompletionPayload, 'function');
 });

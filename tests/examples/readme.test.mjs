@@ -67,6 +67,7 @@ test('README TypeScript snippets typecheck against the public package declaratio
         baseUrl: new URL('../..', import.meta.url).pathname,
         paths: {
           '@ismail-elkorchi/cli-core': ['./dist/index.d.ts'],
+          '@ismail-elkorchi/cli-core/command': ['./dist/command/public.d.ts'],
           '@ismail-elkorchi/cli-core/adapter': ['./dist/adapter/index.d.ts'],
           '@ismail-elkorchi/cli-core/completion': ['./dist/completion/index.d.ts'],
           '@ismail-elkorchi/cli-core/config': ['./dist/config/index.d.ts'],
