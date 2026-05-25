@@ -9,10 +9,54 @@
     "ok": { "type": "boolean" },
     "version": { "type": "string" },
     "values": { "type": "object" },
-    "entries": { "type": "array", "items": { "type": "object", "required": ["key", "value", "source"] } },
-    "explanations": { "type": "array", "items": { "type": "object", "required": ["key", "selected", "candidates"] } },
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["key", "value", "source"],
+        "properties": {
+          "key": { "type": "string" },
+          "source": { "$ref": "#/$defs/source" }
+        }
+      }
+    },
+    "explanations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["key", "selected", "selectedValue", "candidates", "candidateValues"],
+        "properties": {
+          "key": { "type": "string" },
+          "selected": { "$ref": "#/$defs/source" },
+          "candidates": { "type": "array", "items": { "$ref": "#/$defs/source" } },
+          "candidateValues": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["source", "value", "selected"],
+              "properties": {
+                "source": { "$ref": "#/$defs/source" },
+                "selected": { "type": "boolean" }
+              }
+            }
+          }
+        }
+      }
+    },
     "discovery": { "type": "object", "required": ["scope", "searchedPaths"] },
     "diagnostics": { "type": "array", "items": { "type": "object", "required": ["code", "severity", "message", "fields"] } }
+  },
+  "$defs": {
+    "source": {
+      "type": "object",
+      "required": ["kind", "label", "precedence"],
+      "properties": {
+        "kind": { "enum": ["built_in_default", "workspace_default", "config_file", "environment", "argv"] },
+        "label": { "type": "string" },
+        "precedence": { "type": "integer" },
+        "path": { "type": "string" }
+      }
+    }
   },
   "additionalProperties": true
 }

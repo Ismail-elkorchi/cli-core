@@ -1,18 +1,42 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:ismail-elkorchi:cli-core:schema:repair-suggestions:v1",
-  "title": "cli-core Repair Suggestions",
-  "type": "array",
-  "items": {
-    "type": "object",
-    "required": ["code", "title", "detail", "replacement", "diagnostic"],
-    "properties": {
-      "code": { "pattern": "^REPAIR_" },
-      "title": { "type": "string" },
-      "detail": { "type": "string" },
-      "replacement": { "type": "array", "items": { "type": "string" } },
-      "diagnostic": { "type": "object", "required": ["code", "severity", "message", "fields"] }
+  "title": "cli-core Repair Suggestion Result",
+  "type": "object",
+  "required": ["schemaVersion", "hasSuggestions", "suggestions", "diagnostics"],
+  "properties": {
+    "schemaVersion": { "const": "cli-core.repair-suggestions.v1" },
+    "hasSuggestions": { "type": "boolean" },
+    "suggestions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["code", "title", "detail", "replacement", "rank", "evidence", "diagnostic"],
+        "properties": {
+          "code": { "pattern": "^REPAIR_" },
+          "title": { "type": "string" },
+          "detail": { "type": "string" },
+          "replacement": { "type": "array", "items": { "type": "string" } },
+          "rank": { "type": "integer", "minimum": 0 },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["kind", "value"],
+              "properties": {
+                "kind": { "enum": ["edit_distance", "diagnostic", "pass_through"] },
+                "value": { "type": "string" },
+                "candidate": { "type": "string" },
+                "distance": { "type": "integer", "minimum": 0 }
+              }
+            }
+          },
+          "diagnostic": { "type": "object", "required": ["code", "severity", "message", "fields"] }
+        },
+        "additionalProperties": true
+      }
     },
-    "additionalProperties": true
-  }
+    "diagnostics": { "type": "array", "items": { "type": "object", "required": ["code", "severity", "message", "fields"] } }
+  },
+  "additionalProperties": true
 }

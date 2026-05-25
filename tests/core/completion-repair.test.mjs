@@ -13,7 +13,7 @@ import {
   createCompletionRequest,
   createCompletionScript
 } from '../../dist/completion/index.js';
-import { suggestRepairs } from '../../dist/repair/index.js';
+import { createRepairSuggestionResult, suggestRepairs } from '../../dist/repair/index.js';
 
 const program = defineCli({
   name: 'ship',
@@ -261,6 +261,7 @@ test('completion bridge stops at pass-through boundaries', () => {
 
 test('suggestRepairs maps invocation diagnostics to stable suggestions', () => {
   const command = suggestRepairs(parseCli(program, { argv: ['deply'] }), program);
+  const commandResult = createRepairSuggestionResult(parseCli(program, { argv: ['deply'] }), program);
   const commandWithoutProgram = suggestRepairs(parseCli(program, { argv: ['deply'] }));
   const farCommand = suggestRepairs(parseCli(program, { argv: ['zzzzzzzz'] }), program);
   const missing = suggestRepairs(parseCli(program, { argv: ['deploy'] }), program);
@@ -311,6 +312,12 @@ test('suggestRepairs maps invocation diagnostics to stable suggestions', () => {
   assert.equal(command[0].title, 'Unknown command');
   assert.equal(command[0].detail, 'Use a declared command path or ask for completion candidates.');
   assert.deepEqual(command[0].replacement, ['deploy']);
+  assert.equal(command[0].rank, 0);
+  assert.deepEqual(command[0].evidence, [{ kind: 'edit_distance', value: 'deply', candidate: 'deploy', distance: 1 }]);
+  assert.equal(commandResult.schemaVersion, 'cli-core.repair-suggestions.v1');
+  assert.equal(commandResult.hasSuggestions, true);
+  assert.equal(commandResult.suggestions[0].code, 'REPAIR_UNKNOWN_COMMAND');
+  assert.equal(commandResult.diagnostics[0].code, 'CLI_UNKNOWN_COMMAND');
   assert.deepEqual(commandWithoutProgram[0].replacement, []);
   assert.deepEqual(farCommand[0].replacement, []);
   assert.equal(missing[0].code, 'REPAIR_MISSING_INPUT');

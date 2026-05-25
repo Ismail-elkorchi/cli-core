@@ -34,7 +34,7 @@ import {
   applyCliPluginCommands,
   defineCliPluginManifest
 } from '../../dist/plugins/index.js';
-import { suggestRepairs } from '../../dist/repair/index.js';
+import { createRepairSuggestionResult } from '../../dist/repair/index.js';
 import {
   createCliFailureEnvelope,
   createCliSchemaEnvelope,
@@ -60,6 +60,8 @@ test('current public outputs validate against shipped schema artifacts', async (
 
 test('schema artifacts reject malformed public documents', async () => {
   const manifestSchema = await readSchema('./command-manifest.schema.json');
+  const runEventSchema = await readSchema('./run-event.schema.json');
+  const repairSchema = await readSchema('./repair-suggestions.schema.json');
   const missingCommands = {
     schemaVersion: 'cli-core.manifest.v1',
     package: { name: '@ismail-elkorchi/cli-core', version: '0.1.0', contractVersion: '0.1.0' },
@@ -78,6 +80,24 @@ test('schema artifacts reject malformed public documents', async () => {
   );
   assert.equal(
     validateJsonSchema(manifestSchema, wrongSchemaVersion).some((error) => error.includes('schemaVersion')),
+    true
+  );
+  assert.equal(
+    validateJsonSchema(runEventSchema, {
+      schemaVersion: 'cli-core.run-event.v1',
+      runId: 'run-1',
+      sequence: 0,
+      name: 'not.real',
+      payload: {}
+    }).some((error) => error.includes('$.name')),
+    true
+  );
+  assert.equal(
+    validateJsonSchema(repairSchema, {
+      hasSuggestions: true,
+      suggestions: [],
+      diagnostics: []
+    }).some((error) => error.includes('$.schemaVersion')),
     true
   );
 });
@@ -153,7 +173,7 @@ async function createPublicSamples() {
   const completionScript = createCompletionScript(extendedProgram, 'bash');
   const completionInstallPlan = createCompletionInstallPlan(extendedProgram, 'fish');
   const unknown = parseCli(extendedProgram, { argv: ['deply'] });
-  const repairs = suggestRepairs(unknown, extendedProgram);
+  const repairs = createRepairSuggestionResult(unknown, extendedProgram);
   const run = await runCli(extendedProgram, {
     mode: 'apply',
     invocation,

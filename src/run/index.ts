@@ -1,11 +1,12 @@
 import type { CliCommand, CliProgram } from '../command/index.js';
+import type { ConfigResolution } from '../config/index.js';
 import {
   createCliDiagnostic,
   hasErrorDiagnostics,
   type CliDiagnostic,
   type CliDiagnosticValue
 } from '../diagnostics.js';
-import { parseCli, type ParsedInvocation } from '../parse/index.js';
+import { parseCli, type ParsedInvocation, type SemanticValidationResult } from '../parse/index.js';
 import type { CliPluginHookEvent, CliPluginHookRunResult, CliPluginHost } from '../plugins/index.js';
 import { redactCliDiagnostics, redactCliSecrets, type CliRedactionOptions } from '../schema/index.js';
 
@@ -15,7 +16,9 @@ export type RunIdentifier = string;
 
 export type ExitKind =
   | 'ok'
-  | 'usage'
+  | 'parse_error'
+  | 'config_error'
+  | 'validation_error'
   | 'policy_denied'
   | 'cancelled'
   | 'interrupted'
@@ -31,6 +34,8 @@ export interface RunRequest {
   readonly argv?: readonly string[];
   readonly invocation?: ParsedInvocation;
   readonly handlers?: Readonly<Record<string, RunHandler>>;
+  readonly config?: ConfigResolution;
+  readonly validation?: SemanticValidationResult;
   readonly effects?: readonly RunEffect[];
   readonly artifacts?: readonly RunArtifact[];
   readonly context?: RunPayload;
@@ -42,7 +47,10 @@ export interface RunRequest {
   readonly interrupted?: boolean;
   readonly timeoutMs?: number;
   readonly elapsedMs?: number;
+  readonly eventSink?: RunEventSink;
 }
+
+export type RunEventSink = (event: RunEvent) => void;
 
 export type RunHandler = (context: RunHandlerContext) => RunHandlerOutput | Promise<RunHandlerOutput>;
 
@@ -85,10 +93,15 @@ export interface RunEvent {
 }
 
 export type RunEventName =
+  | 'parse.completed'
+  | 'config.resolved'
+  | 'validation.completed'
   | 'run.started'
   | 'run.planned'
   | 'run.applied'
   | 'run.skipped'
+  | 'effects.planned'
+  | 'run.failed'
   | 'plugin.hooks.planned'
   | 'plugin.hooks.completed'
   | 'run.completed';
@@ -133,25 +146,38 @@ export interface RunArtifact {
 
 export type ExitStatusPolicy = Partial<Record<ExitKind, number>>;
 
-const defaultExitStatusPolicy: Readonly<Record<ExitKind, number>> = Object.freeze({
-  ok: 0,
-  usage: 2,
-  policy_denied: 3,
-  cancelled: 130,
-  interrupted: 130,
-  timeout: 124,
-  external_error: 1,
-  internal_error: 1
-});
-
 export async function runCli(program: CliProgram, request: RunRequest): Promise<RunResult> {
   const mode = request.mode ?? 'plan';
   const invocation = request.invocation ?? parseCli(program, { argv: request.argv ?? [] });
   const runId = request.runId ?? createRunIdentifier(program, invocation, mode);
-  const events = new RunEventRecorder(runId);
-  const diagnostics: CliDiagnostic[] = [...invocation.diagnostics, ...effectDiagnostics(request.effects ?? [])];
+  const diagnostics: CliDiagnostic[] = [
+    ...invocation.diagnostics,
+    ...(request.config?.diagnostics ?? []),
+    ...(request.validation?.diagnostics ?? []),
+    ...effectDiagnostics(request.effects ?? [])
+  ];
+  const events = new RunEventRecorder(runId, request.eventSink, diagnostics);
   const effects = [...(request.effects ?? [])].map((effect) => freezeRunValue(effect));
   const artifacts = [...(request.artifacts ?? [])].map((artifact) => freezeRunValue(artifact));
+
+  events.record('parse.completed', {
+    ok: invocation.ok,
+    commandPath: invocation.commandPath,
+    diagnostics: invocation.diagnostics.length
+  });
+  if (request.config !== undefined) {
+    events.record('config.resolved', {
+      ok: request.config.ok,
+      version: request.config.version ?? '',
+      diagnostics: request.config.diagnostics.length
+    });
+  }
+  if (request.validation !== undefined) {
+    events.record('validation.completed', {
+      ok: request.validation.ok,
+      diagnostics: request.validation.diagnostics.length
+    });
+  }
 
   await runPluginLifecycle('init', request, invocation, events, effects, diagnostics);
   // In runCli, preparse is an observation hook over the parsed invocation.
@@ -187,13 +213,32 @@ export async function runCli(program: CliProgram, request: RunRequest): Promise<
 
   if (!invocation.ok) {
     await runPluginLifecycle('command_not_found', request, invocation, events, effects, diagnostics);
-    events.record('run.skipped', { reason: 'usage' });
+    events.record('run.skipped', { reason: 'parse_error' });
     await runPluginLifecycle('finally', request, invocation, events, effects, diagnostics);
     return finishRun({
       runId,
       mode,
       invocation,
-      exitKind: 'usage',
+      exitKind: 'parse_error',
+      explicitExitStatus: undefined,
+      diagnostics,
+      effects,
+      artifacts,
+      events,
+      policy: request.exitStatusPolicy,
+      redaction: request.redaction
+    });
+  }
+
+  const requestFailureKind = requestInputFailureKind(request);
+  if (requestFailureKind !== undefined) {
+    events.record('run.skipped', { reason: requestFailureKind });
+    await runPluginLifecycle('finally', request, invocation, events, effects, diagnostics);
+    return finishRun({
+      runId,
+      mode,
+      invocation,
+      exitKind: requestFailureKind,
       explicitExitStatus: undefined,
       diagnostics,
       effects,
@@ -209,6 +254,9 @@ export async function runCli(program: CliProgram, request: RunRequest): Promise<
   events.record('run.planned', {
     effects: effects.length,
     artifacts: artifacts.length
+  });
+  events.record('effects.planned', {
+    effects: effects.length
   });
 
   if (mode === 'plan') {
@@ -391,12 +439,20 @@ interface FinishRunInput {
 }
 
 function finishRun(input: FinishRunInput): RunResult {
-  const diagnostics = redactCliDiagnostics(input.diagnostics, input.redaction);
   const exitStatus = input.explicitExitStatus ?? exitStatusFor(input.exitKind, input.policy);
+  if (input.exitKind !== 'ok') {
+    input.events.record('run.failed', {
+      exitKind: input.exitKind,
+      exitStatus,
+      diagnostics: input.diagnostics.length
+    });
+  }
   input.events.record('run.completed', {
     exitKind: input.exitKind,
     exitStatus
   });
+  const diagnostics = redactCliDiagnostics(input.diagnostics, input.redaction);
+  const invocation = redactCliSecrets(input.invocation, input.redaction) as ParsedInvocation;
   const events = Object.freeze(input.events.snapshot().map((event) => redactCliSecrets(event, input.redaction) as RunEvent));
   const effects = Object.freeze(input.effects.map((effect) => redactCliSecrets(effect, input.redaction) as RunEffect));
   const artifacts = Object.freeze(input.artifacts.map((artifact) => redactCliSecrets(artifact, input.redaction) as RunArtifact));
@@ -405,7 +461,7 @@ function finishRun(input: FinishRunInput): RunResult {
     schemaVersion: 'cli-core.run-result.v1',
     runId: input.runId,
     mode: input.mode,
-    invocation: input.invocation,
+    invocation,
     ok: input.exitKind === 'ok' && !hasErrorDiagnostics(diagnostics),
     exitKind: input.exitKind,
     exitStatus,
@@ -450,6 +506,12 @@ function interruptionResult(
   return undefined;
 }
 
+function requestInputFailureKind(request: RunRequest): ExitKind | undefined {
+  if (request.config !== undefined && !request.config.ok) return 'config_error';
+  if (request.validation !== undefined && !request.validation.ok) return 'validation_error';
+  return undefined;
+}
+
 function effectDiagnostics(effects: readonly RunEffect[]): readonly CliDiagnostic[] {
   const diagnostics: CliDiagnostic[] = [];
   for (const effect of effects) {
@@ -471,7 +533,32 @@ function effectDiagnostics(effects: readonly RunEffect[]): readonly CliDiagnosti
 }
 
 function exitStatusFor(kind: ExitKind, policy: ExitStatusPolicy | undefined): number {
-  return policy?.[kind] ?? defaultExitStatusPolicy[kind];
+  return policyStatusFor(kind, policy) ?? defaultExitStatusFor(kind);
+}
+
+function policyStatusFor(kind: ExitKind, policy: ExitStatusPolicy | undefined): number | undefined {
+  if (policy === undefined) return undefined;
+  if (kind === 'ok') return policy.ok;
+  if (kind === 'parse_error') return policy.parse_error;
+  if (kind === 'config_error') return policy.config_error;
+  if (kind === 'validation_error') return policy.validation_error;
+  if (kind === 'policy_denied') return policy.policy_denied;
+  if (kind === 'cancelled') return policy.cancelled;
+  if (kind === 'interrupted') return policy.interrupted;
+  if (kind === 'timeout') return policy.timeout;
+  if (kind === 'external_error') return policy.external_error;
+  return policy.internal_error;
+}
+
+function defaultExitStatusFor(kind: ExitKind): number {
+  if (kind === 'ok') return 0;
+  if (kind === 'parse_error') return 2;
+  if (kind === 'config_error') return 78;
+  if (kind === 'validation_error') return 3;
+  if (kind === 'policy_denied') return 3;
+  if (kind === 'cancelled' || kind === 'interrupted') return 130;
+  if (kind === 'timeout') return 124;
+  return 1;
 }
 
 function createRunIdentifier(program: CliProgram, invocation: ParsedInvocation, mode: RunMode): RunIdentifier {
@@ -485,20 +572,33 @@ function createRunIdentifier(program: CliProgram, invocation: ParsedInvocation, 
 
 class RunEventRecorder {
   readonly #runId: RunIdentifier;
+  readonly #sink: RunEventSink | undefined;
+  readonly #diagnostics: CliDiagnostic[];
   readonly #events: RunEvent[] = [];
 
-  public constructor(runId: RunIdentifier) {
+  public constructor(runId: RunIdentifier, sink: RunEventSink | undefined, diagnostics: CliDiagnostic[]) {
     this.#runId = runId;
+    this.#sink = sink;
+    this.#diagnostics = diagnostics;
   }
 
   public record(name: RunEventName, payload: RunPayload): void {
-    this.#events.push(Object.freeze({
+    const event = Object.freeze({
       schemaVersion: 'cli-core.run-event.v1',
       runId: this.#runId,
       sequence: this.#events.length,
       name,
       payload: freezeRunValue(payload)
-    }));
+    });
+    this.#events.push(event);
+    try {
+      this.#sink?.(event);
+    } catch (error) {
+      this.#diagnostics.push(createCliDiagnostic('CLI_RUN_EVENT_SINK_FAILED', 'warning', 'Run event sink failed.', {
+        eventName: name,
+        errorMessage: errorMessage(error)
+      }));
+    }
   }
 
   public snapshot(): readonly RunEvent[] {

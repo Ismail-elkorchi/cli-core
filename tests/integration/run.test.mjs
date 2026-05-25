@@ -27,5 +27,12 @@ test('consumer can parse an invocation and run it through plan and apply modes',
   assert.equal(plan.effects[0].kind, 'spawn');
   assert.equal(apply.ok, true);
   assert.equal(apply.artifacts[0].id, 'summary');
-  assert.deepEqual(apply.events.map((event) => event.name), ['run.started', 'run.planned', 'run.applied', 'run.completed']);
+  assert.deepEqual(apply.events.map((event) => event.name), [
+    'parse.completed',
+    'run.started',
+    'run.planned',
+    'effects.planned',
+    'run.applied',
+    'run.completed'
+  ]);
 });

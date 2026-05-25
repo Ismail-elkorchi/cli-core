@@ -76,7 +76,15 @@ export interface ConfigResolutionEntry {
 export interface ConfigExplanation {
   readonly key: string;
   readonly selected: ConfigSource;
+  readonly selectedValue: ConfigValue;
   readonly candidates: readonly ConfigSource[];
+  readonly candidateValues: readonly ConfigCandidate[];
+}
+
+export interface ConfigCandidate {
+  readonly source: ConfigSource;
+  readonly value: ConfigValue;
+  readonly selected: boolean;
 }
 
 export interface ConfigSource {

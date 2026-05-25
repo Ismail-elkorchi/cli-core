@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { execFile } from 'node:child_process';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import test from 'node:test';
+import { promisify } from 'node:util';
 import { runCliMainExample } from '../../examples/cli-main.mjs';
 import { runCompletionRepairExample } from '../../examples/completion-repair.mjs';
 import { runConfigResolutionExample } from '../../examples/config-resolution.mjs';
@@ -12,6 +16,8 @@ import { runSchemaArtifactsExample } from '../../examples/schema-artifacts.mjs';
 import { runExecutionExample } from '../../examples/run.mjs';
 import { runSchemaRedactionExample } from '../../examples/schema-redaction.mjs';
 import { runTestingHarnessExample } from '../../examples/testing-harness.mjs';
+
+const execFileAsync = promisify(execFile);
 
 test('README does not expose private paths', async () => {
   const readme = await readFile(new URL('../../README.md', import.meta.url), 'utf8');
@@ -36,6 +42,51 @@ test('README package imports correspond to exported package paths', async () => 
       continue;
     }
     assert.equal(exportedPaths.has(specifier ?? ''), true, `${specifier} is not exported`);
+  }
+});
+
+test('README TypeScript snippets typecheck against the public package declarations', async () => {
+  const readme = await readFile(new URL('../../README.md', import.meta.url), 'utf8');
+  const snippets = [...readme.matchAll(/```ts\n([\s\S]*?)```/g)].map((match) => match[1]);
+  const directory = await mkdtemp(join(tmpdir(), 'cli-core-readme-'));
+
+  try {
+    await Promise.all(snippets.map((snippet, index) => writeFile(join(directory, `snippet-${index}.ts`), snippet, 'utf8')));
+    await writeFile(join(directory, 'package.json'), JSON.stringify({ type: 'module' }), 'utf8');
+    await writeFile(join(directory, 'tsconfig.json'), JSON.stringify({
+      compilerOptions: {
+        target: 'ES2022',
+        module: 'NodeNext',
+        moduleResolution: 'NodeNext',
+        strict: true,
+        exactOptionalPropertyTypes: true,
+        noUncheckedIndexedAccess: true,
+        skipLibCheck: false,
+        ignoreDeprecations: '6.0',
+        noEmit: true,
+        baseUrl: new URL('../..', import.meta.url).pathname,
+        paths: {
+          '@ismail-elkorchi/cli-core': ['./dist/index.d.ts'],
+          '@ismail-elkorchi/cli-core/adapter': ['./dist/adapter/index.d.ts'],
+          '@ismail-elkorchi/cli-core/completion': ['./dist/completion/index.d.ts'],
+          '@ismail-elkorchi/cli-core/config': ['./dist/config/index.d.ts'],
+          '@ismail-elkorchi/cli-core/effects': ['./dist/effects/index.d.ts'],
+          '@ismail-elkorchi/cli-core/help': ['./dist/help/index.d.ts'],
+          '@ismail-elkorchi/cli-core/manifest': ['./dist/manifest/index.d.ts'],
+          '@ismail-elkorchi/cli-core/plugins': ['./dist/plugins/index.d.ts'],
+          '@ismail-elkorchi/cli-core/repair': ['./dist/repair/index.d.ts'],
+          '@ismail-elkorchi/cli-core/schema': ['./dist/schema/index.d.ts'],
+          '@ismail-elkorchi/cli-core/testing': ['./dist/testing/index.d.ts']
+        }
+      },
+      files: snippets.map((_snippet, index) => `snippet-${index}.ts`)
+    }, null, 2), 'utf8');
+
+    await execFileAsync('./node_modules/.bin/tsc', ['-p', directory], {
+      cwd: new URL('../..', import.meta.url).pathname
+    });
+  } finally {
+    await rm(directory, { recursive: true, force: true });
   }
 });
 

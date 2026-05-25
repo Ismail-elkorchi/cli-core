@@ -278,6 +278,74 @@ test('scenario runner passes when entrypoint exports and fixture family match', 
   assert.deepEqual(result.diagnostics, []);
 });
 
+test('scenario runner replays parse, config, plugin command, and run behavior', async () => {
+  const result = await runCliScenario(createCliHarness(), {
+    id: 'unit.testing-harness.replay',
+    steps: [
+      {
+        kind: 'parse',
+        name: 'parse command argv',
+        definition: { name: 'ship', commands: [{ name: 'deploy', positionals: [{ name: 'service' }] }] },
+        argv: ['deploy', 'api'],
+        expectedOk: true,
+        expectedCommandPath: ['deploy']
+      },
+      {
+        kind: 'config-resolution',
+        name: 'resolve config values',
+        definition: {
+          name: 'ship',
+          config: { fields: [{ name: 'profile', type: 'string', default: 'default' }] }
+        },
+        input: { argv: { profile: 'prod' } },
+        expectedOk: true,
+        expectedValues: { profile: 'prod' }
+      },
+      {
+        kind: 'plugin-command-application',
+        name: 'apply plugin command',
+        definition: { name: 'ship', commands: [{ name: 'status' }] },
+        plugins: [{ name: 'audit-plugin', version: '1.0.0', commands: [{ name: 'audit' }] }],
+        expectedOk: true,
+        expectedCommandPaths: [['audit']]
+      },
+      {
+        kind: 'run',
+        name: 'plan command run',
+        definition: { name: 'ship', commands: [{ name: 'deploy' }] },
+        argv: ['deploy'],
+        mode: 'plan',
+        expectedOk: true,
+        expectedExitKind: 'ok',
+        expectedEventNames: ['parse.completed', 'run.started', 'run.planned', 'effects.planned', 'run.completed']
+      }
+    ]
+  });
+
+  assert.equal(result.status, 'passed');
+  assert.deepEqual(result.diagnostics, []);
+});
+
+test('scenario runner reports replay expectation failures as data', async () => {
+  const result = await runCliScenario(createCliHarness(), {
+    id: 'unit.testing-harness.replay-failure',
+    steps: [
+      {
+        kind: 'parse',
+        name: 'parse wrong path',
+        definition: { name: 'ship', commands: [{ name: 'deploy' }] },
+        argv: ['missing'],
+        expectedOk: true,
+        expectedCommandPath: ['deploy']
+      }
+    ]
+  });
+
+  assert.equal(result.status, 'failed');
+  assert.equal(result.diagnostics[0].code, 'CLI_TEST_EXPECTATION_FAILED');
+  assert.equal(result.diagnostics[0].fields.stepName, 'parse wrong path');
+});
+
 test('large command fixture helpers normalize counts and generate indexed command shapes', () => {
   const defaultDefinition = createLargeCommandDefinition();
   const fractional = createLargeCommandDefinition({ commandCount: 2.8, programName: 'fleet' });

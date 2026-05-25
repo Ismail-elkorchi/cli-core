@@ -45,6 +45,7 @@ export type {
   ValidationContext
 } from './parse/index.js';
 export type {
+  ConfigCandidate,
   ConfigDefinition,
   ConfigExplanation,
   ConfigFieldDefinition,
@@ -90,6 +91,7 @@ export type {
   RunEffect,
   RunEvent,
   RunEventName,
+  RunEventSink,
   RunHandler,
   RunHandlerContext,
   RunHandlerOutput,

@@ -46,6 +46,21 @@ test('resolveCliConfig applies precedence and provenance', () => {
   );
   assert.equal(resolution.explanations.find((item) => item.key === 'mode')?.selected.kind, 'argv');
   assert.equal(resolution.explanations.find((item) => item.key === 'mode')?.selected.label, 'argv');
+  assert.equal(resolution.explanations.find((item) => item.key === 'mode')?.selectedValue, 'argv');
+  assert.deepEqual(
+    resolution.explanations.find((item) => item.key === 'mode')?.candidateValues.map((candidate) => [
+      candidate.source.kind,
+      candidate.value,
+      candidate.selected
+    ]),
+    [
+      ['built_in_default', 'safe', false],
+      ['workspace_default', 'workspace', false],
+      ['config_file', 'file', false],
+      ['environment', 'env', false],
+      ['argv', 'argv', true]
+    ]
+  );
   assert.equal(resolution.explanations.find((item) => item.key === 'retries')?.selected.kind, 'environment');
   assert.equal(resolution.explanations.find((item) => item.key === 'trace')?.selected.kind, 'built_in_default');
 });

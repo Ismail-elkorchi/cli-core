@@ -155,7 +155,7 @@ const schemaDescriptors: readonly CliSchemaDescriptor[] = Object.freeze([
   descriptor('completion-command', 'cli-core.completion-command.v1', 'Completion command protocol.'),
   descriptor('completion-script', 'cli-core.completion-script.v1', 'Shell completion script payload.'),
   descriptor('completion-install-plan', 'cli-core.completion-install-plan.v1', 'Data-only completion install plan.'),
-  descriptor('repair-suggestions', 'cli-core.repair-suggestions.v1', 'Repair suggestion list.'),
+  descriptor('repair-suggestions', 'cli-core.repair-suggestions.v1', 'Repair suggestion result.'),
   descriptor('plugin', 'cli-core.plugin.v1', 'Plugin manifest.'),
   descriptor('plugin-command-application', 'cli-core.plugin-command-application.v1', 'Plugin command contribution result.'),
   descriptor('run-result', 'cli-core.run-result.v1', 'Run result envelope.'),
@@ -263,7 +263,8 @@ export function redactCliSecretsWithReport<TData>(value: TData, options?: CliRed
     keys: Object.freeze([...(options?.sensitiveKeys ?? defaultSensitiveKeys)].map((key) => normalizeKey(key))),
     patterns: Object.freeze([...(options?.stringPatterns ?? defaultStringPatterns)]),
     maxDepth: options?.maxDepth ?? 64,
-    seen: new WeakSet<object>(),
+    active: new WeakSet<object>(),
+    cache: new WeakMap<object, unknown>(),
     matches: []
   };
   const redacted = redactValue(value, '$', 0, undefined, context) as TData;
@@ -277,7 +278,9 @@ export function redactCliSecretsWithReport<TData>(value: TData, options?: CliRed
 }
 
 export function exitKindToFailureKind(exitKind: string): CliFailureKind {
-  if (exitKind === 'usage') return 'parse';
+  if (exitKind === 'parse_error') return 'parse';
+  if (exitKind === 'config_error') return 'config';
+  if (exitKind === 'validation_error') return 'validation';
   if (exitKind === 'policy_denied') return 'policy_denial';
   if (exitKind === 'cancelled') return 'cancellation';
   if (exitKind === 'interrupted') return 'interruption';
@@ -293,11 +296,17 @@ export function failureKindForDiagnostics(diagnostics: readonly CliDiagnostic[])
   if (codes.includes('CLI_RUN_CANCELLED')) return 'cancellation';
   if (codes.includes('CLI_RUN_INTERRUPTED')) return 'interruption';
   if (codes.includes('CLI_RUN_TIMEOUT')) return 'timeout';
-  if (codes.includes('CLI_ARGV_FLAG_ISSUE')) return 'config';
   if (codes.some((code) => code.startsWith('CLI_CONFIG_'))) return 'config';
-  if (codes.includes('CLI_UNKNOWN_COMMAND') || codes.includes('CLI_UNKNOWN_OPTION') || codes.includes('CLI_MISSING_POSITIONAL')) {
+  if (
+    codes.includes('CLI_ARGV_FLAG_ISSUE') ||
+    codes.includes('CLI_UNKNOWN_COMMAND') ||
+    codes.includes('CLI_UNKNOWN_OPTION') ||
+    codes.includes('CLI_MISSING_POSITIONAL')
+  ) {
     return 'parse';
   }
+  if (codes.some((code) => code.startsWith('CLI_VALIDATION_'))) return 'validation';
+  if (codes.includes('CLI_RUN_HANDLER_FAILED')) return 'external_error';
   return 'validation';
 }
 
@@ -306,7 +315,8 @@ interface RedactionContext {
   readonly keys: readonly string[];
   readonly patterns: readonly RegExp[];
   readonly maxDepth: number;
-  readonly seen: WeakSet<object>;
+  readonly active: WeakSet<object>;
+  readonly cache: WeakMap<object, unknown>;
   readonly matches: CliRedactionMatch[];
 }
 
@@ -334,23 +344,34 @@ function redactValue(
     return context.replacement;
   }
 
-  if (context.seen.has(value)) {
+  if (context.active.has(value)) {
     context.matches.push(Object.freeze({ path, reason: 'circular_reference' as const }));
     return context.replacement;
   }
-  context.seen.add(value);
+  if (context.cache.has(value)) return context.cache.get(value);
+  context.active.add(value);
 
   if (Array.isArray(value)) {
-    return Object.freeze(value.map((item, index) => redactValue(item, `${path}[${index}]`, depth + 1, undefined, context)));
+    const redactedArray = Object.freeze(value.map((item, index) => redactValue(item, `${path}[${index}]`, depth + 1, undefined, context)));
+    context.cache.set(value, redactedArray);
+    context.active.delete(value);
+    return redactedArray;
   }
 
-  if (!isPlainRecord(value)) return value;
+  if (!isPlainRecord(value)) {
+    context.cache.set(value, value);
+    context.active.delete(value);
+    return value;
+  }
 
   const entries = Object.entries(value).map(([entryKey, entryValue]) => [
     entryKey,
     redactValue(entryValue, `${path}.${entryKey}`, depth + 1, entryKey, context)
   ]);
-  return Object.freeze(Object.fromEntries(entries));
+  const redactedObject = Object.freeze(Object.fromEntries(entries));
+  context.cache.set(value, redactedObject);
+  context.active.delete(value);
+  return redactedObject;
 }
 
 function redactString(value: string, path: string, context: RedactionContext): string {
