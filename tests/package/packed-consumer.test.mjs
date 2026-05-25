@@ -113,6 +113,7 @@ function assertPackageFiles(files) {
 
   assert.equal(paths.has('package.json'), true);
   assert.equal(paths.has('dist/index.js'), true);
+  assert.equal(paths.has('dist/command/public.js'), true);
   assert.equal(paths.has('dist/adapter/index.js'), true);
   assert.equal(paths.has('dist/completion/index.js'), true);
   assert.equal(paths.has('dist/config/index.js'), true);
@@ -148,6 +149,7 @@ function consumerScenarioSource() {
   return `
 import * as assert from 'node:assert/strict';
 import * as root from '@ismail-elkorchi/cli-core';
+import * as command from '@ismail-elkorchi/cli-core/command';
 import * as adapter from '@ismail-elkorchi/cli-core/adapter';
 import * as completion from '@ismail-elkorchi/cli-core/completion';
 import * as config from '@ismail-elkorchi/cli-core/config';
@@ -196,7 +198,7 @@ const resolved = config.resolveCliConfig(program, discovered.input);
 const helpDocument = help.createHelpDocument(program);
 const manifestDocument = manifest.importCommandManifest(manifest.exportCommandManifest(manifest.describeCli(program)));
 const completionResponse = completion.completeCli(program, { words: ['ship', '__complete', 'a'], cursor: 3 });
-const repairs = repair.suggestRepairs(root.parseCli(program, { argv: ['audt'] }), program);
+const repairs = repair.createRepairSuggestionResult(root.parseCli(program, { argv: ['audt'] }), program).suggestions;
 const run = await root.runCli(program, {
   mode: 'apply',
   invocation,
@@ -236,6 +238,7 @@ const scenario = await testing.runCliScenario(harness, {
 });
 
 assert.equal(pluginApplication.ok, true);
+assert.equal(command.findCliCommand(program, ['audit'])?.source.pluginName, 'ship-audit');
 assert.equal(schemaIndex.artifacts.some((artifact) => artifact.path === './command-manifest.schema.json'), true);
 assert.equal(manifestSchema.properties.schemaVersion.const, 'cli-core.manifest.v1');
 

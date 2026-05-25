@@ -2,13 +2,19 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
-test('root entrypoint exposes command model APIs', async () => {
-  const module = await import('../../dist/index.js');
+test('root and command subpath expose the intended command model APIs', async () => {
+  const root = await import('../../dist/index.js');
+  const command = await import('../../dist/command/public.js');
 
-  assert.equal(typeof module.defineCli, 'function');
-  assert.equal(typeof module.parseCli, 'function');
-  assert.equal(typeof module.validateCli, 'function');
-  assert.equal(typeof module.findCliCommand, 'function');
+  assert.equal(typeof root.defineCli, 'function');
+  assert.equal(typeof root.parseCli, 'function');
+  assert.equal(typeof root.validateCli, 'function');
+  assert.equal(typeof root.findCliCommand, 'undefined');
+  assert.equal(typeof root.findCliCommandByAlias, 'undefined');
+  assert.equal(typeof command.defineCli, 'function');
+  assert.equal(typeof command.findCliCommand, 'function');
+  assert.equal(typeof command.findCliCommandByAlias, 'function');
+  assert.equal(typeof command.findCliCommandChildren, 'undefined');
 });
 
 test('root declarations include command and parse result contracts', async () => {
@@ -17,5 +23,6 @@ test('root declarations include command and parse result contracts', async () =>
   assert.match(text, /CliDefinition/);
   assert.match(text, /CliProgram/);
   assert.match(text, /ParsedInvocation/);
+  assert.doesNotMatch(text, /findCliCommand/);
   assert.doesNotMatch(text, /internal\//);
 });

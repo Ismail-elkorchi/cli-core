@@ -10,7 +10,7 @@ import {
   createCompletionInstallPlan,
   createCompletionScript
 } from '../../dist/completion/index.js';
-import { suggestRepairs } from '../../dist/repair/index.js';
+import { createRepairSuggestionResult } from '../../dist/repair/index.js';
 
 test('consumer can derive completion payloads, scripts, install plans, and repair suggestions', () => {
   const program = defineCli({
@@ -32,7 +32,7 @@ test('consumer can derive completion payloads, scripts, install plans, and repai
   const script = createCompletionScript(program, 'zsh');
   const plan = createCompletionInstallPlan(program, 'pwsh');
   const invocation = parseCli(program, { argv: ['deply', 'api'] });
-  const repairs = suggestRepairs(invocation, program);
+  const repairs = createRepairSuggestionResult(invocation, program).suggestions;
 
   assert.deepEqual(completion.items.map((item) => item.value), ['deploy', 'd']);
   assert.deepEqual(bridge.payload.items.map((item) => item.value), ['--region']);

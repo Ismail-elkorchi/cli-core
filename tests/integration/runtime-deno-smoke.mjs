@@ -28,7 +28,7 @@ const compatibility = plugins.checkCliPluginCompatibility(plugins.defineCliPlugi
   version: '1.0.0',
   runtimes: ['node', 'deno', 'bun']
 }), { runtime: 'deno' });
-const repairs = repair.suggestRepairs(root.parseCli(program, { argv: ['chek'] }), program);
+const repairs = repair.createRepairSuggestionResult(root.parseCli(program, { argv: ['chek'] }), program).suggestions;
 const run = await root.runCli(program, { mode: 'plan', invocation });
 const main = await adapter.runCliMain({ program, mode: 'plan', argv: ['check', 'api'] });
 const memoryHost = effects.createMemoryEffectHost();

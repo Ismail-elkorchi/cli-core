@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { defineCli, findCliCommand, findCliCommandByAlias, parseCli, validateCli } from '../../dist/index.js';
+import { defineCli, parseCli, validateCli } from '../../dist/index.js';
+import { findCliCommand, findCliCommandByAlias } from '../../dist/command/public.js';
 
 const treeDefinition = {
   name: 'tree',

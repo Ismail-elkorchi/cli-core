@@ -44,6 +44,7 @@ const validation = await validateCli(program, invocation);
 
 - `@ismail-elkorchi/cli-core`: core program, parse, validation, config, help,
   manifest, completion payload, and run APIs.
+- `@ismail-elkorchi/cli-core/command`: command definition and lookup APIs.
 - `@ismail-elkorchi/cli-core/adapter`: explicit argv/stdout/stderr/exit-code
   adapter helpers.
 - `@ismail-elkorchi/cli-core/completion`: completion bridge, protocol, scripts,

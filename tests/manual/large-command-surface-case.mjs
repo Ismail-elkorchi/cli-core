@@ -3,10 +3,10 @@ import {
   createCompletionPayload,
   defineCli,
   describeCli,
-  findCliCommand,
   parseCli
 } from '../../dist/index.js';
-import { suggestRepairs } from '../../dist/repair/index.js';
+import { findCliCommand } from '../../dist/command/public.js';
+import { createRepairSuggestionResult } from '../../dist/repair/index.js';
 import { createLargeCommandDefinition, createLargeCommandFixture } from '../../dist/testing/index.js';
 
 export function runLargeCommandSurfaceCase(commandCount) {
@@ -37,7 +37,7 @@ export function runLargeCommandSurfaceCase(commandCount) {
   const unknown = measure(metrics, 'parse-near-miss-command', () =>
     parseCli(program, { argv: [`${targetName}x`] })
   );
-  const repairs = measure(metrics, 'repair-near-miss-command', () => suggestRepairs(unknown, program));
+  const repairs = measure(metrics, 'repair-near-miss-command', () => createRepairSuggestionResult(unknown, program).suggestions);
   const manifest = measure(metrics, 'manifest-large-command-surface', () => describeCli(program));
 
   assert.equal(indexed?.id, targetName);

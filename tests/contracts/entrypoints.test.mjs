@@ -4,6 +4,7 @@ import test from 'node:test';
 
 test('root and subpath entrypoints load', async () => {
   const root = await import('../../dist/index.js');
+  const command = await import('../../dist/command/public.js');
   const adapter = await import('../../dist/adapter/index.js');
   const help = await import('../../dist/help/index.js');
   const completion = await import('../../dist/completion/index.js');
@@ -16,6 +17,8 @@ test('root and subpath entrypoints load', async () => {
   const testing = await import('../../dist/testing/index.js');
 
   assert.equal(typeof root.defineCli, 'function');
+  assert.equal(typeof root.findCliCommand, 'undefined');
+  assert.equal(typeof command.findCliCommand, 'function');
   assert.equal(typeof adapter.createCliMain, 'function');
   assert.equal(typeof help.createHelpDocument, 'function');
   assert.equal(typeof completion.completeCli, 'function');
@@ -23,7 +26,7 @@ test('root and subpath entrypoints load', async () => {
   assert.equal(typeof config.resolveCliConfig, 'function');
   assert.equal(typeof effects.applyCliEffects, 'function');
   assert.equal(typeof plugins.defineCliPluginManifest, 'function');
-  assert.equal(typeof repair.suggestRepairs, 'function');
+  assert.equal(typeof repair.createRepairSuggestionResult, 'function');
   assert.equal(typeof schema.describeCliSchemas, 'function');
   assert.equal(typeof testing.createCliHarness, 'function');
 });
@@ -41,6 +44,7 @@ test('testing subpath exposes harness and fixture contracts', async () => {
 test('public declaration files do not expose internal module paths', async () => {
   const declarations = [
     '../../dist/index.d.ts',
+    '../../dist/command/public.d.ts',
     '../../dist/adapter/index.d.ts',
     '../../dist/help/index.d.ts',
     '../../dist/completion/index.d.ts',

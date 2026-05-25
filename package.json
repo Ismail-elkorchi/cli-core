@@ -11,6 +11,10 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./command": {
+      "types": "./dist/command/public.d.ts",
+      "default": "./dist/command/public.js"
+    },
     "./adapter": {
       "types": "./dist/adapter/index.d.ts",
       "default": "./dist/adapter/index.js"
