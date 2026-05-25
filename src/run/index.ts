@@ -154,6 +154,9 @@ export async function runCli(program: CliProgram, request: RunRequest): Promise<
   const artifacts = [...(request.artifacts ?? [])].map((artifact) => freezeRunValue(artifact));
 
   await runPluginLifecycle('init', request, invocation, events, effects, diagnostics);
+  // In runCli, preparse is an observation hook over the parsed invocation.
+  // It cannot mutate argv binding; command-tree extension must happen before
+  // parse through applyCliPluginCommands.
   await runPluginLifecycle('preparse', request, invocation, events, effects, diagnostics);
 
   events.record('run.started', {
