@@ -199,10 +199,12 @@ function effectDenial(effect: RunEffect, request: EffectApplicationRequest): Cli
 }
 
 function applyOneEffect(effect: RunEffect, host: CliEffectHost): EffectHostResult | Promise<EffectHostResult> {
-  if (effect.kind === 'spawn') return host.applySpawn?.(effect) ?? {};
-  if (effect.kind === 'write_file') return host.writeFile?.(effect) ?? {};
-  if (effect.kind === 'delete_path') return host.deletePath?.(effect) ?? {};
-  return host.applyCustom?.(effect) ?? {};
+  // effectDenial is the policy gate for this internal call; a missing method
+  // is reported as a denial before control reaches this dispatcher.
+  if (effect.kind === 'spawn') return host.applySpawn!(effect);
+  if (effect.kind === 'write_file') return host.writeFile!(effect);
+  if (effect.kind === 'delete_path') return host.deletePath!(effect);
+  return host.applyCustom!(effect);
 }
 
 function itemReport(

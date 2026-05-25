@@ -18,7 +18,7 @@ import {
   type RunMode,
   type RunResult
 } from '../run/index.js';
-import type { CliRedactionOptions } from '../schema/index.js';
+import { redactCliDiagnostics, redactCliSecrets, type CliRedactionOptions } from '../schema/index.js';
 
 export type CliMainEffectMode = 'none' | 'plan' | 'apply';
 
@@ -82,8 +82,13 @@ export function createCliMain(request: CliMainRequest): CliMain {
 }
 
 export async function runCliMain(request: CliMainRequest, host: CliMainHost = {}): Promise<CliMainResult> {
-  const run = await runCli(request.program, buildRunRequest(request, host));
-  const effectReport = await runEffectsForMain(request, run);
+  const runRequest = buildRunRequest(request, host);
+  const effectMode = request.effectMode ?? 'none';
+  const rawRun = await runCli(request.program, effectMode === 'none'
+    ? runRequest
+    : { ...runRequest, redaction: { enabled: false } });
+  const effectReport = await runEffectsForMain(request, rawRun);
+  const run = effectMode === 'none' ? rawRun : redactRunResult(rawRun, request.redaction);
   const rendered = (request.render ?? renderRunResultText)(run, effectReport);
 
   if (rendered.stdout.length > 0) await host.writeStdout?.(rendered.stdout);
@@ -186,4 +191,14 @@ async function runEffectsForMain(
     ...(request.redaction !== undefined ? { redaction: request.redaction } : {})
   };
   return applyCliEffects(applicationRequest);
+}
+
+function redactRunResult(run: RunResult, redaction: CliRedactionOptions | undefined): RunResult {
+  return Object.freeze({
+    ...run,
+    events: Object.freeze(run.events.map((event) => redactCliSecrets(event, redaction) as RunResult['events'][number])),
+    effects: Object.freeze(run.effects.map((effect) => redactCliSecrets(effect, redaction) as RunEffect)),
+    artifacts: Object.freeze(run.artifacts.map((artifact) => redactCliSecrets(artifact, redaction) as RunArtifact)),
+    diagnostics: redactCliDiagnostics(run.diagnostics, redaction)
+  });
 }
