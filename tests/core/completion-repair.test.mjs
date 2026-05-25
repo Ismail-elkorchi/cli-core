@@ -151,10 +151,11 @@ test('completeCli returns contextual command, option, and positional candidates'
     name: 'multi',
     commands: [
       { name: 'alpha', aliases: ['a'], options: [{ name: 'alphaOnly', type: 'boolean', flags: ['--alpha'] }] },
-      { name: 'beta', aliases: ['b'], options: [{ name: 'betaOnly', type: 'boolean', flags: ['--beta'] }] }
+      { name: 'beta', aliases: ['b', 'bee'], options: [{ name: 'betaOnly', type: 'boolean', flags: ['--beta'] }] }
     ]
   });
   const aliasContext = completeCli(multiChildProgram, { words: ['multi', 'b', '--b'], cursor: 3 });
+  const noProgramPrefix = completeCli(program, { words: ['deploy', '--r'], cursor: 2 });
 
   assert.deepEqual(rootCommands.payload.items.map((item) => item.value), ['deploy']);
   assert.deepEqual(rootAliases.payload.items.map((item) => item.value), ['deploy', 'd']);
@@ -178,6 +179,8 @@ test('completeCli returns contextual command, option, and positional candidates'
   assert.deepEqual(leadingOption.payload.items.map((item) => item.value), ['--verbose']);
   assert.deepEqual(aliasContext.payload.commandPath, ['beta']);
   assert.deepEqual(aliasContext.payload.items.map((item) => item.value), ['--beta']);
+  assert.deepEqual(noProgramPrefix.payload.commandPath, ['deploy']);
+  assert.deepEqual(noProgramPrefix.payload.items.map((item) => item.value), ['--region']);
 });
 
 test('completion bridge protocol normalizes hidden completion requests', () => {
@@ -198,6 +201,12 @@ test('completion bridge protocol normalizes hidden completion requests', () => {
     words: ['ship', '__complete', 'deploy'],
     cursor: 1,
     currentWord: 'ship'
+  });
+  const wrongSchemaInput = completeCli(program, {
+    schemaVersion: 'not-a-completion-request',
+    words: ['ship', '--v'],
+    cursor: 2,
+    currentWord: '--v'
   });
 
   assert.equal(command.name, '__complete');
@@ -225,6 +234,7 @@ test('completion bridge protocol normalizes hidden completion requests', () => {
   assert.deepEqual(hiddenResponse.payload.items.map((item) => item.value), ['--secret']);
   assert.deepEqual(plainInputResponse.payload.items.map((item) => item.value), ['--verbose']);
   assert.deepEqual(protocolCursor.payload.commandPath, []);
+  assert.deepEqual(wrongSchemaInput.payload.items.map((item) => item.value), ['--verbose']);
 });
 
 test('completion bridge stops at pass-through boundaries', () => {
@@ -236,11 +246,17 @@ test('completion bridge stops at pass-through boundaries', () => {
     words: ['ship', '__complete', '--', '--v'],
     cursor: 4
   });
+  const atSeparator = completeCli(program, {
+    words: ['ship', 'deploy', '--'],
+    cursor: 3
+  });
 
   assert.equal(response.boundary, 'pass_through');
   assert.deepEqual(response.payload.items, []);
   assert.equal(leadingBoundary.boundary, 'pass_through');
   assert.deepEqual(leadingBoundary.payload.items, []);
+  assert.equal(atSeparator.boundary, 'cli');
+  assert.deepEqual(atSeparator.payload.items.map((item) => item.value), ['--verbose', '--region']);
 });
 
 test('suggestRepairs maps invocation diagnostics to stable suggestions', () => {
