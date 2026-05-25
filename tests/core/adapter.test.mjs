@@ -115,7 +115,7 @@ test('runCliMain does not call output writers for empty rendered text', async ()
   assert.equal(result.exitStatus, 7);
 });
 
-test('runCliMain reports usage failures through stderr and explicit exit code', async () => {
+test('runCliMain reports parse failures through stderr and explicit exit code', async () => {
   const writes = { stdout: '', stderr: '', exitCode: -1 };
   const result = await runCliMain({ program, argv: ['deply'] }, {
     writeStdout: (text) => {
@@ -129,7 +129,7 @@ test('runCliMain reports usage failures through stderr and explicit exit code', 
     }
   });
 
-  assert.equal(result.run.exitKind, 'usage');
+  assert.equal(result.run.exitKind, 'parse_error');
   assert.equal(writes.exitCode, 2);
   assert.equal(writes.stdout, '');
   assert.match(writes.stderr, /CLI_UNKNOWN_COMMAND/);
@@ -205,16 +205,16 @@ test('runCliMain forwards optional run fields that change public behavior', asyn
   assert.equal(result.run.artifacts[1].payload.requestId, '[REDACTED]');
 });
 
-test('runCliMain forwards exit status policy into usage rendering', async () => {
+test('runCliMain forwards exit status policy into parse failure rendering', async () => {
   const result = await runCliMain({
     program,
     argv: ['unknown'],
-    exitStatusPolicy: { usage: 9 }
+    exitStatusPolicy: { parse_error: 9 }
   });
 
-  assert.equal(result.run.exitKind, 'usage');
+  assert.equal(result.run.exitKind, 'parse_error');
   assert.equal(result.exitStatus, 9);
-  assert.match(result.rendered.stderr, /exit usage 9/);
+  assert.match(result.rendered.stderr, /exit parse_error 9/);
 });
 
 test('adapter rendering remains redacted by default', async () => {

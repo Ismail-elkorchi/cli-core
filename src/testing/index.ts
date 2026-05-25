@@ -1,4 +1,9 @@
-import type { CliDefinition } from '../command/index.js';
+import { defineCli, type CliDefinition } from '../command/index.js';
+import { resolveCliConfig, type ConfigInput, type ConfigValue } from '../config/index.js';
+import type { CliDiagnosticCode } from '../diagnostics.js';
+import { parseCli } from '../parse/index.js';
+import { applyCliPluginCommands, type CliPluginManifest, type CliPluginManifestDefinition } from '../plugins/index.js';
+import { runCli, type ExitKind, type RunArtifact, type RunEffect, type RunMode, type RunPayload } from '../run/index.js';
 
 export type CliFixtureValue =
   | null
@@ -76,7 +81,13 @@ export interface CliScenario {
   readonly steps: readonly CliScenarioStep[];
 }
 
-export type CliScenarioStep = CliEntrypointLoadStep | CliFixtureAvailableStep;
+export type CliScenarioStep =
+  | CliEntrypointLoadStep
+  | CliFixtureAvailableStep
+  | CliParseScenarioStep
+  | CliConfigScenarioStep
+  | CliPluginCommandScenarioStep
+  | CliRunScenarioStep;
 
 export interface CliEntrypointLoadStep {
   readonly kind: 'entrypoint-load';
@@ -92,6 +103,55 @@ export interface CliFixtureAvailableStep {
   readonly expectedFamily?: CliFixtureFamily;
 }
 
+export interface CliParseScenarioStep {
+  readonly kind: 'parse';
+  readonly name: string;
+  readonly definition: CliDefinition;
+  readonly argv?: readonly string[];
+  readonly expectedOk?: boolean;
+  readonly expectedCommandPath?: readonly string[];
+  readonly expectedDiagnosticCodes?: readonly CliDiagnosticCode[];
+}
+
+export interface CliConfigScenarioStep {
+  readonly kind: 'config-resolution';
+  readonly name: string;
+  readonly definition: CliDefinition;
+  readonly input?: ConfigInput;
+  readonly expectedOk?: boolean;
+  readonly expectedValues?: Readonly<Record<string, ConfigValue>>;
+  readonly expectedDiagnosticCodes?: readonly CliDiagnosticCode[];
+}
+
+export interface CliPluginCommandScenarioStep {
+  readonly kind: 'plugin-command-application';
+  readonly name: string;
+  readonly definition: CliDefinition;
+  readonly plugins: readonly (CliPluginManifestDefinition | CliPluginManifest)[];
+  readonly expectedOk?: boolean;
+  readonly expectedCommandPaths?: readonly (readonly string[])[];
+  readonly expectedDiagnosticCodes?: readonly CliDiagnosticCode[];
+}
+
+export interface CliRunScenarioStep {
+  readonly kind: 'run';
+  readonly name: string;
+  readonly definition: CliDefinition;
+  readonly argv?: readonly string[];
+  readonly mode?: RunMode;
+  readonly effects?: readonly RunEffect[];
+  readonly artifacts?: readonly RunArtifact[];
+  readonly context?: RunPayload;
+  readonly cancelled?: boolean;
+  readonly interrupted?: boolean;
+  readonly timeoutMs?: number;
+  readonly elapsedMs?: number;
+  readonly expectedOk?: boolean;
+  readonly expectedExitKind?: ExitKind;
+  readonly expectedEventNames?: readonly string[];
+  readonly expectedDiagnosticCodes?: readonly CliDiagnosticCode[];
+}
+
 export type CliScenarioStatus = 'passed' | 'failed';
 
 export type CliTestDiagnosticCode =
@@ -99,7 +159,8 @@ export type CliTestDiagnosticCode =
   | 'CLI_TEST_ENTRYPOINT_MISSING'
   | 'CLI_TEST_EXPORT_MISSING'
   | 'CLI_TEST_FIXTURE_MISSING'
-  | 'CLI_TEST_FIXTURE_FAMILY_MISMATCH';
+  | 'CLI_TEST_FIXTURE_FAMILY_MISMATCH'
+  | 'CLI_TEST_EXPECTATION_FAILED';
 
 export interface CliTestDiagnostic {
   readonly code: CliTestDiagnosticCode;
@@ -515,7 +576,10 @@ export function createCliHarness(input: CliHarnessInput = {}): CliHarness {
 }
 
 export async function runCliScenario(harness: CliHarness, scenario: CliScenario): Promise<CliScenarioResult> {
-  const steps = scenario.steps.map((step, index) => runScenarioStep(harness, step, index));
+  const steps: CliScenarioStepResult[] = [];
+  for (const [index, step] of scenario.steps.entries()) {
+    steps.push(await runScenarioStep(harness, step, index));
+  }
   const diagnostics = Object.freeze(steps.flatMap((step) => step.diagnostics));
   const status: CliScenarioStatus = diagnostics.length === 0 ? 'passed' : 'failed';
 
@@ -600,10 +664,8 @@ function normalizeCommandCount(value: number): number {
   return Math.trunc(value);
 }
 
-function runScenarioStep(harness: CliHarness, step: CliScenarioStep, index: number): CliScenarioStepResult {
-  const diagnostics = step.kind === 'entrypoint-load'
-    ? inspectEntrypointStep(harness, step)
-    : inspectFixtureStep(harness, step);
+async function runScenarioStep(harness: CliHarness, step: CliScenarioStep, index: number): Promise<CliScenarioStepResult> {
+  const diagnostics = await inspectScenarioStep(harness, step);
 
   return Object.freeze({
     index,
@@ -612,6 +674,15 @@ function runScenarioStep(harness: CliHarness, step: CliScenarioStep, index: numb
     status: diagnostics.length === 0 ? 'passed' : 'failed',
     diagnostics: Object.freeze(diagnostics)
   });
+}
+
+async function inspectScenarioStep(harness: CliHarness, step: CliScenarioStep): Promise<readonly CliTestDiagnostic[]> {
+  if (step.kind === 'entrypoint-load') return inspectEntrypointStep(harness, step);
+  if (step.kind === 'fixture-available') return inspectFixtureStep(harness, step);
+  if (step.kind === 'parse') return inspectParseStep(step);
+  if (step.kind === 'config-resolution') return inspectConfigStep(step);
+  if (step.kind === 'plugin-command-application') return inspectPluginCommandStep(step);
+  return inspectRunStep(step);
 }
 
 function inspectEntrypointStep(harness: CliHarness, step: CliEntrypointLoadStep): readonly CliTestDiagnostic[] {
@@ -656,6 +727,136 @@ function inspectFixtureStep(harness: CliHarness, step: CliFixtureAvailableStep):
   }
 
   return [];
+}
+
+function inspectParseStep(step: CliParseScenarioStep): readonly CliTestDiagnostic[] {
+  const program = defineCli(step.definition);
+  const invocation = parseCli(program, { argv: step.argv ?? [] });
+  return Object.freeze([
+    ...expectBoolean(step.name, 'parse ok', step.expectedOk, invocation.ok),
+    ...expectStringArray(step.name, 'command path', step.expectedCommandPath, invocation.commandPath),
+    ...expectDiagnosticCodes(step.name, step.expectedDiagnosticCodes, invocation.diagnostics.map((item) => item.code))
+  ]);
+}
+
+function inspectConfigStep(step: CliConfigScenarioStep): readonly CliTestDiagnostic[] {
+  const program = defineCli(step.definition);
+  const resolution = resolveCliConfig(program, step.input ?? {});
+  return Object.freeze([
+    ...expectBoolean(step.name, 'config ok', step.expectedOk, resolution.ok),
+    ...expectRecord(step.name, 'config values', step.expectedValues, resolution.values),
+    ...expectDiagnosticCodes(step.name, step.expectedDiagnosticCodes, resolution.diagnostics.map((item) => item.code))
+  ]);
+}
+
+function inspectPluginCommandStep(step: CliPluginCommandScenarioStep): readonly CliTestDiagnostic[] {
+  const application = applyCliPluginCommands(step.definition, step.plugins);
+  return Object.freeze([
+    ...expectBoolean(step.name, 'plugin command application ok', step.expectedOk, application.ok),
+    ...expectPaths(step.name, 'plugin command paths', step.expectedCommandPaths, application.program.commands.map((command) => command.path)),
+    ...expectDiagnosticCodes(step.name, step.expectedDiagnosticCodes, application.diagnostics.map((item) => item.code))
+  ]);
+}
+
+async function inspectRunStep(step: CliRunScenarioStep): Promise<readonly CliTestDiagnostic[]> {
+  const program = defineCli(step.definition);
+  const result = await runCli(program, {
+    mode: step.mode ?? 'plan',
+    argv: step.argv ?? [],
+    ...(step.effects === undefined ? {} : { effects: step.effects }),
+    ...(step.artifacts === undefined ? {} : { artifacts: step.artifacts }),
+    ...(step.context === undefined ? {} : { context: step.context }),
+    ...(step.cancelled === undefined ? {} : { cancelled: step.cancelled }),
+    ...(step.interrupted === undefined ? {} : { interrupted: step.interrupted }),
+    ...(step.timeoutMs === undefined ? {} : { timeoutMs: step.timeoutMs }),
+    ...(step.elapsedMs === undefined ? {} : { elapsedMs: step.elapsedMs })
+  });
+  return Object.freeze([
+    ...expectBoolean(step.name, 'run ok', step.expectedOk, result.ok),
+    ...expectString(step.name, 'exit kind', step.expectedExitKind, result.exitKind),
+    ...expectStringArray(step.name, 'event names', step.expectedEventNames, result.events.map((event) => event.name)),
+    ...expectDiagnosticCodes(step.name, step.expectedDiagnosticCodes, result.diagnostics.map((item) => item.code))
+  ]);
+}
+
+function expectBoolean(
+  stepName: string,
+  expectation: string,
+  expected: boolean | undefined,
+  actual: boolean
+): readonly CliTestDiagnostic[] {
+  if (expected === undefined || expected === actual) return [];
+  return [expectationDiagnostic(stepName, expectation, expected, actual)];
+}
+
+function expectString(
+  stepName: string,
+  expectation: string,
+  expected: string | undefined,
+  actual: string
+): readonly CliTestDiagnostic[] {
+  if (expected === undefined || expected === actual) return [];
+  return [expectationDiagnostic(stepName, expectation, expected, actual)];
+}
+
+function expectStringArray(
+  stepName: string,
+  expectation: string,
+  expected: readonly string[] | undefined,
+  actual: readonly string[]
+): readonly CliTestDiagnostic[] {
+  if (expected === undefined || sameJson(expected, actual)) return [];
+  return [expectationDiagnostic(stepName, expectation, [...expected], [...actual])];
+}
+
+function expectPaths(
+  stepName: string,
+  expectation: string,
+  expected: readonly (readonly string[])[] | undefined,
+  actual: readonly (readonly string[])[]
+): readonly CliTestDiagnostic[] {
+  if (expected === undefined) return [];
+  const actualKeys = new Set(actual.map((path) => path.join('\u0000')));
+  const missing = expected.filter((path) => !actualKeys.has(path.join('\u0000')));
+  if (missing.length === 0) return [];
+  return [expectationDiagnostic(stepName, expectation, expected.map((path) => [...path]), actual.map((path) => [...path]))];
+}
+
+function expectRecord(
+  stepName: string,
+  expectation: string,
+  expected: Readonly<Record<string, ConfigValue>> | undefined,
+  actual: Readonly<Record<string, ConfigValue>>
+): readonly CliTestDiagnostic[] {
+  if (expected === undefined || sameJson(expected, actual)) return [];
+  return [expectationDiagnostic(stepName, expectation, expected as CliFixtureValue, actual as CliFixtureValue)];
+}
+
+function expectDiagnosticCodes(
+  stepName: string,
+  expected: readonly CliDiagnosticCode[] | undefined,
+  actual: readonly CliDiagnosticCode[]
+): readonly CliTestDiagnostic[] {
+  if (expected === undefined || sameJson(expected, actual)) return [];
+  return [expectationDiagnostic(stepName, 'diagnostic codes', [...expected], [...actual])];
+}
+
+function expectationDiagnostic(
+  stepName: string,
+  expectation: string,
+  expected: CliFixtureValue,
+  actual: CliFixtureValue
+): CliTestDiagnostic {
+  return diagnostic('CLI_TEST_EXPECTATION_FAILED', 'Scenario step expectation failed.', {
+    stepName,
+    expectation,
+    expected,
+    actual
+  });
+}
+
+function sameJson(left: unknown, right: unknown): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
 }
 
 function diagnostic(

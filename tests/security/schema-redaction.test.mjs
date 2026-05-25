@@ -153,6 +153,20 @@ test('redaction handles depth, circular references, arrays, and record prototype
   assert.equal(report.matches.some((match) => match.path === '$.list[0]' && match.reason === 'max_depth'), true);
 });
 
+test('redaction preserves shared non-cyclic structural values', () => {
+  const commandPath = Object.freeze([]);
+  const report = redactCliSecretsWithReport({
+    command: { path: commandPath },
+    commandPath,
+    token: 'abc123'
+  });
+
+  assert.deepEqual(report.value.command.path, []);
+  assert.deepEqual(report.value.commandPath, []);
+  assert.equal(report.value.token, '[REDACTED]');
+  assert.equal(report.matches.some((match) => match.path === '$.commandPath' && match.reason === 'circular_reference'), false);
+});
+
 test('failure envelopes redact diagnostics and classify unsupported schemas as diagnostics', () => {
   const unsupported = createUnsupportedSchemaDiagnostic('cli-core.old.v1');
   const failure = createCliFailureEnvelope({
@@ -209,13 +223,16 @@ test('failure envelopes report redaction only when diagnostics or payload change
 });
 
 test('failure helpers map exit kinds and diagnostics to typed failure kinds', () => {
-  assert.equal(exitKindToFailureKind('usage'), 'parse');
+  assert.equal(exitKindToFailureKind('parse_error'), 'parse');
+  assert.equal(exitKindToFailureKind('config_error'), 'config');
+  assert.equal(exitKindToFailureKind('validation_error'), 'validation');
   assert.equal(exitKindToFailureKind('policy_denied'), 'policy_denial');
   assert.equal(exitKindToFailureKind('cancelled'), 'cancellation');
   assert.equal(exitKindToFailureKind('interrupted'), 'interruption');
   assert.equal(exitKindToFailureKind('timeout'), 'timeout');
   assert.equal(exitKindToFailureKind('external_error'), 'external_error');
   assert.equal(exitKindToFailureKind('internal_error'), 'internal_error');
+  assert.equal(exitKindToFailureKind('usage'), 'internal_error');
   assert.equal(failureKindForDiagnostics([
     {
       code: 'CLI_RUN_HANDLER_FAILED',
@@ -323,12 +340,20 @@ test('failure helpers map exit kinds and diagnostics to typed failure kinds', ()
       message: 'bad flag',
       fields: {}
     }
-  ]), 'config');
+  ]), 'parse');
   assert.equal(failureKindForDiagnostics([
     {
       code: 'CLI_RUN_HANDLER_FAILED',
       severity: 'error',
       message: 'handler failed',
+      fields: {}
+    }
+  ]), 'external_error');
+  assert.equal(failureKindForDiagnostics([
+    {
+      code: 'CLI_VALIDATION_FAILED',
+      severity: 'error',
+      message: 'validation failed',
       fields: {}
     }
   ]), 'validation');

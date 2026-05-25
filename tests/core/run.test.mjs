@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createCliDiagnostic } from '../../dist/diagnostics.js';
-import { defineCli, runCli } from '../../dist/index.js';
+import { defineCli, parseCli, resolveCliConfig, runCli, validateCli } from '../../dist/index.js';
 import { createCliPluginHost } from '../../dist/plugins/index.js';
 
 const program = defineCli({
@@ -33,7 +33,13 @@ test('runCli returns a plan-mode envelope without invoking handlers', async () =
   assert.equal(result.mode, 'plan');
   assert.equal(result.exitKind, 'ok');
   assert.equal(result.exitStatus, 0);
-  assert.deepEqual(result.events.map((event) => event.name), ['run.started', 'run.planned', 'run.completed']);
+  assert.deepEqual(result.events.map((event) => event.name), [
+    'parse.completed',
+    'run.started',
+    'run.planned',
+    'effects.planned',
+    'run.completed'
+  ]);
   assert.equal(result.effects[0].kind, 'spawn');
 });
 
@@ -51,7 +57,7 @@ test('runCli defaults to plan mode with empty argv and preserves request artifac
     effects: 0,
     artifacts: 1
   });
-  assert.deepEqual(result.events[0].payload, {
+  assert.deepEqual(result.events.find((event) => event.name === 'run.started')?.payload, {
     mode: 'plan',
     commandPath: [],
     argv: []
@@ -77,13 +83,39 @@ test('runCli apply mode invokes a handler and returns artifacts and effects', as
 
   assert.equal(result.runId, 'run-apply');
   assert.equal(result.ok, true);
-  assert.deepEqual(result.events.map((event) => event.name), ['run.started', 'run.planned', 'run.applied', 'run.completed']);
+  assert.deepEqual(result.events.map((event) => event.name), [
+    'parse.completed',
+    'run.started',
+    'run.planned',
+    'effects.planned',
+    'run.applied',
+    'run.completed'
+  ]);
   assert.deepEqual(result.events.find((event) => event.name === 'run.applied')?.payload, {
     effects: 1,
     artifacts: 1
   });
   assert.equal(result.effects[0].name, 'deploy.service');
   assert.equal(result.artifacts[0].id, 'deploy-summary');
+});
+
+test('runCli redacts invocation data in run results', async () => {
+  const secretProgram = defineCli({
+    name: 'ship',
+    commands: [
+      {
+        name: 'deploy',
+        options: [{ name: 'token', type: 'string', flags: ['--token'] }]
+      }
+    ]
+  });
+  const result = await runCli(secretProgram, {
+    argv: ['deploy', '--token=abc123']
+  });
+
+  assert.equal(result.invocation.argv[1], '--[REDACTED]');
+  assert.equal(result.invocation.options.values.token, '[REDACTED]');
+  assert.equal(result.events.find((event) => event.name === 'run.started')?.payload.argv[1], '--[REDACTED]');
 });
 
 test('runCli applies exit status policy and handler diagnostics', async () => {
@@ -110,6 +142,46 @@ test('runCli applies exit status policy and handler diagnostics', async () => {
   assert.equal(result.exitKind, 'policy_denied');
   assert.equal(result.exitStatus, 77);
   assert.equal(result.events.some((event) => event.name === 'run.applied'), true);
+});
+
+test('runCli distinguishes parse, config, and validation failures and streams events to a sink', async () => {
+  const configured = defineCli({
+    name: 'ship',
+    config: {
+      fields: [{ name: 'profile', type: 'string' }]
+    },
+    commands: [{ name: 'deploy' }]
+  });
+  const config = resolveCliConfig(configured, { argv: { profile: 3 } });
+  const validationInvocation = parseCli(configured, { argv: ['deploy'] });
+  const validation = await validateCli(configured, {
+    ...validationInvocation,
+    diagnostics: [
+      ...validationInvocation.diagnostics,
+      createCliDiagnostic('CLI_VALIDATION_FAILED', 'error', 'semantic check failed', {})
+    ]
+  });
+  const streamed = [];
+  const parseFailure = await runCli(configured, {
+    argv: ['missing'],
+    eventSink: (event) => {
+      streamed.push(event.name);
+      if (event.name === 'run.failed') throw new Error('sink failed');
+    }
+  });
+  const configFailure = await runCli(configured, { argv: ['deploy'], config });
+  const validationFailure = await runCli(configured, { argv: ['deploy'], validation });
+
+  assert.equal(parseFailure.exitKind, 'parse_error');
+  assert.equal(parseFailure.exitStatus, 2);
+  assert.equal(parseFailure.diagnostics.some((diagnostic) => diagnostic.code === 'CLI_RUN_EVENT_SINK_FAILED'), true);
+  assert.equal(streamed.includes('parse.completed'), true);
+  assert.equal(streamed.includes('run.failed'), true);
+  assert.equal(configFailure.exitKind, 'config_error');
+  assert.equal(configFailure.exitStatus, 78);
+  assert.equal(configFailure.events.some((event) => event.name === 'config.resolved'), true);
+  assert.equal(validationFailure.exitKind, 'validation_error');
+  assert.equal(validationFailure.events.some((event) => event.name === 'validation.completed'), true);
 });
 
 test('runCli reports missing handlers and thrown handler failures', async () => {
@@ -193,7 +265,7 @@ test('runCli maps cancelled, interrupted, and timed out requests to exit kinds',
   assert.equal(noElapsed.exitKind, 'ok');
   assert.equal(noTimeout.exitKind, 'ok');
   assert.equal(cancelledFirst.exitKind, 'cancelled');
-  assert.deepEqual(timeout.events.map((event) => event.name), ['run.started', 'run.skipped', 'run.completed']);
+  assert.deepEqual(timeout.events.map((event) => event.name), ['parse.completed', 'run.started', 'run.skipped', 'run.failed', 'run.completed']);
   assert.deepEqual(timeout.events.find((event) => event.name === 'run.skipped')?.payload, { reason: 'timeout' });
 });
 
@@ -357,7 +429,7 @@ test('runCli treats preparse as a parsed-invocation observation hook', async () 
     ok: true
   });
   assert.equal(result.effects.find((effect) => effect.event === 'preparse')?.effectKind, 'preparse.seen');
-  assert.deepEqual(result.events.slice(0, 4).map((event) => event.name), [
+  assert.deepEqual(result.events.filter((event) => event.name.startsWith('plugin.')).slice(0, 4).map((event) => event.name), [
     'plugin.hooks.planned',
     'plugin.hooks.completed',
     'plugin.hooks.planned',
@@ -433,7 +505,9 @@ test('runCli records plugin planning diagnostics without running failed hook pla
   assert.equal(result.ok, false);
   assert.equal(result.exitKind, 'policy_denied');
   assert.equal(result.diagnostics[0].code, 'CLI_PLUGIN_HOOK_ORDER_CYCLE');
-  assert.deepEqual(result.events[0].payload, {
+  assert.deepEqual(result.events.find((event) =>
+    event.name === 'plugin.hooks.planned' && event.payload.event === 'init'
+  )?.payload, {
     event: 'init',
     hooks: [
       {
@@ -444,7 +518,9 @@ test('runCli records plugin planning diagnostics without running failed hook pla
       }
     ]
   });
-  assert.deepEqual(result.events[1].payload, {
+  assert.deepEqual(result.events.find((event) =>
+    event.name === 'plugin.hooks.completed' && event.payload.event === 'init'
+  )?.payload, {
     event: 'init',
     status: 'failed',
     hooks: []
@@ -577,12 +653,12 @@ test('runCli runs command_not_found hooks without hiding the parse failure', asy
   });
 
   assert.equal(result.ok, false);
-  assert.equal(result.exitKind, 'usage');
+  assert.equal(result.exitKind, 'parse_error');
   assert.equal(result.diagnostics.some((diagnostic) => diagnostic.code === 'CLI_UNKNOWN_COMMAND'), true);
   assert.equal(result.effects[0].event, 'command_not_found');
   assert.equal(Object.hasOwn(result.effects[1], 'payload'), false);
   assert.equal(result.effects[1].event, 'finally');
-  assert.deepEqual(result.events.find((event) => event.name === 'run.skipped')?.payload, { reason: 'usage' });
+  assert.deepEqual(result.events.find((event) => event.name === 'run.skipped')?.payload, { reason: 'parse_error' });
 });
 
 test('runCli validates structured spawn effects before planning or applying', async () => {

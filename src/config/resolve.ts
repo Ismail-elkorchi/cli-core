@@ -6,6 +6,7 @@ import type {
   ConfigFieldDefinition,
   ConfigInput,
   ConfigResolution,
+  ConfigCandidate,
   ConfigResolutionEntry,
   ConfigExplanation,
   ConfigSource,
@@ -104,7 +105,13 @@ function selectEntries(entries: readonly ConfigResolutionEntry[]): {
     explanations.push(Object.freeze({
       key,
       selected: selected.source,
-      candidates: Object.freeze(ordered.map((candidate) => candidate.source))
+      selectedValue: selected.value,
+      candidates: Object.freeze(ordered.map((candidate) => candidate.source)),
+      candidateValues: Object.freeze(ordered.map((candidate): ConfigCandidate => Object.freeze({
+        source: candidate.source,
+        value: candidate.value,
+        selected: candidate === selected
+      })))
     }));
   }
   return {

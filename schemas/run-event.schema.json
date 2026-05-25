@@ -8,7 +8,22 @@
     "schemaVersion": { "const": "cli-core.run-event.v1" },
     "runId": { "type": "string" },
     "sequence": { "type": "integer", "minimum": 0 },
-    "name": { "type": "string" },
+    "name": {
+      "enum": [
+        "parse.completed",
+        "config.resolved",
+        "validation.completed",
+        "run.started",
+        "run.planned",
+        "run.applied",
+        "run.skipped",
+        "effects.planned",
+        "run.failed",
+        "plugin.hooks.planned",
+        "plugin.hooks.completed",
+        "run.completed"
+      ]
+    },
     "payload": {}
   },
   "additionalProperties": true

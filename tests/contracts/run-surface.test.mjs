@@ -18,6 +18,10 @@ test('root declarations include run result, events, effects, artifacts, and exit
   assert.match(text, /RunEffect/);
   assert.match(text, /PluginRunEffect/);
   assert.match(runText, /pluginHost/);
+  assert.match(runText, /eventSink/);
+  assert.match(runText, /parse_error/);
+  assert.match(runText, /config_error/);
+  assert.match(runText, /validation_error/);
   assert.match(runText, /plugin\.hooks\.planned/);
   assert.match(text, /RunArtifact/);
   assert.match(text, /ExitKind/);

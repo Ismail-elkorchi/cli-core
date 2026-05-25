@@ -2,6 +2,7 @@ export { discoverCliConfigInput } from './discovery.js';
 export { createMemoryConfigDiscoveryHost } from './memory-host.js';
 export { resolveCliConfig } from './resolve.js';
 export type {
+  ConfigCandidate,
   ConfigDefinition,
   ConfigDiscoveryCollection,
   ConfigDiscoveryEnvironmentInput,
