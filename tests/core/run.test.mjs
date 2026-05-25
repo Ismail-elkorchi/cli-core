@@ -479,6 +479,40 @@ test('runCli runs finally hooks after handler failure', async () => {
   assert.equal(result.effects[0].event, 'finally');
 });
 
+test('runCli runs finally hooks after skipped execution paths', async () => {
+  const seen = [];
+  const host = createCliPluginHost([
+    {
+      manifest: { name: 'cleanup', version: '1.0.0', hooks: [{ name: 'always', event: 'finally' }] },
+      load: () => ({
+        hooks: {
+          always: () => {
+            seen.push('finally');
+            return { effects: [{ kind: 'cleanup.seen' }] };
+          }
+        }
+      })
+    }
+  ]);
+
+  const cancelled = await runCli(program, {
+    argv: ['deploy', 'api'],
+    cancelled: true,
+    pluginHost: host
+  });
+  const missingHandler = await runCli(program, {
+    mode: 'apply',
+    argv: ['deploy', 'api'],
+    pluginHost: host
+  });
+
+  assert.equal(cancelled.exitKind, 'cancelled');
+  assert.equal(missingHandler.exitKind, 'policy_denied');
+  assert.deepEqual(seen, ['finally', 'finally']);
+  assert.equal(cancelled.effects[0].event, 'finally');
+  assert.equal(missingHandler.effects[0].event, 'finally');
+});
+
 test('runCli skips postrun hooks when handler output is not successful but still runs finally', async () => {
   const seen = [];
   const host = createCliPluginHost([
