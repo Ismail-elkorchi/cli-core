@@ -56,7 +56,7 @@ const sourceAreas = new Map([
   }],
   ['plugins', {
     mutate: ['src/plugins/index.ts'],
-    tests: integrationTestRoots
+    tests: ['tests/core', 'tests/contracts', 'tests/integration']
   }],
   ['repair', {
     mutate: ['src/repair/index.ts'],
