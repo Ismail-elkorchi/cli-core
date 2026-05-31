@@ -253,6 +253,58 @@ test('cmd handles mixed quoting for nested long options', async (context) => {
   });
 });
 
+test('cmd handles space-separated long option values and mixed quoting for nested commands', async (context) => {
+  if (process.platform !== 'win32') {
+    context.skip('Windows shell quoting edge cases are validated on Windows runtime shells');
+  }
+
+  await runShellSmoke(context, 'cmd', async (workspace) => {
+    const result = await runShellEntrypointCommandLine(
+      context,
+      workspace,
+      'cmd',
+      ({ binary, entrypoint }) =>
+        `"${binary}" "${entrypoint}" config set --config-file "C:\\Program Files\\ship\\config profile.json" --message "A 'mixed' value" --dry-run release "output with spaces"`,
+      shellNestedEntrypointSource()
+    );
+
+    assert.equal(result.status, 0);
+    assert.equal(result.payload.ok, true);
+    assert.equal(result.payload.commandPath, 'config set');
+    assert.equal(result.payload.configFile, 'C:\\Program Files\\ship\\config profile.json');
+    assert.equal(result.payload.dryRun, true);
+    assert.equal(result.payload.message, "A 'mixed' value");
+    assert.equal(result.payload.key, 'release');
+    assert.equal(result.payload.value, 'output with spaces');
+  });
+});
+
+test('cmd handles escaped double quotes in nested long options', async (context) => {
+  if (process.platform !== 'win32') {
+    context.skip('Windows shell quoting edge cases are validated on Windows runtime shells');
+  }
+
+  await runShellSmoke(context, 'cmd', async (workspace) => {
+    const result = await runShellEntrypointCommandLine(
+      context,
+      workspace,
+      'cmd',
+      ({ binary, entrypoint }) =>
+        `"${binary}" "${entrypoint}" config set --config-file="C:\\Program Files\\ship\\config profile.json" --message "A ""double""-style value" --dry-run release "output with spaces"`,
+      shellNestedEntrypointSource()
+    );
+
+    assert.equal(result.status, 0);
+    assert.equal(result.payload.ok, true);
+    assert.equal(result.payload.commandPath, 'config set');
+    assert.equal(result.payload.configFile, 'C:\\Program Files\\ship\\config profile.json');
+    assert.equal(result.payload.dryRun, true);
+    assert.equal(result.payload.message, 'A "double"-style value');
+    assert.equal(result.payload.key, 'release');
+    assert.equal(result.payload.value, 'output with spaces');
+  });
+});
+
 test('pwsh handles nested command and long options with mixed quoting', async (context) => {
   if (process.platform !== 'win32') {
     context.skip('Windows command/argv parsing edge case is validated on Windows runtime shells');
@@ -308,6 +360,32 @@ test('pwsh handles mixed quoting forms for nested command parsing', async (conte
     assert.equal(result.payload.configFile, 'C:\\Program Files\\ship\\config profile.json');
     assert.equal(result.payload.dryRun, true);
     assert.equal(result.payload.message, "A 'double'-style value");
+    assert.equal(result.payload.key, 'release');
+  assert.equal(result.payload.value, 'output with spaces');
+  });
+});
+
+test('pwsh handles mixed quoting with both quote styles through nested command long options', async (context) => {
+  if (process.platform !== 'win32') {
+    context.skip('Windows command/argv parsing edge case is validated on Windows runtime shells');
+  }
+
+  await runShellSmoke(context, 'pwsh', async (workspace) => {
+    const result = await runShellEntrypointCommandLine(
+      context,
+      workspace,
+      'pwsh',
+      ({ binary, entrypoint }) =>
+        `& ${powerShellString(binary)} ${powerShellString(entrypoint)} config set --config-file='C:\\Program Files\\ship\\config profile.json' --message 'A "double" and ''single'' style' --dry-run release 'output with spaces'`,
+      shellNestedEntrypointSource()
+    );
+
+    assert.equal(result.status, 0);
+    assert.equal(result.payload.ok, true);
+    assert.equal(result.payload.commandPath, 'config set');
+    assert.equal(result.payload.configFile, 'C:\\Program Files\\ship\\config profile.json');
+    assert.equal(result.payload.dryRun, true);
+    assert.equal(result.payload.message, 'A "double" and \'single\' style');
     assert.equal(result.payload.key, 'release');
     assert.equal(result.payload.value, 'output with spaces');
   });
