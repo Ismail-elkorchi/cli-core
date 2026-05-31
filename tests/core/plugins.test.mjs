@@ -687,13 +687,12 @@ test('applyCliPluginCommands preserves raw definition options, config, aliases, 
     options: [
       {
         name: 'tag',
-        type: 'string',
+        type: 'array',
         flags: ['--tag'],
         description: 'Release tag.',
         required: true,
         default: ['latest'],
         allowEmpty: true,
-        allowNo: true,
         hidden: true
       }
     ],
@@ -718,13 +717,12 @@ test('applyCliPluginCommands preserves raw definition options, config, aliases, 
   });
   assert.deepEqual(application.definition.options?.[0], {
     name: 'tag',
-    type: 'string',
+    type: 'array',
     flags: ['--tag'],
     description: 'Release tag.',
     required: true,
     default: ['latest'],
     allowEmpty: true,
-    allowNo: true,
     hidden: true
   });
   assert.equal(application.definition.commands?.[0].source?.kind, 'definition');

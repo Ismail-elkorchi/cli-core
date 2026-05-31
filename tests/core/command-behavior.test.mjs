@@ -122,7 +122,7 @@ test('variadic positionals bind without implicit default-command routing', () =>
       {
         name: 'build',
         options: [
-          { name: 'envSecret', type: 'string', flags: ['--env.API_SECRET'] },
+          { name: 'envSecret', type: 'string', flags: ['--env-secret'] },
           { name: 'minimize', type: 'boolean', flags: ['--minimize'] }
         ],
         positionals: [{ name: 'files', variadic: true }]
@@ -130,7 +130,7 @@ test('variadic positionals bind without implicit default-command routing', () =>
     ]
   });
   const invocation = parseCli(program, {
-    argv: ['build', 'entry.ts', 'extra.ts', '--env.API_SECRET', 'token', '--minimize']
+    argv: ['build', 'entry.ts', 'extra.ts', '--env-secret', 'token', '--minimize']
   });
   const defaultAttempt = parseCli(program, { argv: ['entry.ts'] });
 
