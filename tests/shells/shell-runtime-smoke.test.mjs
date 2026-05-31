@@ -190,7 +190,204 @@ test('cmd can invoke a Node CLI adapter entrypoint explicitly', async (context) 
 
     const { stdout, stderr } = await execFileAsync('cmd.exe', ['/d', '/c', wrapper]);
     assert.equal(stderr, '');
-    assert.match(stdout, /command deploy/);
+    const payload = parseJsonPayload(stdout);
+    assert.equal(payload.ok, true);
+    assert.equal(payload.commandPath, 'deploy');
+    assert.equal(payload.target, 'api');
+    assert.equal(payload.exitStatus, 0);
+  });
+});
+
+test('cmd handles nested command and long options with spaces', async (context) => {
+  await runShellSmoke(context, 'cmd', async (workspace) => {
+    const result = await runShellEntrypoint(
+      context,
+      workspace,
+      'cmd',
+      [
+        'config',
+        'set',
+        '--config-file=C:\\Program Files\\ship\\config profile.json',
+        '--dry-run',
+        '--message=Alpha\'s value',
+        'release',
+        'output with spaces'
+      ],
+      shellNestedEntrypointSource()
+    );
+
+    assert.equal(result.status, 0);
+    assert.equal(result.payload.ok, true);
+    assert.equal(result.payload.commandPath, 'config set');
+    assert.equal(result.payload.configFile, 'C:\\Program Files\\ship\\config profile.json');
+    assert.equal(result.payload.dryRun, true);
+    assert.equal(result.payload.message, "Alpha's value");
+    assert.equal(result.payload.key, 'release');
+    assert.equal(result.payload.value, 'output with spaces');
+  });
+});
+
+test('cmd handles mixed quoting for nested long options', async (context) => {
+  if (process.platform !== 'win32') {
+    context.skip('Windows shell quoting edge cases are validated on Windows runtime shells');
+  }
+
+  await runShellSmoke(context, 'cmd', async (workspace) => {
+    const result = await runShellEntrypointCommandLine(
+      context,
+      workspace,
+      'cmd',
+      ({ binary, entrypoint }) =>
+        `"${binary}" "${entrypoint}" config set --config-file="C:\\Program Files\\ship\\config profile.json" --message="A 'mixed' value" --dry-run release "output with spaces"`,
+      shellNestedEntrypointSource()
+    );
+
+    assert.equal(result.status, 0);
+    assert.equal(result.payload.ok, true);
+    assert.equal(result.payload.commandPath, 'config set');
+    assert.equal(result.payload.configFile, 'C:\\Program Files\\ship\\config profile.json');
+    assert.equal(result.payload.dryRun, true);
+    assert.equal(result.payload.message, "A 'mixed' value");
+    assert.equal(result.payload.key, 'release');
+    assert.equal(result.payload.value, 'output with spaces');
+  });
+});
+
+test('cmd handles space-separated long option values and mixed quoting for nested commands', async (context) => {
+  if (process.platform !== 'win32') {
+    context.skip('Windows shell quoting edge cases are validated on Windows runtime shells');
+  }
+
+  await runShellSmoke(context, 'cmd', async (workspace) => {
+    const result = await runShellEntrypointCommandLine(
+      context,
+      workspace,
+      'cmd',
+      ({ binary, entrypoint }) =>
+        `"${binary}" "${entrypoint}" config set --config-file "C:\\Program Files\\ship\\config profile.json" --message "A 'mixed' value" --dry-run release "output with spaces"`,
+      shellNestedEntrypointSource()
+    );
+
+    assert.equal(result.status, 0);
+    assert.equal(result.payload.ok, true);
+    assert.equal(result.payload.commandPath, 'config set');
+    assert.equal(result.payload.configFile, 'C:\\Program Files\\ship\\config profile.json');
+    assert.equal(result.payload.dryRun, true);
+    assert.equal(result.payload.message, "A 'mixed' value");
+    assert.equal(result.payload.key, 'release');
+    assert.equal(result.payload.value, 'output with spaces');
+  });
+});
+
+test('cmd handles escaped double quotes in nested long options', async (context) => {
+  if (process.platform !== 'win32') {
+    context.skip('Windows shell quoting edge cases are validated on Windows runtime shells');
+  }
+
+  await runShellSmoke(context, 'cmd', async (workspace) => {
+    const result = await runShellEntrypointCommandLine(
+      context,
+      workspace,
+      'cmd',
+      ({ binary, entrypoint }) =>
+        `"${binary}" "${entrypoint}" config set --config-file="C:\\Program Files\\ship\\config profile.json" --message "A ""double""-style value" --dry-run release "output with spaces"`,
+      shellNestedEntrypointSource()
+    );
+
+    assert.equal(result.status, 0);
+    assert.equal(result.payload.ok, true);
+    assert.equal(result.payload.commandPath, 'config set');
+    assert.equal(result.payload.configFile, 'C:\\Program Files\\ship\\config profile.json');
+    assert.equal(result.payload.dryRun, true);
+    assert.equal(result.payload.message, 'A "double"-style value');
+    assert.equal(result.payload.key, 'release');
+    assert.equal(result.payload.value, 'output with spaces');
+  });
+});
+
+test('pwsh handles nested command and long options with mixed quoting', async (context) => {
+  if (process.platform !== 'win32') {
+    context.skip('Windows command/argv parsing edge case is validated on Windows runtime shells');
+  }
+
+  await runShellSmoke(context, 'pwsh', async (workspace) => {
+    const result = await runShellEntrypoint(
+      context,
+      workspace,
+      'pwsh',
+      [
+        'config',
+        'set',
+        '--message',
+        'A value with mixed quoting',
+        '--config-file=C:\\Program Files\\ship\\config profile.json',
+        '--dry-run',
+        'release',
+        'value with spaces'
+      ],
+      shellNestedEntrypointSource()
+    );
+
+    assert.equal(result.status, 0);
+    assert.equal(result.payload.ok, true);
+    assert.equal(result.payload.commandPath, 'config set');
+    assert.equal(result.payload.configFile, 'C:\\Program Files\\ship\\config profile.json');
+    assert.equal(result.payload.dryRun, true);
+    assert.equal(result.payload.message, 'A value with mixed quoting');
+    assert.equal(result.payload.key, 'release');
+    assert.equal(result.payload.value, 'value with spaces');
+  });
+});
+
+test('pwsh handles mixed quoting forms for nested command parsing', async (context) => {
+  if (process.platform !== 'win32') {
+    context.skip('Windows shell quoting edge cases are validated on Windows runtime shells');
+  }
+
+  await runShellSmoke(context, 'pwsh', async (workspace) => {
+    const result = await runShellEntrypointCommandLine(
+      context,
+      workspace,
+      'pwsh',
+      ({ binary, entrypoint }) =>
+        `& ${powerShellString(binary)} ${powerShellString(entrypoint)} config set --config-file "C:\\Program Files\\ship\\config profile.json" --message 'A ''double''-style value' --dry-run release 'output with spaces'`,
+      shellNestedEntrypointSource()
+    );
+
+    assert.equal(result.status, 0);
+    assert.equal(result.payload.ok, true);
+    assert.equal(result.payload.commandPath, 'config set');
+    assert.equal(result.payload.configFile, 'C:\\Program Files\\ship\\config profile.json');
+    assert.equal(result.payload.dryRun, true);
+    assert.equal(result.payload.message, "A 'double'-style value");
+    assert.equal(result.payload.key, 'release');
+  assert.equal(result.payload.value, 'output with spaces');
+  });
+});
+
+test('pwsh handles mixed quoting with both quote styles through nested command long options', async (context) => {
+  if (process.platform !== 'win32') {
+    context.skip('Windows command/argv parsing edge case is validated on Windows runtime shells');
+  }
+
+  await runShellSmoke(context, 'pwsh', async (workspace) => {
+    const result = await runShellEntrypointCommandLine(
+      context,
+      workspace,
+      'pwsh',
+      ({ binary, entrypoint }) =>
+        `& ${powerShellString(binary)} ${powerShellString(entrypoint)} config set --config-file='C:\\Program Files\\ship\\config profile.json' --message 'A "double" and ''single'' style' --dry-run release 'output with spaces'`,
+      shellNestedEntrypointSource()
+    );
+
+    assert.equal(result.status, 0);
+    assert.equal(result.payload.ok, true);
+    assert.equal(result.payload.commandPath, 'config set');
+    assert.equal(result.payload.configFile, 'C:\\Program Files\\ship\\config profile.json');
+    assert.equal(result.payload.dryRun, true);
+    assert.equal(result.payload.message, 'A "double" and \'single\' style');
+    assert.equal(result.payload.key, 'release');
+    assert.equal(result.payload.value, 'output with spaces');
   });
 });
 
@@ -213,11 +410,55 @@ async function runShellSmoke(context, shell, run) {
   await run(workspace);
 }
 
-async function runShellEntrypoint(context, workspace, shell, args) {
-  const entrypoint = await writeShellEntrypoint(workspace);
-  const commandLine = shellInvocationLine(shell, process.execPath, entrypoint, args);
+async function runShellEntrypoint(context, workspace, shell, args, entrypointSource = shellEntrypointSource()) {
+  return runShellEntrypointCommandLine(
+    context,
+    workspace,
+    shell,
+    ({ binary, entrypoint }) =>
+      shellInvocationLine(
+        shell,
+        binary,
+        entrypoint,
+        args
+      ),
+    entrypointSource
+  );
+}
+
+async function runShellEntrypointCommandLine(
+  context,
+  workspace,
+  shell,
+  commandLineFactory,
+  entrypointSource = shellEntrypointSource()
+) {
+  const entrypoint = await writeShellEntrypoint(workspace, entrypointSource);
+  const commandLine = commandLineFactory({
+    binary: process.execPath,
+    entrypoint
+  });
   const command = commandForShell(shell);
-  const commandArgs = shellCommandArgs(shell, commandLine);
+  let commandArgs;
+
+  if (shell === 'cmd') {
+    const commandFile = join(workspace, 'run-shell-command.cmd');
+    await writeFile(commandFile, cmdInvocationScript(commandLine), 'utf8');
+    commandArgs = ['/d', '/c', commandFile];
+  } else if (shell === 'pwsh') {
+    const commandFile = join(workspace, 'run-shell-command.ps1');
+    await writeFile(commandFile, pwshInvocationScript(commandLine), 'utf8');
+    commandArgs = [
+      '-NoProfile',
+      '-NonInteractive',
+      '-ExecutionPolicy',
+      'Bypass',
+      '-File',
+      commandFile
+    ];
+  } else {
+    commandArgs = shellCommandArgs(shell, commandLine);
+  }
 
   try {
     const { stdout, stderr } = await execFileAsync(command, commandArgs);
@@ -237,6 +478,14 @@ async function runShellEntrypoint(context, workspace, shell, args) {
   }
 }
 
+function cmdInvocationScript(commandLine) {
+  return `@echo off\r\n${commandLine}\r\n`;
+}
+
+function pwshInvocationScript(commandLine) {
+  return `$ErrorActionPreference = 'Stop'\n${commandLine}\n`;
+}
+
 async function writeCompletionScript(workspace, shell) {
   const script = createCompletionScript(program, shell);
   const scriptPath = join(workspace, `ship-completion.${shellScriptExtension(shell)}`);
@@ -244,11 +493,11 @@ async function writeCompletionScript(workspace, shell) {
   return scriptPath;
 }
 
-async function writeShellEntrypoint(workspace) {
+async function writeShellEntrypoint(workspace, entrypointSource) {
   const entryWorkspace = join(workspace, 'entrypoint with spaces');
   await mkdir(entryWorkspace, { recursive: true });
   const entrypoint = join(entryWorkspace, 'ship main.mjs');
-  await writeFile(entrypoint, shellEntrypointSource(), 'utf8');
+  await writeFile(entrypoint, entrypointSource, 'utf8');
   return entrypoint;
 }
 
@@ -322,7 +571,7 @@ function shellCommandArgs(shell, commandLine) {
 
 function shellAwareQuote(shell, value) {
   if (shell === 'cmd') {
-    return `"${value.replaceAll('"', '`"') }"`;
+    return `"${value}"`;
   }
   if (shell === 'pwsh') {
     return powerShellString(value);
@@ -347,8 +596,45 @@ const program = defineCli({
 
 await runCliMain({
   program,
-  mode: 'plan',
-  handlers: { deploy: () => ({}) }
+  mode: 'apply',
+  handlers: {
+    deploy: ({ invocation }) => ({
+      artifacts: [
+        {
+          id: 'deploy',
+          kind: 'json',
+          payload: {
+            target: invocation.positionals.service
+          }
+        }
+      ]
+    })
+  },
+  render: (run) => {
+    if (!run.ok) {
+      return {
+        stdout: JSON.stringify({
+          ok: run.ok,
+          commandPath: run.invocation.commandPath.join(' '),
+          target: run.invocation.positionals.service ?? null,
+          diagnostics: run.diagnostics.map((diagnostic) => diagnostic.code),
+          exitStatus: run.exitStatus
+        }),
+        stderr: '',
+        exitStatus: run.exitStatus
+      };
+    }
+    return {
+      stdout: JSON.stringify({
+        ok: run.ok,
+        commandPath: run.invocation.commandPath.join(' '),
+        target: run.invocation.positionals.service,
+        exitStatus: run.exitStatus
+      }),
+      stderr: '',
+      exitStatus: run.exitStatus
+    };
+  }
 }, createNodeCliAdapter(process));
 `;
 }
@@ -395,7 +681,7 @@ await runCliMain({
           target: run.invocation.positionals.target ?? null,
           diagnostics: run.diagnostics.map((diagnostic) => diagnostic.code),
           exitStatus: run.exitStatus
-        }) + '\\n',
+        }),
         stderr: '',
         exitStatus: run.exitStatus
       };
@@ -406,7 +692,106 @@ await runCliMain({
         commandPath: run.invocation.commandPath.join(' '),
         target: run.invocation.positionals.target,
         exitStatus: run.exitStatus
-      }) + '\\n',
+      }),
+      stderr: '',
+      exitStatus: run.exitStatus
+    };
+  }
+}, createNodeCliAdapter(process));
+`;
+}
+
+function shellNestedEntrypointSource() {
+  const rootUrl = new URL('../../dist/index.js', import.meta.url).href;
+  const adapterUrl = new URL('../../dist/adapter/index.js', import.meta.url).href;
+  return `
+import { defineCli } from ${JSON.stringify(rootUrl)};
+import { createNodeCliAdapter, runCliMain } from ${JSON.stringify(adapterUrl)};
+
+const program = defineCli({
+  name: 'ship',
+  commands: [
+    {
+      name: 'config',
+      commands: [
+        {
+          name: 'set',
+          options: [
+            {
+              name: 'config-file',
+              type: 'string',
+              flags: ['--config-file']
+            },
+            {
+              name: 'message',
+              type: 'string',
+              flags: ['--message']
+            },
+            {
+              name: 'dry-run',
+              type: 'boolean',
+              flags: ['--dry-run']
+            }
+          ],
+          positionals: [
+            { name: 'key' },
+            { name: 'value' }
+          ]
+        }
+      ]
+    }
+  ]
+});
+
+await runCliMain({
+  program,
+  mode: 'apply',
+  handlers: {
+    'config set': ({ invocation }) => ({
+      artifacts: [
+        {
+          id: 'config-set',
+          kind: 'json',
+          payload: {
+            commandPath: invocation.commandPath.join(' '),
+            configFile: invocation.options.values['config-file'],
+            message: invocation.options.values.message,
+            dryRun: invocation.options.values['dry-run'],
+            key: invocation.positionals.key,
+            value: invocation.positionals.value
+          }
+        }
+      ]
+    })
+  },
+  render: (run) => {
+    if (!run.ok) {
+      return {
+        stdout: JSON.stringify({
+          ok: run.ok,
+          commandPath: run.invocation.commandPath.join(' '),
+          configFile: run.invocation.options.values['config-file'],
+          message: run.invocation.options.values.message,
+          dryRun: run.invocation.options.values['dry-run'],
+          key: run.invocation.positionals.key ?? null,
+          value: run.invocation.positionals.value ?? null,
+          exitStatus: run.exitStatus
+        }),
+        stderr: '',
+        exitStatus: run.exitStatus
+      };
+    }
+    return {
+      stdout: JSON.stringify({
+        ok: run.ok,
+        commandPath: run.invocation.commandPath.join(' '),
+        configFile: run.invocation.options.values['config-file'],
+        message: run.invocation.options.values.message,
+        dryRun: run.invocation.options.values['dry-run'],
+        key: run.invocation.positionals.key,
+        value: run.invocation.positionals.value,
+        exitStatus: run.exitStatus
+      }),
       stderr: '',
       exitStatus: run.exitStatus
     };
