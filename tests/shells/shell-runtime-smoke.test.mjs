@@ -190,7 +190,66 @@ test('cmd can invoke a Node CLI adapter entrypoint explicitly', async (context) 
 
     const { stdout, stderr } = await execFileAsync('cmd.exe', ['/d', '/c', wrapper]);
     assert.equal(stderr, '');
-    assert.match(stdout, /command deploy/);
+    assert.match(stdout, /\{"ok":true,"commandPath":"deploy","target":"api","exitStatus":0\}/);
+  });
+});
+
+test('cmd handles nested command and long options with spaces', async (context) => {
+  await runShellSmoke(context, 'cmd', async (workspace) => {
+    const result = await runShellEntrypoint(
+      context,
+      workspace,
+      'cmd',
+      [
+        'config',
+        'set',
+        '--config-file=C:\\Program Files\\ship\\config profile.json',
+        '--dry-run',
+        '--message=Alpha\'s value',
+        'release',
+        'output with spaces'
+      ],
+      shellNestedEntrypointSource()
+    );
+
+    assert.equal(result.status, 0);
+    assert.equal(result.payload.ok, true);
+    assert.equal(result.payload.commandPath, 'config set');
+    assert.equal(result.payload.configFile, 'C:/Program Files/ship/config profile.json');
+    assert.equal(result.payload.dryRun, true);
+    assert.equal(result.payload.message, "Alpha's value");
+    assert.equal(result.payload.key, 'release');
+    assert.equal(result.payload.value, 'output with spaces');
+  });
+});
+
+test('pwsh handles nested command and long options with mixed quoting', async (context) => {
+  await runShellSmoke(context, 'pwsh', async (workspace) => {
+    const result = await runShellEntrypoint(
+      context,
+      workspace,
+      'pwsh',
+      [
+        'config',
+        'set',
+        '--message',
+        'A value with mixed quoting',
+        '--config-file=C:\\Program Files\\ship\\config profile.json',
+        '--dry-run',
+        'release',
+        'value with spaces'
+      ],
+      shellNestedEntrypointSource()
+    );
+
+    assert.equal(result.status, 0);
+    assert.equal(result.payload.ok, true);
+    assert.equal(result.payload.commandPath, 'config set');
+    assert.equal(result.payload.configFile, 'C:/Program Files/ship/config profile.json');
+    assert.equal(result.payload.dryRun, true);
+    assert.equal(result.payload.message, 'A value with mixed quoting');
+    assert.equal(result.payload.key, 'release');
+    assert.equal(result.payload.value, 'value with spaces');
   });
 });
 
@@ -213,8 +272,8 @@ async function runShellSmoke(context, shell, run) {
   await run(workspace);
 }
 
-async function runShellEntrypoint(context, workspace, shell, args) {
-  const entrypoint = await writeShellEntrypoint(workspace);
+async function runShellEntrypoint(context, workspace, shell, args, entrypointSource = shellEntrypointSource()) {
+  const entrypoint = await writeShellEntrypoint(workspace, entrypointSource);
   const commandLine = shellInvocationLine(shell, process.execPath, entrypoint, args);
   const command = commandForShell(shell);
   const commandArgs = shellCommandArgs(shell, commandLine);
@@ -244,11 +303,11 @@ async function writeCompletionScript(workspace, shell) {
   return scriptPath;
 }
 
-async function writeShellEntrypoint(workspace) {
+async function writeShellEntrypoint(workspace, entrypointSource) {
   const entryWorkspace = join(workspace, 'entrypoint with spaces');
   await mkdir(entryWorkspace, { recursive: true });
   const entrypoint = join(entryWorkspace, 'ship main.mjs');
-  await writeFile(entrypoint, shellEntrypointSource(), 'utf8');
+  await writeFile(entrypoint, entrypointSource, 'utf8');
   return entrypoint;
 }
 
@@ -407,6 +466,105 @@ await runCliMain({
         target: run.invocation.positionals.target,
         exitStatus: run.exitStatus
       }) + '\\n',
+      stderr: '',
+      exitStatus: run.exitStatus
+    };
+  }
+}, createNodeCliAdapter(process));
+`;
+}
+
+function shellNestedEntrypointSource() {
+  const rootUrl = new URL('../../dist/index.js', import.meta.url).href;
+  const adapterUrl = new URL('../../dist/adapter/index.js', import.meta.url).href;
+  return `
+import { defineCli } from ${JSON.stringify(rootUrl)};
+import { createNodeCliAdapter, runCliMain } from ${JSON.stringify(adapterUrl)};
+
+const program = defineCli({
+  name: 'ship',
+  commands: [
+    {
+      name: 'config',
+      commands: [
+        {
+          name: 'set',
+          options: [
+            {
+              name: 'config-file',
+              type: 'string',
+              flags: ['--config-file']
+            },
+            {
+              name: 'message',
+              type: 'string',
+              flags: ['--message']
+            },
+            {
+              name: 'dry-run',
+              type: 'boolean',
+              flags: ['--dry-run']
+            }
+          ],
+          positionals: [
+            { name: 'key' },
+            { name: 'value' }
+          ]
+        }
+      ]
+    }
+  ]
+});
+
+await runCliMain({
+  program,
+  mode: 'apply',
+  handlers: {
+    config: ({ invocation }) => ({
+      artifacts: [
+        {
+          id: 'config-set',
+          kind: 'json',
+          payload: {
+            commandPath: invocation.commandPath.join(' '),
+            configFile: invocation.options.values['config-file'],
+            message: invocation.options.values.message,
+            dryRun: invocation.options.values['dry-run'],
+            key: invocation.positionals.key,
+            value: invocation.positionals.value
+          }
+        }
+      ]
+    })
+  },
+  render: (run) => {
+    if (!run.ok) {
+      return {
+        stdout: JSON.stringify({
+          ok: run.ok,
+          commandPath: run.invocation.commandPath.join(' '),
+          configFile: run.invocation.options.values['config-file'],
+          message: run.invocation.options.values.message,
+          dryRun: run.invocation.options.values['dry-run'],
+          key: run.invocation.positionals.key ?? null,
+          value: run.invocation.positionals.value ?? null,
+          exitStatus: run.exitStatus
+        }) + '\n',
+        stderr: '',
+        exitStatus: run.exitStatus
+      };
+    }
+    return {
+      stdout: JSON.stringify({
+        ok: run.ok,
+        commandPath: run.invocation.commandPath.join(' '),
+        configFile: run.invocation.options.values['config-file'],
+        message: run.invocation.options.values.message,
+        dryRun: run.invocation.options.values['dry-run'],
+        key: run.invocation.positionals.key,
+        value: run.invocation.positionals.value,
+        exitStatus: run.exitStatus
+      }) + '\n',
       stderr: '',
       exitStatus: run.exitStatus
     };
