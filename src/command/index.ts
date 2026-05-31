@@ -368,6 +368,20 @@ function compileOptions<T extends CliOptionType>(
       diagnostics.push(optionDiagnostic('CLI_OPTION_NAME_DUPLICATE', commandPath, definition.name, scope));
       continue;
     }
+    if (definition.allowNo !== undefined && definition.type !== 'boolean') {
+      diagnostics.push(optionDiagnostic('CLI_OPTION_FLAG_INVALID', commandPath, definition.name, scope, {
+        flag: 'allowNo',
+        reason: 'allowNo is only valid for boolean options.'
+      }));
+      continue;
+    }
+    if (definition.allowEmpty !== undefined && definition.type !== 'string' && definition.type !== 'array') {
+      diagnostics.push(optionDiagnostic('CLI_OPTION_FLAG_INVALID', commandPath, definition.name, scope, {
+        flag: 'allowEmpty',
+        reason: 'allowEmpty is only valid for string or array options.'
+      }));
+      continue;
+    }
     const invalidFlag = definition.flags.find((flag) => !isValidOptionFlag(flag));
     if (definition.flags.length === 0 || invalidFlag !== undefined) {
       diagnostics.push(optionDiagnostic('CLI_OPTION_FLAG_INVALID', commandPath, definition.name, scope, {
@@ -609,7 +623,19 @@ function isValidOptionName(value: string): boolean {
 }
 
 function isValidOptionFlag(value: string): boolean {
-  return /^-{1,2}[^\s-][^\s]*$/u.test(value) && !value.includes('\u0000');
+  if (value.length < 2 || !value.startsWith('-')) {
+    return false;
+  }
+  if (value === '--' || value.includes('=') || value.includes(' ') || value.includes('\u0000')) {
+    return false;
+  }
+  if (value.startsWith('--no-')) {
+    return false;
+  }
+  if (value.startsWith('--')) {
+    return /^--[a-zA-Z][A-Za-z0-9-]*$/u.test(value);
+  }
+  return /^-[a-zA-Z0-9]$/u.test(value) || /^-[a-zA-Z0-9][a-zA-Z0-9-]*$/u.test(value);
 }
 
 function cloneOptionDefault<T extends CliOptionType>(value: CliOptionValue<T>): CliOptionValue<T> {

@@ -71,7 +71,7 @@ test('defineCli preserves command metadata, plugin source, and option defaults i
         source: { kind: 'plugin', pluginName: 'ship-plugin', pluginVersion: '2.0.0' },
         aliases: [{ name: 'd', deprecated: true }],
         positionals: [{ name: 'service', required: false, variadic: true, description: 'Service names.' }],
-        options: [{ name: 'region', type: 'string', flags: ['--region'], default: 'eu', allowNo: true }]
+        options: [{ name: 'region', type: 'boolean', flags: ['--region'], default: false, allowNo: true }]
       },
       {
         name: 'inspect',
@@ -97,7 +97,7 @@ test('defineCli preserves command metadata, plugin source, and option defaults i
     description: 'Service names.'
   });
   assert.equal(command?.options[0].scope, 'local');
-  assert.equal(command?.options[0].default, 'eu');
+  assert.equal(command?.options[0].default, false);
   assert.equal(command?.options[0].allowNo, true);
   assert.deepEqual(inspect?.positionals[0], {
     name: 'target',
@@ -151,6 +151,8 @@ test('defineCli reports duplicate and invalid option definitions', () => {
       { name: 'badFlag', type: 'boolean', flags: ['verbose'] },
       { name: 'badPrefix', type: 'boolean', flags: ['x--bad'] },
       { name: 'badWhitespace', type: 'boolean', flags: ['--bad flag'] },
+      { name: 'badAllowNo', type: 'string', allowNo: true, flags: ['--bad-allow-no'] },
+      { name: 'badAllowEmpty', type: 'number', allowEmpty: true, flags: ['--bad-allow-empty'] },
       { name: 'noFlags', type: 'boolean', flags: [] },
       { name: 'dupeFlag', type: 'boolean', flags: ['--shared', '--shared'] }
     ],
@@ -174,6 +176,8 @@ test('defineCli reports duplicate and invalid option definitions', () => {
     'CLI_OPTION_FLAG_INVALID',
     'CLI_OPTION_FLAG_INVALID',
     'CLI_OPTION_FLAG_INVALID',
+    'CLI_OPTION_FLAG_INVALID',
+    'CLI_OPTION_FLAG_INVALID',
     'CLI_OPTION_FLAG_DUPLICATE',
     'CLI_OPTION_NAME_DUPLICATE',
     'CLI_OPTION_FLAG_DUPLICATE'
@@ -185,9 +189,13 @@ test('defineCli reports duplicate and invalid option definitions', () => {
     reason: 'name'
   });
   assert.equal(program.diagnostics[3].fields.flag, 'x--bad');
-  assert.equal(program.diagnostics[5].fields.flag, '');
-  assert.equal(program.diagnostics[6].fields.existingOption, 'dupeFlag');
-  assert.equal(program.diagnostics[8].fields.existingOption, 'verbose');
+  assert.equal(program.diagnostics[5].fields.flag, 'allowNo');
+  assert.equal(program.diagnostics[5].fields.reason, 'allowNo is only valid for boolean options.');
+  assert.equal(program.diagnostics[6].fields.flag, 'allowEmpty');
+  assert.equal(program.diagnostics[6].fields.reason, 'allowEmpty is only valid for string or array options.');
+  assert.equal(program.diagnostics[7].fields.flag, '');
+  assert.equal(program.diagnostics[8].fields.existingOption, 'dupeFlag');
+  assert.equal(program.diagnostics[10].fields.existingOption, 'verbose');
   assert.deepEqual(program.root.inheritedOptions.map((option) => option.name), ['verbose']);
   assert.deepEqual(command?.options.map((option) => option.name), ['safe']);
 });
