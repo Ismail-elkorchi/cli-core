@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
@@ -128,6 +128,59 @@ $result.CompletionMatches | ForEach-Object { $_.CompletionText }
   });
 });
 
+test('bash can invoke a Node CLI adapter entrypoint with OS-native parsing', async (context) => {
+  await runShellSmoke(context, 'bash', async (workspace) => {
+    const result = await runShellEntrypoint(context, workspace, 'bash', ['deploy', 'api']);
+    assert.equal(result.status, 0);
+    assert.equal(result.payload.ok, true);
+    assert.equal(result.payload.commandPath, 'deploy');
+    assert.equal(result.payload.target, 'api');
+    assert.equal(result.payload.exitStatus, 0);
+  });
+});
+
+test('zsh can invoke a Node CLI adapter entrypoint with OS-native parsing', async (context) => {
+  await runShellSmoke(context, 'zsh', async (workspace) => {
+    const result = await runShellEntrypoint(context, workspace, 'zsh', ['deploy', 'api']);
+    assert.equal(result.status, 0);
+    assert.equal(result.payload.ok, true);
+    assert.equal(result.payload.commandPath, 'deploy');
+    assert.equal(result.payload.target, 'api');
+    assert.equal(result.payload.exitStatus, 0);
+  });
+});
+
+test('fish can invoke a Node CLI adapter entrypoint with OS-native parsing', async (context) => {
+  await runShellSmoke(context, 'fish', async (workspace) => {
+    const result = await runShellEntrypoint(context, workspace, 'fish', ['deploy', 'api']);
+    assert.equal(result.status, 0);
+    assert.equal(result.payload.ok, true);
+    assert.equal(result.payload.commandPath, 'deploy');
+    assert.equal(result.payload.target, 'api');
+    assert.equal(result.payload.exitStatus, 0);
+  });
+});
+
+test('pwsh can invoke a Node CLI adapter entrypoint with OS-native parsing', async (context) => {
+  await runShellSmoke(context, 'pwsh', async (workspace) => {
+    const result = await runShellEntrypoint(context, workspace, 'pwsh', ['deploy', 'api']);
+    assert.equal(result.status, 0);
+    assert.equal(result.payload.ok, true);
+    assert.equal(result.payload.commandPath, 'deploy');
+    assert.equal(result.payload.target, 'api');
+    assert.equal(result.payload.exitStatus, 0);
+  });
+});
+
+test('shell entrypoint failure is translated into non-zero exit status', async (context) => {
+  await runShellSmoke(context, 'bash', async (workspace) => {
+    const result = await runShellEntrypoint(context, workspace, 'bash', ['deply', 'api']);
+    assert.equal(result.status, 2);
+    assert.equal(result.payload.ok, false);
+    assert.equal(result.payload.exitStatus, 2);
+  });
+});
+
 test('cmd can invoke a Node CLI adapter entrypoint explicitly', async (context) => {
   await runShellSmoke(context, 'cmd', async (workspace) => {
     const entrypoint = join(workspace, 'cmd-main.mjs');
@@ -160,6 +213,30 @@ async function runShellSmoke(context, shell, run) {
   await run(workspace);
 }
 
+async function runShellEntrypoint(context, workspace, shell, args) {
+  const entrypoint = await writeShellEntrypoint(workspace);
+  const commandLine = shellInvocationLine(shell, process.execPath, entrypoint, args);
+  const command = commandForShell(shell);
+  const commandArgs = shellCommandArgs(shell, commandLine);
+
+  try {
+    const { stdout, stderr } = await execFileAsync(command, commandArgs);
+    assert.equal(stderr, '');
+    return {
+      status: 0,
+      payload: parseJsonPayload(stdout),
+      stderr: stderr
+    };
+  } catch (error) {
+    context.diagnostic(`shell entrypoint failed for ${shell}: ${String(error.message ?? error)}`);
+    return {
+      status: typeof error.code === 'number' ? error.code : 1,
+      payload: parseJsonPayload(error.stdout ?? ''),
+      stderr: error.stderr ?? ''
+    };
+  }
+}
+
 async function writeCompletionScript(workspace, shell) {
   const script = createCompletionScript(program, shell);
   const scriptPath = join(workspace, `ship-completion.${shellScriptExtension(shell)}`);
@@ -167,8 +244,15 @@ async function writeCompletionScript(workspace, shell) {
   return scriptPath;
 }
 
+async function writeShellEntrypoint(workspace) {
+  const entryWorkspace = join(workspace, 'entrypoint with spaces');
+  await mkdir(entryWorkspace, { recursive: true });
+  const entrypoint = join(entryWorkspace, 'ship main.mjs');
+  await writeFile(entrypoint, shellEntrypointSource(), 'utf8');
+  return entrypoint;
+}
+
 async function readShellLog(path) {
-  const { readFile } = await import('node:fs/promises');
   return (await readFile(path, 'utf8')).trim().split(/\r?\n/).filter(Boolean);
 }
 
@@ -209,6 +293,46 @@ function powerShellString(value) {
   return `'${value.replaceAll("'", "''")}'`;
 }
 
+function parseJsonPayload(rawOutput) {
+  return JSON.parse(rawOutput.toString().trim() || '{}');
+}
+
+function shellInvocationLine(shell, nodeBinary, entrypoint, args) {
+  const quotedBinary = shellAwareQuote(shell, nodeBinary);
+  const quotedEntrypoint = shellAwareQuote(shell, entrypoint);
+  const quotedArgs = args.map((arg) => shellAwareQuote(shell, arg)).join(' ');
+  const commandLine = `${quotedBinary} ${quotedEntrypoint} ${quotedArgs}`.trim();
+
+  if (shell === 'pwsh') {
+    return `& ${commandLine}`;
+  }
+  return commandLine;
+}
+
+function shellCommandArgs(shell, commandLine) {
+  if (shell === 'cmd') return ['/d', '/c', commandLine];
+  if (shell === 'pwsh') {
+    return ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', commandLine];
+  }
+  if (shell === 'zsh') {
+    return ['-fc', commandLine];
+  }
+  return ['-c', commandLine];
+}
+
+function shellAwareQuote(shell, value) {
+  if (shell === 'cmd') {
+    return `"${value.replaceAll('"', '`"') }"`;
+  }
+  if (shell === 'pwsh') {
+    return powerShellString(value);
+  }
+  if (shell === 'fish') {
+    return fishString(value);
+  }
+  return shellSingleQuote(value);
+}
+
 function cmdEntrypointSource() {
   const rootImport = new URL('../../dist/index.js', import.meta.url).href;
   const adapterImport = new URL('../../dist/adapter/index.js', import.meta.url).href;
@@ -225,6 +349,68 @@ await runCliMain({
   program,
   mode: 'plan',
   handlers: { deploy: () => ({}) }
+}, createNodeCliAdapter(process));
+`;
+}
+
+function shellEntrypointSource() {
+  const rootUrl = new URL('../../dist/index.js', import.meta.url).href;
+  const adapterUrl = new URL('../../dist/adapter/index.js', import.meta.url).href;
+  return `
+import { defineCli } from ${JSON.stringify(rootUrl)};
+import { createNodeCliAdapter, runCliMain } from ${JSON.stringify(adapterUrl)};
+
+const program = defineCli({
+  name: 'ship',
+  commands: [
+    {
+      name: 'deploy',
+      positionals: [{ name: 'target' }]
+    }
+  ]
+});
+
+await runCliMain({
+  program,
+  mode: 'apply',
+  handlers: {
+    deploy: ({ invocation }) => ({
+      artifacts: [
+        {
+          id: 'target',
+          kind: 'json',
+          payload: {
+            target: invocation.positionals.target
+          }
+        }
+      ]
+    })
+  },
+  render: (run) => {
+    if (!run.ok) {
+      return {
+        stdout: JSON.stringify({
+          ok: run.ok,
+          commandPath: run.invocation.commandPath.join(' '),
+          target: run.invocation.positionals.target ?? null,
+          diagnostics: run.diagnostics.map((diagnostic) => diagnostic.code),
+          exitStatus: run.exitStatus
+        }) + '\\n',
+        stderr: '',
+        exitStatus: run.exitStatus
+      };
+    }
+    return {
+      stdout: JSON.stringify({
+        ok: run.ok,
+        commandPath: run.invocation.commandPath.join(' '),
+        target: run.invocation.positionals.target,
+        exitStatus: run.exitStatus
+      }) + '\\n',
+      stderr: '',
+      exitStatus: run.exitStatus
+    };
+  }
 }, createNodeCliAdapter(process));
 `;
 }

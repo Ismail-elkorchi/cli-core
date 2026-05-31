@@ -91,6 +91,8 @@ jobs:
         run: npm ci
       - name: OS runtime smoke
         run: npm run test:runtime:os
+      - name: Node runtime smoke
+        run: npm run test:runtime:node
       - name: Packed package consumer
         run: npm run test:package
 
@@ -107,8 +109,10 @@ jobs:
             install: sudo apt-get update && sudo apt-get install -y zsh fish
           - name: macos
             os: macos-latest
-            expected: bash,zsh,pwsh
-            install: if ! command -v pwsh >/dev/null 2>&1; then brew install --cask powershell; fi
+            expected: bash,zsh,fish,pwsh
+            install: |
+              if ! command -v pwsh >/dev/null 2>&1; then brew install --cask powershell; fi
+              if ! command -v fish >/dev/null 2>&1; then brew install fish; fi
           - name: windows
             os: windows-latest
             expected: pwsh,cmd
