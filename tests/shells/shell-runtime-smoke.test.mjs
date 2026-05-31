@@ -298,7 +298,7 @@ test('pwsh handles mixed quoting forms for nested command parsing', async (conte
       workspace,
       'pwsh',
       ({ binary, entrypoint }) =>
-        `& ${powerShellString(binary)} ${powerShellString(entrypoint)} config set --config-file "C:\\Program Files\\ship\\config profile.json" --message "A ''double''-style value" --dry-run release 'output with spaces'`,
+        `& ${powerShellString(binary)} ${powerShellString(entrypoint)} config set --config-file "C:\\Program Files\\ship\\config profile.json" --message 'A ''double''-style value' --dry-run release 'output with spaces'`,
       shellNestedEntrypointSource()
     );
 
@@ -669,7 +669,7 @@ await runCliMain({
   program,
   mode: 'apply',
   handlers: {
-    config: ({ invocation }) => ({
+    'config set': ({ invocation }) => ({
       artifacts: [
         {
           id: 'config-set',
