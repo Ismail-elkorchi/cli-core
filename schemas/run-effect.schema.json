@@ -8,11 +8,16 @@
     "kind": { "enum": ["spawn", "write_file", "delete_path", "plugin", "custom"] },
     "command": { "type": "string" },
     "argv": { "type": "array", "items": { "type": "string" } },
+    "cwd": { "type": "string" },
+    "env": { "type": "object" },
     "path": { "type": "string" },
+    "content": { "type": "string" },
     "pluginName": { "type": "string" },
     "hookName": { "type": "string" },
+    "event": { "enum": ["init", "preparse", "prerun", "postrun", "finally", "command_not_found"] },
+    "effectKind": { "type": "string" },
     "name": { "type": "string" },
     "payload": {}
   },
-  "additionalProperties": true
+  "additionalProperties": false
 }

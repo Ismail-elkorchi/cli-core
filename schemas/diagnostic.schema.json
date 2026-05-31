@@ -10,5 +10,5 @@
     "message": { "type": "string" },
     "fields": { "type": "object" }
   },
-  "additionalProperties": true
+  "additionalProperties": false
 }

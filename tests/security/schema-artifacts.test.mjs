@@ -100,6 +100,27 @@ test('schema artifacts reject malformed public documents', async () => {
     }).some((error) => error.includes('$.schemaVersion')),
     true
   );
+  assert.equal(
+    validateJsonSchema(await readSchema('./diagnostic.schema.json'), {
+      code: 'CLI_SCHEMA_UNSUPPORTED',
+      severity: 'error',
+      message: 'Unsupported schema.',
+      fields: {},
+      extra: true
+    }).some((error) => error.includes('$.extra')),
+    true
+  );
+  assert.equal(
+    validateJsonSchema(await readSchema('./run-event.schema.json'), {
+      schemaVersion: 'cli-core.run-event.v1',
+      runId: 'run-1',
+      sequence: 0,
+      name: 'run.completed',
+      payload: {},
+      extra: true
+    }).some((error) => error.includes('$.extra')),
+    true
+  );
 });
 
 test('npm pack dry-run includes concrete schema artifacts', async () => {
@@ -266,6 +287,12 @@ function validateOne(schema, value, path, errors) {
   if (schema.required !== undefined && isRecord(value)) {
     for (const key of schema.required) {
       if (!Object.hasOwn(value, key)) errors.push(`${path}.${key}: missing required property`);
+    }
+  }
+  if (schema.additionalProperties === false && schema.properties !== undefined && isRecord(value)) {
+    const allowed = new Set(Object.keys(schema.properties));
+    for (const key of Object.keys(value)) {
+      if (!allowed.has(key)) errors.push(`${path}.${key}: unknown property`);
     }
   }
   if (schema.properties !== undefined && isRecord(value)) {

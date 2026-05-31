@@ -8,7 +8,20 @@
     "schemaVersion": { "const": "cli-core.redaction.v1" },
     "value": {},
     "redacted": { "type": "boolean" },
-    "matches": { "type": "array", "items": { "type": "object", "required": ["path", "reason"] } }
+    "matches": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "reason"],
+        "properties": {
+          "path": { "type": "string" },
+          "reason": { "enum": ["sensitive_key", "string_pattern", "circular_reference", "max_depth"] },
+          "key": { "type": "string" },
+          "pattern": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
   },
-  "additionalProperties": true
+  "additionalProperties": false
 }

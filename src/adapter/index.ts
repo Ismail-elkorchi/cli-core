@@ -70,7 +70,7 @@ export interface NodeCliProcessLike {
   readonly argv: readonly string[];
   readonly stdout: CliWritableStream;
   readonly stderr: CliWritableStream;
-  exitCode?: number;
+  exitCode?: number | string | null | undefined;
 }
 
 export interface CliWritableStream {

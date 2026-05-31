@@ -109,6 +109,8 @@ export interface CliPluginEffect {
 export interface CliPluginHostInput {
   readonly cliCoreVersion?: string;
   readonly runtime?: CliPluginRuntime;
+  readonly trustedPlugins?: readonly string[];
+  readonly requireExplicitCapabilities?: boolean;
   readonly allowedCapabilities?: readonly string[];
 }
 
@@ -223,7 +225,8 @@ export function checkCliPluginCompatibility(
     ...manifestDiagnostics(manifest),
     ...versionDiagnostics(manifest, cliCoreVersion),
     ...runtimeDiagnostics(manifest, runtime),
-    ...capabilityDiagnostics(manifest, input.allowedCapabilities)
+    ...trustDiagnostics(manifest, input.trustedPlugins),
+    ...capabilityDiagnostics(manifest, input.allowedCapabilities, input.requireExplicitCapabilities ?? true)
   ]);
 
   return Object.freeze({
@@ -721,9 +724,18 @@ function runtimeDiagnostics(manifest: CliPluginManifest, runtime: CliPluginRunti
 
 function capabilityDiagnostics(
   manifest: CliPluginManifest,
-  allowedCapabilities: readonly string[] | undefined
+  allowedCapabilities: readonly string[] | undefined,
+  requireExplicitCapabilities: boolean
 ): readonly CliDiagnostic[] {
-  if (allowedCapabilities === undefined) return [];
+  if (allowedCapabilities === undefined) {
+    if (!requireExplicitCapabilities || manifest.capabilities.length === 0) return [];
+    return [
+      pluginDiagnostic('CLI_PLUGIN_CAPABILITY_POLICY_REQUIRED', 'Plugin declares capabilities but no capability allow-list was provided.', {
+        pluginName: manifest.name,
+        capabilities: manifest.capabilities
+      })
+    ];
+  }
   const allowed = new Set(allowedCapabilities);
   const blocked = manifest.capabilities.filter((capability) => !allowed.has(capability));
   if (blocked.length === 0) return [];
@@ -731,6 +743,23 @@ function capabilityDiagnostics(
     pluginDiagnostic('CLI_PLUGIN_CAPABILITY_BLOCKED', 'Plugin declares capabilities outside the allowed set.', {
       pluginName: manifest.name,
       capabilities: blocked
+    })
+  ];
+}
+
+function trustDiagnostics(
+  manifest: CliPluginManifest,
+  trustedPlugins: readonly string[] | undefined
+): readonly CliDiagnostic[] {
+  if (trustedPlugins === undefined) return [];
+  const trusted = new Set(trustedPlugins);
+  const exactIdentity = `${manifest.name}@${manifest.version}`;
+  if (trusted.has(manifest.name) || trusted.has(exactIdentity)) return [];
+  return [
+    pluginDiagnostic('CLI_PLUGIN_UNTRUSTED', 'Plugin identity is outside the trusted plugin set.', {
+      pluginName: manifest.name,
+      pluginVersion: manifest.version,
+      trustedPlugins
     })
   ];
 }

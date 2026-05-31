@@ -1,6 +1,6 @@
 # @ismail-elkorchi/cli-core
 
-Typed command-core primitives for TypeScript and JavaScript CLIs.
+Structured command-core primitives for TypeScript and JavaScript CLIs.
 
 `cli-core` compiles command definitions, parses invocations through
 `argv-flags`, resolves explicit configuration input, returns structured help and
@@ -180,13 +180,21 @@ const manifest = defineCliPluginManifest({
 const application = applyCliPluginCommands(
   defineCli({ name: 'ship', commands: [{ name: 'status' }] }),
   [manifest],
-  { allowedCapabilities: ['audit'] }
+  { allowedCapabilities: ['audit'], trustedPlugins: ['ship-audit@1.0.0'] }
 );
 const host = createCliPluginHost([{ manifest, load: () => ({ manifest }) }], {
-  allowedCapabilities: ['audit']
+  allowedCapabilities: ['audit'],
+  trustedPlugins: ['ship-audit@1.0.0']
 });
-const compatibility = checkCliPluginCompatibility(manifest, { allowedCapabilities: ['audit'] });
+const compatibility = checkCliPluginCompatibility(manifest, {
+  allowedCapabilities: ['audit'],
+  trustedPlugins: ['ship-audit@1.0.0']
+});
 ```
+
+Plugin compatibility checks run before command contributions affect parsing or
+hook modules load. Manifests with declared capabilities need an explicit
+capability allow-list; hosts can also restrict accepted plugin identities.
 
 ### Run
 
@@ -208,6 +216,32 @@ const result = await runCli(program, {
     })
   }
 });
+```
+
+### CLI Adapter
+
+```ts
+import { defineCli } from '@ismail-elkorchi/cli-core';
+import { createNodeCliAdapter, runCliMain } from '@ismail-elkorchi/cli-core/adapter';
+
+const program = defineCli({
+  name: 'ship',
+  commands: [{ name: 'deploy', positionals: [{ name: 'service' }] }]
+});
+
+await runCliMain({
+  program,
+  mode: 'plan',
+  handlers: {
+    deploy: ({ invocation }) => ({
+      artifacts: [{
+        id: 'deploy-summary',
+        kind: 'json',
+        payload: { service: invocation.positionals.service ?? null }
+      }]
+    })
+  }
+}, createNodeCliAdapter(process));
 ```
 
 ### Testing Harness
@@ -246,7 +280,9 @@ stdout or stderr, mutate shell profiles, read implicit config files, install
 completions, or execute spawn/file effects. Config discovery, CLI adapters, and
 effect application require caller-supplied hosts. Spawn effects use argv arrays
 and do not imply shell interpolation. Run results, failure envelopes, and schema
-envelopes redact secret-like keys and common token patterns by default.
+envelopes redact secret-like keys and common token patterns by default. Plugin
+command contributions and hook modules are gated by compatibility, capability,
+and optional trusted-plugin checks before they participate in parsing or running.
 
 ## Runtime Support
 
