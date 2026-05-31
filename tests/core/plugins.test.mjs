@@ -78,6 +78,24 @@ test('checkCliPluginCompatibility reports manifest, max-version, and capability 
     version: '1.0.0',
     capabilities: ['audit', 'network']
   }, { allowedCapabilities: ['audit'] });
+  const missingCapabilityPolicy = checkCliPluginCompatibility({
+    name: 'needs-policy',
+    version: '1.0.0',
+    capabilities: ['audit']
+  });
+  const relaxedCapabilityPolicy = checkCliPluginCompatibility({
+    name: 'relaxed',
+    version: '1.0.0',
+    capabilities: ['audit']
+  }, { requireExplicitCapabilities: false });
+  const untrusted = checkCliPluginCompatibility({
+    name: 'unknown-plugin',
+    version: '1.0.0'
+  }, { trustedPlugins: ['trusted-plugin'] });
+  const trustedByVersion = checkCliPluginCompatibility({
+    name: 'known-plugin',
+    version: '1.0.0'
+  }, { trustedPlugins: ['known-plugin@1.0.0'] });
   const defaultRuntime = checkCliPluginCompatibility({
     name: 'portable',
     version: '1.0.0'
@@ -98,6 +116,14 @@ test('checkCliPluginCompatibility reports manifest, max-version, and capability 
   assert.equal(maxVersion.diagnostics[0].fields.maxVersion, '0.0.0');
   assert.equal(capabilities.ok, false);
   assert.deepEqual(capabilities.diagnostics[0].fields.capabilities, ['network']);
+  assert.equal(missingCapabilityPolicy.ok, false);
+  assert.equal(missingCapabilityPolicy.diagnostics[0].code, 'CLI_PLUGIN_CAPABILITY_POLICY_REQUIRED');
+  assert.deepEqual(missingCapabilityPolicy.diagnostics[0].fields.capabilities, ['audit']);
+  assert.equal(relaxedCapabilityPolicy.ok, true);
+  assert.equal(untrusted.ok, false);
+  assert.equal(untrusted.diagnostics[0].code, 'CLI_PLUGIN_UNTRUSTED');
+  assert.equal(untrusted.diagnostics[0].fields.pluginName, 'unknown-plugin');
+  assert.equal(trustedByVersion.ok, true);
   assert.equal(defaultRuntime.ok, true);
 
   const exactBounds = checkCliPluginCompatibility({
@@ -105,8 +131,43 @@ test('checkCliPluginCompatibility reports manifest, max-version, and capability 
     version: '1.0.0',
     cliCore: { minVersion: '1.2.3.9', maxVersion: '1.2.3.9' },
     capabilities: ['audit']
-  }, { cliCoreVersion: '1.2.3' });
+  }, { cliCoreVersion: '1.2.3', allowedCapabilities: ['audit'] });
   assert.equal(exactBounds.ok, true);
+});
+
+test('plugin trust policy blocks hooks and command contributions before plugin code loads', async () => {
+  let loads = 0;
+  const manifest = defineCliPluginManifest({
+    name: 'third-party-audit',
+    version: '1.0.0',
+    commands: [{ name: 'audit' }],
+    hooks: [{ name: 'record', event: 'prerun' }]
+  });
+  const application = applyCliPluginCommands({ name: 'ship' }, [manifest], {
+    trustedPlugins: ['first-party-audit']
+  });
+  const host = createCliPluginHost([
+    {
+      manifest,
+      load: () => {
+        loads += 1;
+        return { manifest, hooks: { record: () => undefined } };
+      }
+    }
+  ], { trustedPlugins: ['first-party-audit'] });
+  const run = await host.runHooks('prerun');
+  const directLoad = await host.loadPlugin('third-party-audit');
+
+  assert.equal(application.ok, false);
+  assert.equal(application.program.commands.some((command) => command.path.join(' ') === 'audit'), false);
+  assert.equal(application.diagnostics.some((diagnostic) => diagnostic.code === 'CLI_PLUGIN_UNTRUSTED'), true);
+  assert.equal(host.diagnostics[0].code, 'CLI_PLUGIN_UNTRUSTED');
+  assert.deepEqual(host.planHooks('prerun').hooks, []);
+  assert.equal(run.ok, true);
+  assert.deepEqual(run.hooks, []);
+  assert.equal(directLoad.ok, false);
+  assert.equal(directLoad.diagnostics[0].code, 'CLI_PLUGIN_UNTRUSTED');
+  assert.equal(loads, 0);
 });
 
 test('createCliPluginHost keeps plugin modules lazy until load or hook execution', async () => {

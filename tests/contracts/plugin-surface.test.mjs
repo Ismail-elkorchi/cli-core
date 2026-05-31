@@ -21,6 +21,8 @@ test('plugin declarations include manifest, host, hook, and diagnostic contracts
   assert.match(text, /CliPluginHost/);
   assert.match(text, /CliPluginHookPlan/);
   assert.match(text, /CliPluginHookRunResult/);
+  assert.match(text, /readonly trustedPlugins/);
+  assert.match(text, /readonly requireExplicitCapabilities/);
   assert.match(text, /readonly payload/);
   assert.doesNotMatch(text, /internal\//);
 });

@@ -16,7 +16,10 @@ export async function runPluginsExample() {
   const application = applyCliPluginCommands({
     name: 'ship',
     commands: [{ name: 'status' }]
-  }, [manifest], { allowedCapabilities: ['audit'] });
+  }, [manifest], {
+    allowedCapabilities: ['audit'],
+    trustedPlugins: ['ship-audit@1.0.0']
+  });
   const host = createCliPluginHost([
     {
       manifest,
@@ -29,10 +32,16 @@ export async function runPluginsExample() {
         }
       })
     }
-  ], { allowedCapabilities: ['audit'] });
+  ], {
+    allowedCapabilities: ['audit'],
+    trustedPlugins: ['ship-audit@1.0.0']
+  });
 
   return {
-    compatibility: checkCliPluginCompatibility(manifest, { allowedCapabilities: ['audit'] }),
+    compatibility: checkCliPluginCompatibility(manifest, {
+      allowedCapabilities: ['audit'],
+      trustedPlugins: ['ship-audit@1.0.0']
+    }),
     application,
     plan: host.planHooks('prerun'),
     run: await host.runHooks('prerun')

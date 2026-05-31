@@ -26,5 +26,5 @@
     },
     "payload": {}
   },
-  "additionalProperties": true
+  "additionalProperties": false
 }

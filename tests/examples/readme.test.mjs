@@ -62,6 +62,8 @@ test('README TypeScript snippets typecheck against the public package declaratio
         exactOptionalPropertyTypes: true,
         noUncheckedIndexedAccess: true,
         skipLibCheck: false,
+        types: ['node'],
+        typeRoots: [new URL('../../node_modules/@types', import.meta.url).pathname],
         ignoreDeprecations: '6.0',
         noEmit: true,
         baseUrl: new URL('../..', import.meta.url).pathname,

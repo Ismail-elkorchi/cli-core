@@ -11,5 +11,5 @@
     "packageVersion": { "type": "string" },
     "payload": {}
   },
-  "additionalProperties": true
+  "additionalProperties": false
 }

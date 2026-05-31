@@ -8,8 +8,21 @@
     "schemaVersion": { "const": "cli-core.effect-application.v1" },
     "mode": { "enum": ["plan", "apply"] },
     "ok": { "type": "boolean" },
-    "reports": { "type": "array", "items": { "type": "object", "required": ["effect", "status", "payload", "diagnostics"] } },
+    "reports": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["effect", "status", "payload", "diagnostics"],
+        "properties": {
+          "effect": { "type": "object", "required": ["kind"] },
+          "status": { "enum": ["planned", "applied", "denied", "failed"] },
+          "payload": {},
+          "diagnostics": { "type": "array", "items": { "type": "object", "required": ["code", "severity", "message", "fields"] } }
+        },
+        "additionalProperties": false
+      }
+    },
     "diagnostics": { "type": "array", "items": { "type": "object", "required": ["code", "severity", "message", "fields"] } }
   },
-  "additionalProperties": true
+  "additionalProperties": false
 }
