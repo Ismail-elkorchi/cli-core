@@ -2,30 +2,57 @@ import type { CliDiagnostic } from '../diagnostics.ts';
 import type { ParsedInvocation } from '../parse/index.ts';
 import type { CliProgram } from '../command/index.ts';
 
+/**
+ * Machine-readable repair suggestion for an invocation diagnostic.
+ */
 export interface RepairSuggestion {
+  /** Stable diagnostic code. */
   readonly code: 'REPAIR_UNKNOWN_COMMAND' | 'REPAIR_UNKNOWN_OPTION' | 'REPAIR_MISSING_INPUT' | 'REPAIR_DEPRECATED_ALIAS' | 'REPAIR_PASS_THROUGH';
+  /** Optional scenario title. */
   readonly title: string;
+  /** Optional detail text for the suggestion. */
   readonly detail: string;
+  /** Replacement string used for redaction. */
   readonly replacement: readonly string[];
+  /** Ranking value used to order suggestions. */
   readonly rank: number;
+  /** Evidence used to create the suggestion. */
   readonly evidence: readonly RepairSuggestionEvidence[];
+  /** Diagnostic that caused this suggestion. */
   readonly diagnostic: CliDiagnostic;
 }
 
+/**
+ * Evidence used to rank or explain a repair suggestion.
+ */
 export interface RepairSuggestionEvidence {
+  /** Evidence category used by repair explainers. */
   readonly kind: 'edit_distance' | 'diagnostic' | 'pass_through';
+  /** User token or diagnostic field that triggered this evidence. */
   readonly value: string;
+  /** Candidate string evaluated for the suggestion. */
   readonly candidate: string | undefined;
+  /** Edit distance used for candidate ranking. */
   readonly distance: number | undefined;
 }
 
+/**
+ * Repair suggestions and diagnostics for an invocation.
+ */
 export interface RepairSuggestionResult {
+  /** Schema version for this document. */
   readonly schemaVersion: 'cli-core.repair-suggestions.v1';
+  /** Whether at least one suggestion is present. */
   readonly hasSuggestions: boolean;
+  /** Suggestions generated for the invocation. */
   readonly suggestions: readonly RepairSuggestion[];
+  /** Original invocation diagnostics used to create suggestions. */
   readonly diagnostics: readonly CliDiagnostic[];
 }
 
+/**
+ * Creates repair suggestions from parse diagnostics.
+ */
 export function createRepairSuggestionResult(invocation: ParsedInvocation, program?: CliProgram): RepairSuggestionResult {
   const suggestions = Object.freeze(invocation.diagnostics
     .flatMap((diagnostic) => toRepairSuggestion(diagnostic, invocation, program))

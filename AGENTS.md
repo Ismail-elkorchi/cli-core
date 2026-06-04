@@ -33,6 +33,7 @@
 - `npm run test:shells`
 - `npm run check:deno:source`
 - `npm run check:deno:lint`
+- `npm run check:deno:docs`
 - `npm run check:jsr`
 - `npm run test:mutation:dry`
 - `npm run test:mutation:file -- src/config/path.ts`

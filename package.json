@@ -84,6 +84,7 @@
     "test:shells": "npm run build && node --test tests/shells/*.test.mjs",
     "check:deno:source": "deno check src/index.ts src/command/public.ts src/adapter/index.ts src/help/index.ts src/completion/index.ts src/manifest/index.ts src/config/index.ts src/effects/index.ts src/plugins/index.ts src/repair/index.ts src/schema/index.ts src/testing/index.ts",
     "check:deno:lint": "deno lint src tests/integration/runtime-deno-smoke.mjs",
+    "check:deno:docs": "deno doc --lint src/index.ts src/command/public.ts src/adapter/index.ts src/help/index.ts src/completion/index.ts src/manifest/index.ts src/config/index.ts src/effects/index.ts src/plugins/index.ts src/repair/index.ts src/schema/index.ts src/testing/index.ts",
     "check:jsr": "deno publish --dry-run --allow-dirty",
     "test:mutation:dry": "stryker run --dryRunOnly",
     "test:mutation:file": "node scripts/run-mutation.mjs file",

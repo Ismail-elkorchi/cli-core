@@ -5,6 +5,9 @@ import { parseCli } from '../parse/index.ts';
 import { applyCliPluginCommands, type CliPluginManifest, type CliPluginManifestDefinition } from '../plugins/index.ts';
 import { runCli, type ExitKind, type RunArtifact, type RunEffect, type RunMode, type RunPayload } from '../run/index.ts';
 
+/**
+ * JSON-compatible value stored in fixtures.
+ */
 export type CliFixtureValue =
   | null
   | boolean
@@ -13,39 +16,76 @@ export type CliFixtureValue =
   | readonly CliFixtureValue[]
   | { readonly [key: string]: CliFixtureValue };
 
+/**
+ * Fixture families exposed by the testing harness.
+ */
 export type CliFixtureFamily = 'commands' | 'config' | 'plugins' | 'runs';
 
+/**
+ * Fixture input accepted by fixture registries.
+ */
 export interface CliFixtureDefinition {
+  /** Registry key used by scenarios to locate this fixture. */
   readonly id: string;
+  /** Fixture family for this definition. */
   readonly family: CliFixtureFamily;
+  /** Optional scenario title. */
   readonly title: string;
+  /** Optional explanatory text for fixture browsers. */
   readonly description?: string;
+  /** Behavior tags that describe what the fixture exercises. */
   readonly capabilities: readonly string[];
+  /** Fixture payload copied into the immutable registry entry. */
   readonly value?: CliFixtureValue;
 }
 
+/**
+ * Immutable fixture stored in a registry.
+ */
 export interface CliFixture {
+  /** Registry key used by scenarios to locate this fixture. */
   readonly id: string;
+  /** Fixture family for this fixture. */
   readonly family: CliFixtureFamily;
+  /** Optional scenario title. */
   readonly title: string;
+  /** Optional explanatory text for fixture browsers. */
   readonly description?: string;
+  /** Behavior tags that describe what the fixture exercises. */
   readonly capabilities: readonly string[];
+  /** Immutable fixture payload. */
   readonly value: CliFixtureValue;
 }
 
+/**
+ * Input for generated large command fixtures.
+ */
 export interface LargeCommandFixtureInput {
+  /** Registry key for the generated fixture. */
   readonly id?: string;
+  /** Number of commands to generate. */
   readonly commandCount?: number;
+  /** Name of the CLI program. */
   readonly programName?: string;
 }
 
+/**
+ * Immutable fixture registry used by the harness.
+ */
 export interface CliFixtureRegistry {
+  /** Looks up a fixture by id. */
   readonly get: (id: string) => CliFixture | undefined;
+  /** Returns whether a fixture id exists. */
   readonly has: (id: string) => boolean;
+  /** Lists fixtures, optionally filtered by family. */
   readonly list: (family?: CliFixtureFamily) => readonly CliFixture[];
+  /** Returns an immutable fixture snapshot. */
   readonly snapshot: () => readonly CliFixture[];
 }
 
+/**
+ * Entrypoint names understood by harness scenarios.
+ */
 export type CliPackageEntrypoint =
   | 'root'
   | 'adapter'
@@ -59,28 +99,53 @@ export type CliPackageEntrypoint =
   | 'schema'
   | 'testing';
 
+/**
+ * Entrypoint module object inspected by harness scenarios.
+ */
 export interface CliEntrypointModule {
+  /** Exported value available from this entrypoint module. */
   readonly [exportName: string]: unknown;
 }
 
+/**
+ * Input for creating a CLI harness.
+ */
 export interface CliHarnessInput {
+  /** CLI program for this operation. */
   readonly program?: unknown;
+  /** Entrypoint modules available to harness scenarios. */
   readonly entrypoints?: Partial<Record<CliPackageEntrypoint, CliEntrypointModule>>;
+  /** Fixtures registered in the harness. */
   readonly fixtures?: readonly CliFixtureDefinition[];
 }
 
+/**
+ * Harness state used to run scenarios.
+ */
 export interface CliHarness {
+  /** CLI program for this operation. */
   readonly program: unknown | undefined;
+  /** Fixtures registered in the harness. */
   readonly fixtures: CliFixtureRegistry;
+  /** Returns an entrypoint module by name. */
   readonly getEntrypoint: (entrypoint: CliPackageEntrypoint) => CliEntrypointModule | undefined;
 }
 
+/**
+ * Scenario replayed by {@link runCliScenario}.
+ */
 export interface CliScenario {
+  /** Scenario identifier reported in harness results. */
   readonly id: string;
+  /** Optional scenario title. */
   readonly title?: string;
+  /** Ordered steps replayed by the harness. */
   readonly steps: readonly CliScenarioStep[];
 }
 
+/**
+ * Scenario step variants understood by the harness.
+ */
 export type CliScenarioStep =
   | CliEntrypointLoadStep
   | CliFixtureAvailableStep
@@ -89,71 +154,140 @@ export type CliScenarioStep =
   | CliPluginCommandScenarioStep
   | CliRunScenarioStep;
 
+/**
+ * Scenario step that inspects an entrypoint module.
+ */
 export interface CliEntrypointLoadStep {
+  /** Scenario step category. */
   readonly kind: 'entrypoint-load';
+  /** Step name reported in harness results. */
   readonly name: string;
+  /** Entrypoint loaded by this scenario step. */
   readonly entrypoint: CliPackageEntrypoint;
+  /** Exports expected from the entrypoint. */
   readonly expectedExports?: readonly string[];
 }
 
+/**
+ * Scenario step that checks fixture availability.
+ */
 export interface CliFixtureAvailableStep {
+  /** Scenario step category. */
   readonly kind: 'fixture-available';
+  /** Step name reported in harness results. */
   readonly name: string;
+  /** Identifier of the fixture to inspect. */
   readonly fixtureId: string;
+  /** Fixture family expected by the scenario. */
   readonly expectedFamily?: CliFixtureFamily;
 }
 
+/**
+ * Scenario step that exercises command parsing.
+ */
 export interface CliParseScenarioStep {
+  /** Scenario step category. */
   readonly kind: 'parse';
+  /** Step name reported in harness results. */
   readonly name: string;
+  /** Command definition used by the scenario. */
   readonly definition: CliDefinition;
+  /** Tokens parsed by this scenario step. */
   readonly argv?: readonly string[];
+  /** Expected ok value for the scenario step. */
   readonly expectedOk?: boolean;
+  /** Expected command path for a parse step. */
   readonly expectedCommandPath?: readonly string[];
+  /** Expected diagnostic codes for the step. */
   readonly expectedDiagnosticCodes?: readonly CliDiagnosticCode[];
 }
 
+/**
+ * Scenario step that exercises config resolution.
+ */
 export interface CliConfigScenarioStep {
+  /** Scenario step category. */
   readonly kind: 'config-resolution';
+  /** Step name reported in harness results. */
   readonly name: string;
+  /** Command definition used by the scenario. */
   readonly definition: CliDefinition;
+  /** Config input resolved by this scenario step. */
   readonly input?: ConfigInput;
+  /** Expected ok value for the scenario step. */
   readonly expectedOk?: boolean;
+  /** Expected resolved config values. */
   readonly expectedValues?: Readonly<Record<string, ConfigValue>>;
+  /** Expected diagnostic codes for the step. */
   readonly expectedDiagnosticCodes?: readonly CliDiagnosticCode[];
 }
 
+/**
+ * Scenario step that applies plugin command contributions.
+ */
 export interface CliPluginCommandScenarioStep {
+  /** Scenario step category. */
   readonly kind: 'plugin-command-application';
+  /** Step name reported in harness results. */
   readonly name: string;
+  /** Command definition used by the scenario. */
   readonly definition: CliDefinition;
+  /** Plugin manifests or definitions used by this step. */
   readonly plugins: readonly (CliPluginManifestDefinition | CliPluginManifest)[];
+  /** Expected ok value for the scenario step. */
   readonly expectedOk?: boolean;
+  /** Expected command paths after plugin application. */
   readonly expectedCommandPaths?: readonly (readonly string[])[];
+  /** Expected diagnostic codes for the step. */
   readonly expectedDiagnosticCodes?: readonly CliDiagnosticCode[];
 }
 
+/**
+ * Scenario step that exercises run planning or application.
+ */
 export interface CliRunScenarioStep {
+  /** Scenario step category. */
   readonly kind: 'run';
+  /** Step name reported in harness results. */
   readonly name: string;
+  /** Command definition used by the scenario. */
   readonly definition: CliDefinition;
+  /** Tokens parsed before the run step is planned or applied. */
   readonly argv?: readonly string[];
+  /** Run mode used by this scenario step. */
   readonly mode?: RunMode;
+  /** Effects supplied to the run step before handlers. */
   readonly effects?: readonly RunEffect[];
+  /** Artifacts supplied to the run step before handlers. */
   readonly artifacts?: readonly RunArtifact[];
+  /** Caller-provided JSON-compatible context. */
   readonly context?: RunPayload;
+  /** Whether the request was cancelled before execution. */
   readonly cancelled?: boolean;
+  /** Whether the request was interrupted before execution. */
   readonly interrupted?: boolean;
+  /** Timeout budget in milliseconds. */
   readonly timeoutMs?: number;
+  /** Elapsed time in milliseconds. */
   readonly elapsedMs?: number;
+  /** Expected ok value for the scenario step. */
   readonly expectedOk?: boolean;
+  /** Expected exit classification. */
   readonly expectedExitKind?: ExitKind;
+  /** Expected ordered event names. */
   readonly expectedEventNames?: readonly string[];
+  /** Expected diagnostic codes for the step. */
   readonly expectedDiagnosticCodes?: readonly CliDiagnosticCode[];
 }
 
+/**
+ * Scenario pass/fail status.
+ */
 export type CliScenarioStatus = 'passed' | 'failed';
 
+/**
+ * Diagnostic codes emitted by the testing harness.
+ */
 export type CliTestDiagnosticCode =
   | 'CLI_TEST_DUPLICATE_FIXTURE'
   | 'CLI_TEST_ENTRYPOINT_MISSING'
@@ -162,28 +296,52 @@ export type CliTestDiagnosticCode =
   | 'CLI_TEST_FIXTURE_FAMILY_MISMATCH'
   | 'CLI_TEST_EXPECTATION_FAILED';
 
+/**
+ * Diagnostic emitted by a harness scenario.
+ */
 export interface CliTestDiagnostic {
+  /** Stable diagnostic code. */
   readonly code: CliTestDiagnosticCode;
+  /** Human-readable diagnostic message. */
   readonly message: string;
+  /** Structured diagnostic fields. */
   readonly fields: Readonly<Record<string, CliFixtureValue>>;
 }
 
+/**
+ * Result for one scenario step.
+ */
 export interface CliScenarioStepResult {
+  /** Zero-based step index. */
   readonly index: number;
+  /** Step name copied from the scenario. */
   readonly name: string;
+  /** Scenario step category that produced this result. */
   readonly kind: CliScenarioStep['kind'];
+  /** Pass/fail outcome for this step. */
   readonly status: CliScenarioStatus;
+  /** Harness diagnostics produced by this step. */
   readonly diagnostics: readonly CliTestDiagnostic[];
 }
 
+/**
+ * Result for a full harness scenario.
+ */
 export interface CliScenarioResult {
+  /** Identifier of the scenario. */
   readonly scenarioId: string;
+  /** Aggregate status derived from all step results. */
   readonly status: CliScenarioStatus;
+  /** Step results in replay order. */
   readonly steps: readonly CliScenarioStepResult[];
+  /** Flattened diagnostics produced by the scenario. */
   readonly diagnostics: readonly CliTestDiagnostic[];
 }
 
 // Stryker disable all: built-in fixture corpus is static sample data; behavior tests cover public consumers and selected generated fixtures, not exact inventory strings.
+/**
+ * Built-in command fixture corpus.
+ */
 export const commandFixtures: readonly CliFixture[] = Object.freeze([
   defineCliFixture({
     id: 'commands.minimal-program',
@@ -275,6 +433,9 @@ export const commandFixtures: readonly CliFixture[] = Object.freeze([
   })
 ]);
 
+/**
+ * Built-in config fixture corpus.
+ */
 export const configFixtures: readonly CliFixture[] = Object.freeze([
   defineCliFixture({
     id: 'config.config-layer-stack',
@@ -331,6 +492,9 @@ export const configFixtures: readonly CliFixture[] = Object.freeze([
   })
 ]);
 
+/**
+ * Built-in plugin fixture corpus.
+ */
 export const pluginFixtures: readonly CliFixture[] = Object.freeze([
   defineCliFixture({
     id: 'plugins.compatible-plugin',
@@ -416,6 +580,9 @@ export const pluginFixtures: readonly CliFixture[] = Object.freeze([
   })
 ]);
 
+/**
+ * Built-in run fixture corpus.
+ */
 export const runFixtures: readonly CliFixture[] = Object.freeze([
   defineCliFixture({
     id: 'runs.apply-run',
@@ -483,6 +650,9 @@ export const runFixtures: readonly CliFixture[] = Object.freeze([
   })
 ]);
 
+/**
+ * Combined built-in fixture corpus.
+ */
 export const cliCoreFixtures: readonly CliFixture[] = Object.freeze([
   ...commandFixtures,
   ...configFixtures,
@@ -491,17 +661,26 @@ export const cliCoreFixtures: readonly CliFixture[] = Object.freeze([
 ]);
 // Stryker restore all
 
+/**
+ * Normalizes and freezes one fixture definition.
+ */
 export function defineCliFixture(definition: CliFixtureDefinition): CliFixture {
   const fixture = buildFixture(definition);
   return freezeFixture(fixture);
 }
 
+/**
+ * Generates a deterministic large command definition.
+ */
 export function createLargeCommandDefinition(input: LargeCommandFixtureInput = {}): CliDefinition {
   const commandCount = normalizeCommandCount(input.commandCount ?? 128);
   const programName = input.programName ?? 'large';
   return largeCommandDefinition({ commandCount, programName });
 }
 
+/**
+ * Generates a deterministic large command fixture.
+ */
 export function createLargeCommandFixture(input: LargeCommandFixtureInput = {}): CliFixture {
   const commandCount = normalizeCommandCount(input.commandCount ?? 128);
   const programName = input.programName ?? 'large';
@@ -515,6 +694,9 @@ export function createLargeCommandFixture(input: LargeCommandFixtureInput = {}):
   });
 }
 
+/**
+ * Creates an immutable fixture registry.
+ */
 export function createCliFixtureRegistry(
   fixtures: readonly CliFixtureDefinition[] = cliCoreFixtures
 ): CliFixtureRegistry {
@@ -551,6 +733,9 @@ export function createCliFixtureRegistry(
   });
 }
 
+/**
+ * Creates a harness for fixture and scenario checks.
+ */
 export function createCliHarness(input: CliHarnessInput = {}): CliHarness {
   const entrypoints = new Map<CliPackageEntrypoint, CliEntrypointModule>();
 
@@ -575,6 +760,9 @@ export function createCliHarness(input: CliHarnessInput = {}): CliHarness {
   });
 }
 
+/**
+ * Runs a harness scenario and returns structured step results.
+ */
 export async function runCliScenario(harness: CliHarness, scenario: CliScenario): Promise<CliScenarioResult> {
   const steps: CliScenarioStepResult[] = [];
   for (const [index, step] of scenario.steps.entries()) {

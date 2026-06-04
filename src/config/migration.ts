@@ -1,6 +1,9 @@
 import { createCliDiagnostic, type CliDiagnostic } from '../diagnostics.ts';
 import type { ConfigFileInput, ConfigMigration, ConfigValue } from './types.ts';
 
+/**
+ * Applies versioned config-file migrations.
+ */
 export function migrateConfigFile(
   file: ConfigFileInput,
   migrations: readonly ConfigMigration[],

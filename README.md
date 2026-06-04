@@ -327,6 +327,7 @@ npm run test:mutation:all
 npm run check:exports
 npm run check:deno:source
 npm run check:deno:lint
+npm run check:deno:docs
 npm run check:jsr
 npm run check:leakage
 ```

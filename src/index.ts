@@ -39,6 +39,7 @@ export type {
   ParsedCliOptionValue,
   ParsedCliOptions,
   ParsedInvocation,
+  ParseIssue,
   ParsedPositionalValue,
   ParseInput,
   SemanticValidationResult,

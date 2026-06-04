@@ -18,6 +18,9 @@ import type {
   ConfigValue
 } from './types.ts';
 
+/**
+ * Collects config files and environment values through an explicit host.
+ */
 export async function discoverCliConfigInput(
   program: CliProgram,
   request: ConfigDiscoveryRequest
@@ -53,6 +56,9 @@ export async function discoverCliConfigInput(
   });
 }
 
+/**
+ * Builds discovery metadata from searched files and scope.
+ */
 export function buildDiscovery(discovery: ConfigDiscoveryInput | undefined, files: readonly ConfigFileInput[]): ConfigDiscoveryResult {
   const scope = discovery?.scope ?? 'none';
   const searchedPaths = discovery?.searchedPaths
