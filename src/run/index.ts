@@ -11,7 +11,7 @@ import type { CliPluginHookEvent, CliPluginHookRunResult, CliPluginHost } from '
 import { redactCliDiagnostics, redactCliSecrets, type CliRedactionOptions } from '../schema/index.ts';
 
 /**
- * Run execution modes supported by {@link runCli}.
+ * Run execution modes supported by runCli.
  */
 export type RunMode = 'plan' | 'apply';
 
@@ -41,7 +41,7 @@ export type ExitKind =
 export type RunPayload = CliDiagnosticValue;
 
 /**
- * Request envelope consumed by {@link runCli}.
+ * Request envelope consumed by runCli.
  */
 export interface RunRequest {
   /** Selects planning without handlers or apply execution with handlers. */
@@ -127,7 +127,7 @@ export interface RunHandlerOutput {
 }
 
 /**
- * Structured result envelope returned by {@link runCli}.
+ * Structured result envelope returned by runCli.
  */
 export interface RunResult {
   /** Schema version for this document. */

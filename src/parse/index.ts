@@ -20,7 +20,7 @@ export interface ParseInput {
 }
 
 /**
- * Structured parse result returned by {@link parseCli}.
+ * Structured parse result returned by parseCli.
  */
 export interface ParsedInvocation {
   /** Schema version for this document. */

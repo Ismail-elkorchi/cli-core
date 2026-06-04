@@ -347,6 +347,19 @@ export function redactCliSecrets<TData>(value: TData, options?: CliRedactionOpti
 
 /**
  * Returns a redacted copy plus match metadata.
+ *
+ * @example
+ * ```ts
+ * import { redactCliSecretsWithReport } from '@ismail-elkorchi/cli-core/schema';
+ *
+ * const report = redactCliSecretsWithReport({
+ *   token: 'abc123',
+ *   nested: { value: 'password=secret' }
+ * });
+ *
+ * report.redacted; // true
+ * report.matches.map((match) => match.path); // ["$.token", "$.nested.value"]
+ * ```
  */
 export function redactCliSecretsWithReport<TData>(value: TData, options?: CliRedactionOptions): CliRedactionResult<TData> {
   if (options?.enabled === false) {

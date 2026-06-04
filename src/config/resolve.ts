@@ -15,6 +15,28 @@ import type {
 
 /**
  * Resolves explicit config layers into values and provenance explanations.
+ *
+ * @example
+ * ```ts
+ * import { defineCli, resolveCliConfig } from '@ismail-elkorchi/cli-core';
+ *
+ * const program = defineCli({
+ *   name: 'ship',
+ *   config: {
+ *     fields: [{ name: 'region', type: 'string', default: 'local', env: 'SHIP_REGION' }]
+ *   }
+ * });
+ *
+ * const config = resolveCliConfig(program, {
+ *   workspaceDefaults: { region: 'workspace' },
+ *   configFiles: [{ path: 'ship.json', values: { region: 'file' } }],
+ *   env: { SHIP_REGION: 'env' },
+ *   argv: { region: 'argv' }
+ * });
+ *
+ * config.values.region; // "argv"
+ * config.explanations[0]?.candidateValues;
+ * ```
  */
 export function resolveCliConfig(program: CliProgram, input: ConfigInput = {}): ConfigResolution {
   const definition = program.config;

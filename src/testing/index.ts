@@ -132,7 +132,7 @@ export interface CliHarness {
 }
 
 /**
- * Scenario replayed by {@link runCliScenario}.
+ * Scenario replayed by runCliScenario.
  */
 export interface CliScenario {
   /** Scenario identifier reported in harness results. */
