@@ -13,6 +13,9 @@ import type {
   ConfigValue
 } from './types.ts';
 
+/**
+ * Resolves explicit config layers into values and provenance explanations.
+ */
 export function resolveCliConfig(program: CliProgram, input: ConfigInput = {}): ConfigResolution {
   const definition = program.config;
   const diagnostics: CliDiagnostic[] = [];

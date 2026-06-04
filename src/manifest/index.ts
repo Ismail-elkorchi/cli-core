@@ -2,63 +2,123 @@ import type { CliCommand, CliCommandSource, CliOption, CliPositional, CliProgram
 import type { CliDiagnostic } from '../diagnostics.ts';
 import { cliCorePackage } from '../package.ts';
 
+/**
+ * Serializable manifest for a compiled command program.
+ */
 export interface CommandManifest {
+  /** Schema version for this document. */
   readonly schemaVersion: 'cli-core.manifest.v1';
+  /** Package metadata for the manifest producer. */
   readonly package: {
+    /** Package name that produced the manifest. */
     readonly name: string;
+    /** Package version that produced the manifest. */
     readonly version: string;
+    /** Version of the public cli-core contract. */
     readonly contractVersion: string;
   };
+  /** Root program metadata copied from the compiled program. */
   readonly program: ManifestProgram;
+  /** Frozen command tree serialized as a flat list. */
   readonly commands: readonly ManifestCommand[];
+  /** Definition diagnostics retained with the manifest. */
   readonly diagnostics: readonly CliDiagnostic[];
 }
 
+/**
+ * Program metadata stored in a command manifest.
+ */
 export interface ManifestProgram {
+  /** Root program token. */
   readonly name: string;
+  /** Program version copied from the definition. */
   readonly version: string | undefined;
+  /** Root summary copied from the definition. */
   readonly description: string | undefined;
 }
 
+/**
+ * Command node stored in a command manifest.
+ */
 export interface ManifestCommand {
+  /** Command identifier used by run handlers and indexes. */
   readonly id: string;
+  /** Canonical command token at this path segment. */
   readonly name: string;
+  /** Canonical command path for this manifest command. */
   readonly path: readonly string[];
+  /** Aliases declared for this command. */
   readonly aliases: readonly ManifestAlias[];
+  /** Summary copied from the compiled command. */
   readonly description: string | undefined;
+  /** Deprecation marker copied from the compiled command. */
   readonly deprecated: boolean | string | undefined;
+  /** Provenance for this command. */
   readonly source: ManifestCommandSource;
+  /** Positional entries declared by this command. */
   readonly positionals: readonly ManifestPositional[];
+  /** Option entries declared by this command. */
   readonly options: readonly ManifestOption[];
+  /** Global options inherited by this command. */
   readonly inheritedOptions: readonly ManifestOption[];
+  /** Whether tokens after the pass-through boundary are accepted. */
   readonly allowPassThrough: boolean;
 }
 
+/**
+ * Command provenance stored in a command manifest.
+ */
 export type ManifestCommandSource = CliCommandSource;
 
+/**
+ * Alias stored in a command manifest.
+ */
 export interface ManifestAlias {
+  /** Alias token at the final alias path segment. */
   readonly name: string;
+  /** Alias path for this manifest alias. */
   readonly path: readonly string[];
+  /** Deprecation marker copied from the compiled alias. */
   readonly deprecated: boolean | string | undefined;
 }
 
+/**
+ * Positional argument stored in a command manifest.
+ */
 export interface ManifestPositional {
+  /** Positional key used in parsed output. */
   readonly name: string;
+  /** Indicates whether parsing requires this positional. */
   readonly required: boolean;
+  /** Whether this positional captures remaining tokens. */
   readonly variadic: boolean;
+  /** Summary copied from the positional definition. */
   readonly description: string | undefined;
 }
 
+/**
+ * Option stored in a command manifest.
+ */
 export interface ManifestOption {
+  /** Option key used in parsed output. */
   readonly name: string;
+  /** Value category delegated to argv-flags. */
   readonly type: string;
+  /** Flag spellings accepted for this option. */
   readonly flags: readonly string[];
+  /** Summary copied from the option definition. */
   readonly description: string | undefined;
+  /** Indicates whether parsing requires this option. */
   readonly required: boolean;
+  /** Indicates whether default help and completion omit this option. */
   readonly hidden: boolean;
+  /** Indicates whether the option is inherited or local. */
   readonly scope: 'global' | 'local';
 }
 
+/**
+ * Creates a command manifest from a compiled program.
+ */
 export function describeCli(program: CliProgram): CommandManifest {
   return Object.freeze({
     schemaVersion: 'cli-core.manifest.v1',
@@ -73,10 +133,16 @@ export function describeCli(program: CliProgram): CommandManifest {
   });
 }
 
+/**
+ * Serializes a command manifest as JSON.
+ */
 export function exportCommandManifest(manifest: CommandManifest): string {
   return `${JSON.stringify(manifest, null, 2)}\n`;
 }
 
+/**
+ * Imports and validates a command manifest JSON payload.
+ */
 export function importCommandManifest(input: string | CommandManifest): CommandManifest {
   const parsed = typeof input === 'string' ? JSON.parse(input) as unknown : input;
   assertCommandManifestShape(parsed);

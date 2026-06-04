@@ -1,5 +1,11 @@
+/**
+ * Severity level for a cli-core diagnostic.
+ */
 export type CliDiagnosticSeverity = 'error' | 'warning';
 
+/**
+ * Stable machine-readable diagnostic codes emitted by cli-core.
+ */
 export type CliDiagnosticCode =
   | 'CLI_DUPLICATE_COMMAND_PATH'
   | 'CLI_DUPLICATE_COMMAND_ALIAS'
@@ -51,6 +57,9 @@ export type CliDiagnosticCode =
   | 'CLI_EFFECT_APPLY_FAILED'
   | 'CLI_SCHEMA_UNSUPPORTED';
 
+/**
+ * JSON-compatible diagnostic field value.
+ */
 export type CliDiagnosticValue =
   | null
   | boolean
@@ -59,13 +68,23 @@ export type CliDiagnosticValue =
   | readonly CliDiagnosticValue[]
   | { readonly [key: string]: CliDiagnosticValue };
 
+/**
+ * Structured diagnostic emitted by cli-core APIs.
+ */
 export interface CliDiagnostic {
+  /** Stable machine-readable diagnostic code. */
   readonly code: CliDiagnosticCode;
+  /** Diagnostic severity. */
   readonly severity: CliDiagnosticSeverity;
+  /** Human-readable diagnostic message. */
   readonly message: string;
+  /** Structured diagnostic fields. */
   readonly fields: Readonly<Record<string, CliDiagnosticValue>>;
 }
 
+/**
+ * Creates an immutable cli-core diagnostic.
+ */
 export function createCliDiagnostic(
   code: CliDiagnosticCode,
   severity: CliDiagnosticSeverity,
@@ -80,6 +99,9 @@ export function createCliDiagnostic(
   });
 }
 
+/**
+ * Checks diagnostics for error severity without inspecting messages.
+ */
 export function hasErrorDiagnostics(diagnostics: readonly CliDiagnostic[]): boolean {
   return diagnostics.some((diagnostic) => diagnostic.severity === 'error');
 }

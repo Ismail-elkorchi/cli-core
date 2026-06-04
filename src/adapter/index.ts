@@ -20,67 +20,134 @@ import {
 } from '../run/index.ts';
 import { redactCliDiagnostics, redactCliSecrets, type CliRedactionOptions } from '../schema/index.ts';
 
+/**
+ * Effect mode used by CLI adapter helpers.
+ */
 export type CliMainEffectMode = 'none' | 'plan' | 'apply';
 
+/**
+ * Writer function supplied by an explicit CLI host.
+ */
 export type CliTextWriter = (text: string) => void | Promise<void>;
 
+/**
+ * Explicit host boundary for argv, output, and exit status.
+ */
 export interface CliMainHost {
+  /** Tokens supplied by the host after executable and binary names are removed. */
   readonly argv?: readonly string[];
+  /** Explicit stdout writer supplied by the host. */
   readonly writeStdout?: CliTextWriter;
+  /** Explicit stderr writer supplied by the host. */
   readonly writeStderr?: CliTextWriter;
+  /** Explicit exit status setter supplied by the host. */
   readonly setExitCode?: (status: number) => void | Promise<void>;
 }
 
+/**
+ * Request used to build a reusable CLI main function.
+ */
 export interface CliMainRequest {
+  /** CLI program for this operation. */
   readonly program: CliProgram;
+  /** Default argv tokens used when the host does not supply argv. */
   readonly argv?: readonly string[];
+  /** Run mode forwarded to {@link runCli}. */
   readonly mode?: RunMode;
+  /** Run handlers keyed by command id, path, or name. */
   readonly handlers?: Readonly<Record<string, RunHandler>>;
+  /** Effects supplied before handler execution. */
   readonly effects?: readonly RunEffect[];
+  /** Artifacts supplied before handler execution. */
   readonly artifacts?: readonly RunArtifact[];
+  /** Caller-provided JSON-compatible context. */
   readonly context?: RunPayload;
+  /** Plugin host used for lifecycle hooks. */
   readonly pluginHost?: CliPluginHost;
+  /** Context passed to plugin hooks. */
   readonly pluginContext?: RunPayload;
+  /** Exit status overrides keyed by exit kind. */
   readonly exitStatusPolicy?: ExitStatusPolicy;
+  /** Redaction options applied to returned data. */
   readonly redaction?: CliRedactionOptions;
+  /** How the adapter handles run effects. */
   readonly effectMode?: CliMainEffectMode;
+  /** Host used to apply effects explicitly. */
   readonly effectHost?: CliEffectHost;
+  /** Policy used to authorize explicit effect application. */
   readonly effectPolicy?: EffectApplicationPolicy;
+  /** Renderer used to convert run data into text. */
   readonly render?: CliMainRenderer;
 }
 
+/**
+ * Renderer that converts structured run data into text.
+ */
 export type CliMainRenderer = (run: RunResult, effectReport: EffectApplicationReport | undefined) => CliMainText;
 
+/**
+ * Rendered stdout, stderr, and exit status.
+ */
 export interface CliMainText {
+  /** Text intended for stdout. */
   readonly stdout: string;
+  /** Text intended for stderr. */
   readonly stderr: string;
+  /** Process-style numeric exit status. */
   readonly exitStatus: number;
 }
 
+/**
+ * Result returned by a CLI main adapter.
+ */
 export interface CliMainResult {
+  /** Structured run result returned by runCli. */
   readonly run: RunResult;
+  /** Effect application report when effects were processed. */
   readonly effectReport?: EffectApplicationReport;
+  /** Rendered text and exit status. */
   readonly rendered: CliMainText;
+  /** Process-style numeric exit status. */
   readonly exitStatus: number;
 }
 
+/**
+ * Reusable CLI entrypoint function.
+ */
 export type CliMain = (host?: CliMainHost) => Promise<CliMainResult>;
 
+/**
+ * Process-like object accepted by the Node CLI adapter.
+ */
 export interface NodeCliProcessLike {
+  /** Process argv including executable and script entries. */
   readonly argv: readonly string[];
+  /** Stream used only by the explicit adapter boundary. */
   readonly stdout: CliWritableStream;
+  /** Error stream used only by the explicit adapter boundary. */
   readonly stderr: CliWritableStream;
+  /** Mutable exit code field on the process-like host. */
   exitCode?: number | string | null | undefined;
 }
 
+/**
+ * Minimal writable stream shape used by the adapter.
+ */
 export interface CliWritableStream {
+  /** Writes a string chunk to the stream. */
   readonly write: (chunk: string) => unknown;
 }
 
+/**
+ * Creates a reusable CLI main function from a request.
+ */
 export function createCliMain(request: CliMainRequest): CliMain {
   return (host: CliMainHost = {}) => runCliMain(request, host);
 }
 
+/**
+ * Runs the CLI adapter through an explicit host.
+ */
 export async function runCliMain(request: CliMainRequest, host: CliMainHost = {}): Promise<CliMainResult> {
   const runRequest = buildRunRequest(request, host);
   const effectMode = request.effectMode ?? 'none';
@@ -105,6 +172,9 @@ export async function runCliMain(request: CliMainRequest, host: CliMainHost = {}
   });
 }
 
+/**
+ * Renders a structured run result into stdout, stderr, and exit status text.
+ */
 export function renderRunResultText(
   run: RunResult,
   effectReport: EffectApplicationReport | undefined = undefined
@@ -135,6 +205,9 @@ export function renderRunResultText(
   return Object.freeze({ stdout, stderr, exitStatus });
 }
 
+/**
+ * Creates a CLI host from a process-like object.
+ */
 export function createNodeCliAdapter(processLike: NodeCliProcessLike): CliMainHost {
   return Object.freeze({
     argv: Object.freeze(processLike.argv.slice(2)),

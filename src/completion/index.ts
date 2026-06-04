@@ -7,107 +7,210 @@ import {
 } from '../command/index.ts';
 import type { CliDiagnostic } from '../diagnostics.ts';
 
+/**
+ * Shell families supported by generated completion artifacts.
+ */
 export type CompletionShell = 'bash' | 'zsh' | 'fish' | 'pwsh';
 
+/**
+ * Input for branch-local completion payload generation.
+ */
 export interface CompletionInput {
+  /** Canonical command path for the invocation. */
   readonly commandPath?: readonly string[];
+  /** Current word used for completion filtering. */
   readonly word?: string;
+  /** Whether hidden values are included. */
   readonly includeHidden?: boolean;
 }
 
+/**
+ * Completion protocol customization input.
+ */
 export interface CompletionProtocolInput {
+  /** Command name used by the completion protocol. */
   readonly commandName?: string;
 }
 
+/**
+ * Wire contract used by shell completion bridges.
+ */
 export interface CompletionCommandProtocol {
+  /** Schema version for this document. */
   readonly schemaVersion: 'cli-core.completion-protocol.v1';
+  /** Command name used by the completion protocol. */
   readonly commandName: string;
+  /** Boundary token for completion protocol argv. */
   readonly argvSeparator: '--';
+  /** Request contract for this protocol or operation. */
   readonly request: {
+    /** Shell words supplied to the completion bridge. */
     readonly words: 'argv';
+    /** Current word at the completion cursor. */
     readonly currentWord: 'last_word';
+    /** Word index of the completion cursor. */
     readonly cursor: 'word_index';
+    /** Whether hidden values are included. */
     readonly includeHidden: '--include-hidden';
   };
+  /** Response contract for this protocol. */
   readonly response: {
+    /** Schema version for this document. */
     readonly schemaVersion: 'cli-core.completion-response.v1';
+    /** Response field containing completion items. */
     readonly items: 'payload.items';
+    /** Field a shell bridge should insert as the completed token. */
     readonly value: 'item.value';
   };
 }
 
+/**
+ * Hidden command descriptor for completion requests.
+ */
 export interface CompletionCommand {
+  /** Schema version for this document. */
   readonly schemaVersion: 'cli-core.completion-command.v1';
+  /** Name of the CLI program. */
   readonly programName: string;
+  /** Hidden command token used by the completion protocol. */
   readonly name: string;
+  /** Keeps the protocol command out of default command listings. */
   readonly hidden: true;
+  /** Completion protocol metadata. */
   readonly protocol: CompletionCommandProtocol;
 }
 
+/**
+ * User-facing input accepted by the completion bridge.
+ */
 export interface CompletionRequestInput {
+  /** Shell words supplied to the completion bridge. */
   readonly words?: readonly string[];
+  /** Current word at the completion cursor. */
   readonly currentWord?: string;
+  /** Word index of the completion cursor. */
   readonly cursor?: number;
+  /** Whether hidden values are included. */
   readonly includeHidden?: boolean;
+  /** Completion protocol metadata. */
   readonly protocol?: CompletionProtocolInput;
 }
 
+/**
+ * Normalized completion request used by {@link completeCli}.
+ */
 export interface CompletionRequest {
+  /** Schema version for this document. */
   readonly schemaVersion: 'cli-core.completion-request.v1';
+  /** Shell words supplied to the completion bridge. */
   readonly words: readonly string[];
+  /** Current word at the completion cursor. */
   readonly currentWord: string;
+  /** Word index of the completion cursor. */
   readonly cursor: number;
+  /** Whether hidden values are included. */
   readonly includeHidden: boolean;
+  /** Completion protocol metadata. */
   readonly protocol: CompletionCommandProtocol;
 }
 
+/**
+ * Completion bridge response with boundary metadata.
+ */
 export interface CompletionResponse {
+  /** Schema version for this document. */
   readonly schemaVersion: 'cli-core.completion-response.v1';
+  /** Normalized request that produced this response. */
   readonly request: CompletionRequest;
+  /** Branch-local completion candidates for the request. */
   readonly payload: CompletionPayload;
+  /** Completion boundary that produced the response. */
   readonly boundary: 'cli' | 'pass_through';
+  /** Completion protocol metadata. */
   readonly protocol: CompletionCommandProtocol;
+  /** Bridge diagnostics retained as structured data. */
   readonly diagnostics: readonly CliDiagnostic[];
 }
 
+/**
+ * Completion candidates for one command context.
+ */
 export interface CompletionPayload {
+  /** Schema version for this document. */
   readonly schemaVersion: 'cli-core.completion.v1';
+  /** Name of the CLI program. */
   readonly programName: string;
+  /** Canonical command path for the invocation. */
   readonly commandPath: readonly string[];
+  /** Current word used for completion filtering. */
   readonly word: string;
+  /** Completion candidates in this payload. */
   readonly items: readonly CompletionItem[];
 }
 
+/**
+ * Single completion candidate.
+ */
 export interface CompletionItem {
+  /** Candidate category used by editors and shell bridges. */
   readonly kind: 'command' | 'option' | 'alias' | 'positional';
+  /** Token value to insert when selected. */
   readonly value: string;
+  /** Display label for menus that separate labels from inserted values. */
   readonly label: string;
+  /** Optional explanatory text for interactive completion menus. */
   readonly description: string | undefined;
+  /** Command provenance when the candidate came from a command or alias. */
   readonly source?: CliCommandSource;
 }
 
+/**
+ * Generated completion script artifact.
+ */
 export interface CompletionScript {
+  /** Schema version for this document. */
   readonly schemaVersion: 'cli-core.completion-script.v1';
+  /** Shell family for this completion artifact. */
   readonly shell: CompletionShell;
+  /** Name of the CLI program. */
   readonly programName: string;
+  /** Completion protocol metadata. */
   readonly protocol: CompletionCommandProtocol;
+  /** Generated shell script text. */
   readonly script: string;
 }
 
+/**
+ * Data-only plan for installing a completion script.
+ */
 export interface CompletionInstallPlan {
+  /** Schema version for this document. */
   readonly schemaVersion: 'cli-core.completion-install-plan.v1';
+  /** Shell family for this completion artifact. */
   readonly shell: CompletionShell;
+  /** Name of the CLI program. */
   readonly programName: string;
+  /** Ordered steps for an install plan. */
   readonly steps: readonly CompletionInstallStep[];
 }
 
+/**
+ * Single data-only completion install step.
+ */
 export interface CompletionInstallStep {
+  /** Install-plan action to perform. */
   readonly action: 'write_file' | 'source_file' | 'add_to_profile';
+  /** Filesystem path targeted by the install step. */
   readonly path: string;
+  /** Content to write when the action needs it. */
   readonly content: string | undefined;
+  /** Explanation of the data-only install action. */
   readonly description: string;
 }
 
+/**
+ * Creates branch-local completion candidates.
+ */
 export function createCompletionPayload(program: CliProgram, input: CompletionInput = {}): CompletionPayload {
   const commandPath = input.commandPath ?? [];
   const word = input.word ?? '';
@@ -143,6 +246,9 @@ export function createCompletionPayload(program: CliProgram, input: CompletionIn
   });
 }
 
+/**
+ * Creates a generated completion script artifact.
+ */
 export function createCompletionScript(program: CliProgram, shell: CompletionShell): CompletionScript {
   const protocol = createCompletionProtocol();
   const script = scriptFor(program.name, shell, protocol.commandName);
@@ -155,6 +261,9 @@ export function createCompletionScript(program: CliProgram, shell: CompletionShe
   });
 }
 
+/**
+ * Creates a hidden completion command descriptor.
+ */
 export function createCompletionCommand(
   program: CliProgram,
   input: CompletionProtocolInput = {}
@@ -169,6 +278,9 @@ export function createCompletionCommand(
   });
 }
 
+/**
+ * Normalizes completion bridge input.
+ */
 export function createCompletionRequest(input: CompletionRequestInput | readonly string[] = {}): CompletionRequest {
   const requestInput: CompletionRequestInput = isCompletionWordArray(input) ? { words: input } : input;
   const words = Object.freeze([...(requestInput.words ?? [])]);
@@ -184,6 +296,9 @@ export function createCompletionRequest(input: CompletionRequestInput | readonly
   });
 }
 
+/**
+ * Completes command, alias, option, and positional candidates from shell words.
+ */
 export function completeCli(
   program: CliProgram,
   input: CompletionRequestInput | CompletionRequest | readonly string[] = {}
@@ -199,6 +314,9 @@ export function completeCli(
   return completionResponse(request, normalized, items);
 }
 
+/**
+ * Creates a data-only completion install plan.
+ */
 export function createCompletionInstallPlan(program: CliProgram, shell: CompletionShell): CompletionInstallPlan {
   const script = createCompletionScript(program, shell);
   const path = completionPath(program.name, shell);

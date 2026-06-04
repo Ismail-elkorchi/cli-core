@@ -1,127 +1,267 @@
-import type { FlagSpec, FlagType, FlagValue } from 'argv-flags';
+import type { FlagSpec } from 'argv-flags';
 import type { ConfigDefinition } from '../config/types.ts';
 import { createCliDiagnostic, type CliDiagnostic } from '../diagnostics.ts';
 
-export type CliOptionType = FlagType;
+/**
+ * Option categories that cli-core accepts before delegating token binding to argv-flags.
+ */
+export type CliOptionType = 'string' | 'boolean' | 'number' | 'array';
 
-export type CliOptionValue<T extends CliOptionType = CliOptionType> = FlagValue<T>;
+/**
+ * Runtime value shape associated with a compiled option category.
+ */
+export type CliOptionValue<T extends CliOptionType = CliOptionType> = T extends 'string'
+  ? string
+  : T extends 'boolean'
+    ? boolean
+    : T extends 'number'
+      ? number
+      : T extends 'array'
+        ? string[]
+        : never;
 
+/**
+ * Definition object compiled into an immutable command program.
+ *
+ * @remarks
+ * Diagnostics are stored on the returned program instead of thrown, so callers can inspect invalid definitions as data.
+ */
 export interface CliDefinition {
+  /** Root command token used in usage, help, and manifest documents. */
   readonly name: string;
+  /** Program version surfaced by version and manifest documents. */
   readonly version?: string;
+  /** Summary copied into root help and manifest output. */
   readonly description?: string;
+  /** Config contract resolved separately from argv parsing. */
   readonly config?: ConfigDefinition;
+  /** Global options inherited by each command. */
   readonly options?: readonly CliOptionDefinition[];
+  /** Top-level commands below the program root. */
   readonly commands?: readonly CliCommandDefinition[];
 }
 
+/**
+ * Command-tree node accepted by {@link defineCli}.
+ */
 export interface CliCommandDefinition {
+  /** Command path token relative to the parent command. */
   readonly name: string;
+  /** Alternate path tokens accepted beside the canonical command token. */
   readonly aliases?: readonly CliAliasInput[];
+  /** Summary copied into help and manifest output for this command. */
   readonly description?: string;
+  /** Deprecation marker preserved as diagnostics and manifest data. */
   readonly deprecated?: boolean | string;
+  /** Provenance override for plugin-provided or generated command nodes. */
   readonly source?: CliCommandSource;
+  /** Positional declarations bound after local option parsing. */
   readonly positionals?: readonly CliPositionalDefinition[];
+  /** Local options available only in this command scope. */
   readonly options?: readonly CliOptionDefinition[];
+  /** Nested commands below this command node. */
   readonly commands?: readonly CliCommandDefinition[];
+  /** Whether tokens after the pass-through boundary are accepted. */
   readonly allowPassThrough?: boolean;
 }
 
+/**
+ * Provenance attached to commands from definitions or plugin manifests.
+ */
 export interface CliCommandSource {
+  /** Source category used for provenance-aware help and manifests. */
   readonly kind: 'definition' | 'plugin';
+  /** Plugin identity when this command came from a plugin manifest. */
   readonly pluginName?: string;
+  /** Plugin version recorded with command provenance. */
   readonly pluginVersion?: string;
 }
 
+/**
+ * Alias spelling accepted in shorthand or structured form.
+ */
 export type CliAliasInput = string | CliAliasDefinition;
 
+/**
+ * Structured alias spelling with optional deprecation metadata.
+ */
 export interface CliAliasDefinition {
+  /** Alias token relative to the command parent path. */
   readonly name: string;
+  /** Deprecation marker emitted when this alias is used. */
   readonly deprecated?: boolean | string;
 }
 
+/**
+ * Positional argument declaration used during invocation binding.
+ */
 export interface CliPositionalDefinition {
+  /** Key used when this positional is returned from parsing. */
   readonly name: string;
+  /** Controls missing-input diagnostics for this positional. */
   readonly required?: boolean;
+  /** Whether this positional captures remaining tokens. */
   readonly variadic?: boolean;
+  /** Summary copied into help and manifest output. */
   readonly description?: string;
 }
 
+/**
+ * Logical option declaration that is converted into an argv-flags schema.
+ */
 export interface CliOptionDefinition<T extends CliOptionType = CliOptionType> {
+  /** Option key used in parsed values and config argv bindings. */
   readonly name: string;
+  /** Value category delegated to argv-flags for binding. */
   readonly type: T;
+  /** Flag spellings accepted for this option. */
   readonly flags: readonly string[];
+  /** Summary copied into help, manifests, and completion items. */
   readonly description?: string;
+  /** Controls missing-option diagnostics after argv binding. */
   readonly required?: boolean;
+  /** Default value when no explicit value is supplied. */
   readonly default?: CliOptionValue<T>;
+  /** Whether an empty string value is accepted. */
   readonly allowEmpty?: boolean;
+  /** Enables argv-flags boolean negation for long boolean flags. */
   readonly allowNo?: boolean;
+  /** Omits this option from default help and completion output. */
   readonly hidden?: boolean;
 }
 
+/**
+ * Immutable command program returned by {@link defineCli}.
+ *
+ * @remarks
+ * Arrays remain available for serialization, while lookup helpers use internal indexes for command, alias, and child lookup.
+ */
 export interface CliProgram {
+  /** Schema version for this document. */
   readonly schemaVersion: 'cli-core.program.v1';
+  /** Root command token retained from the source definition. */
   readonly name: string;
+  /** Program version retained for version and manifest output. */
   readonly version?: string;
+  /** Root summary retained for help and manifests. */
   readonly description?: string;
+  /** Config contract retained for explicit config resolution. */
   readonly config: ConfigDefinition | undefined;
+  /** Root command for the compiled program. */
   readonly root: CliCommand;
+  /** Frozen command list including the root command. */
   readonly commands: readonly CliCommand[];
+  /** Serializable index from command path to command id. */
   readonly pathIndex: readonly CliCommandPathIndexEntry[];
+  /** Serializable index from alias path to command id. */
   readonly aliasIndex: readonly CliCommandAliasIndexEntry[];
+  /** Definition diagnostics retained even when compilation succeeds. */
   readonly diagnostics: readonly CliDiagnostic[];
 }
 
+/**
+ * Compiled command node with inherited options and provenance.
+ */
 export interface CliCommand {
+  /** Internal command identifier used by handlers and indexes. */
   readonly id: string;
+  /** Canonical command token at this path segment. */
   readonly name: string;
+  /** Canonical command path from the program root. */
   readonly path: readonly string[];
+  /** Identifier of the parent command when present. */
   readonly parentId?: string;
+  /** Compiled aliases relative to this command's parent path. */
   readonly aliases: readonly CliAlias[];
+  /** Summary used by help, manifests, and completion. */
   readonly description?: string;
+  /** Deprecation marker retained for diagnostics and manifests. */
   readonly deprecated?: boolean | string;
+  /** Provenance for this command. */
   readonly source: CliCommandSource;
+  /** Positional declarations bound after option parsing. */
   readonly positionals: readonly CliPositional[];
+  /** Local options available only for this command. */
   readonly options: readonly CliOption[];
+  /** Global options inherited by this command. */
   readonly inheritedOptions: readonly CliOption[];
+  /** Whether tokens after the pass-through boundary are accepted. */
   readonly allowPassThrough: boolean;
 }
 
+/**
+ * Compiled alias that points at a canonical command path.
+ */
 export interface CliAlias {
+  /** Alias token at the final alias path segment. */
   readonly name: string;
+  /** Command path reached by this alias. */
   readonly path: readonly string[];
+  /** Deprecation marker emitted when this alias is used. */
   readonly deprecated?: boolean | string;
 }
 
+/**
+ * Compiled positional argument used by parse binding.
+ */
 export interface CliPositional {
+  /** Key used in parsed positional output. */
   readonly name: string;
+  /** Controls missing-input diagnostics for this positional. */
   readonly required: boolean;
+  /** Whether this positional captures remaining tokens. */
   readonly variadic: boolean;
+  /** Summary used in help and manifest output. */
   readonly description?: string;
 }
 
+/**
+ * Compiled option visible to parsing, help, manifests, and completion.
+ */
 export interface CliOption<T extends CliOptionType = CliOptionType> {
+  /** Option key used in parsed option output. */
   readonly name: string;
+  /** Value category delegated to argv-flags for binding. */
   readonly type: T;
+  /** Flag spellings accepted for this option. */
   readonly flags: readonly string[];
+  /** Summary used in help, manifests, and completion output. */
   readonly description?: string;
+  /** Controls missing-option diagnostics after argv binding. */
   readonly required: boolean;
+  /** Default value when no explicit value is supplied. */
   readonly default?: CliOptionValue<T>;
+  /** Whether an empty string value is accepted. */
   readonly allowEmpty?: boolean;
+  /** Enables argv-flags boolean negation for long boolean flags. */
   readonly allowNo?: boolean;
+  /** Omits this option from default help and completion output. */
   readonly hidden: boolean;
+  /** Indicates whether this option was inherited or declared locally. */
   readonly scope: 'global' | 'local';
 }
 
+/**
+ * Serializable command-path index entry.
+ */
 export interface CliCommandPathIndexEntry {
+  /** Command path indexed by this entry. */
   readonly path: readonly string[];
+  /** Identifier of the referenced command. */
   readonly commandId: string;
 }
 
+/**
+ * Serializable alias-path index entry.
+ */
 export interface CliCommandAliasIndexEntry {
+  /** Alias path indexed by this entry. */
   readonly path: readonly string[];
+  /** Identifier of the referenced command. */
   readonly commandId: string;
+  /** Final alias token that matched this index entry. */
   readonly alias: string;
+  /** Deprecation marker emitted when this alias path is used. */
   readonly deprecated?: boolean | string;
 }
 
@@ -134,6 +274,12 @@ interface CliCommandLookupIndex {
 
 const commandLookupIndexes = new WeakMap<CliProgram, CliCommandLookupIndex>();
 
+/**
+ * Compiles a command definition into an immutable program.
+ *
+ * @remarks
+ * The returned program carries diagnostics for invalid definitions instead of throwing, which keeps definition review machine-readable.
+ */
 export function defineCli(definition: CliDefinition): CliProgram {
   const diagnostics: CliDiagnostic[] = [];
   if (!isValidPathToken(definition.name)) {
@@ -172,10 +318,16 @@ export function defineCli(definition: CliDefinition): CliProgram {
   return frozenProgram;
 }
 
+/**
+ * Looks up a compiled command by canonical path.
+ */
 export function findCliCommand(program: CliProgram, path: readonly string[]): CliCommand | undefined {
   return commandLookup(program).byPath.get(pathKey(path));
 }
 
+/**
+ * Looks up a compiled command by alias path.
+ */
 export function findCliCommandByAlias(
   program: CliProgram,
   path: readonly string[]
@@ -188,10 +340,16 @@ export function findCliCommandByAlias(
   return { command, alias };
 }
 
+/**
+ * Returns child commands for a compiled parent command.
+ */
 export function findCliCommandChildren(program: CliProgram, parentId: string): readonly CliCommand[] {
   return commandLookup(program).childrenByParentId.get(parentId) ?? Object.freeze([]);
 }
 
+/**
+ * Builds the argv-flags schema for compiled command options.
+ */
 export function createOptionSchema(options: readonly CliOption[]): Record<string, FlagSpec> {
   return Object.fromEntries(
     options.map((option) => [

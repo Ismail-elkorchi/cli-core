@@ -10,10 +10,19 @@ import { parseCli, type ParsedInvocation, type SemanticValidationResult } from '
 import type { CliPluginHookEvent, CliPluginHookRunResult, CliPluginHost } from '../plugins/index.ts';
 import { redactCliDiagnostics, redactCliSecrets, type CliRedactionOptions } from '../schema/index.ts';
 
+/**
+ * Run execution modes supported by {@link runCli}.
+ */
 export type RunMode = 'plan' | 'apply';
 
+/**
+ * Correlation identifier carried by run results and events.
+ */
 export type RunIdentifier = string;
 
+/**
+ * Machine-readable run exit classification.
+ */
 export type ExitKind =
   | 'ok'
   | 'parse_error'
@@ -26,72 +35,144 @@ export type ExitKind =
   | 'external_error'
   | 'internal_error';
 
+/**
+ * JSON-compatible payload carried by run events, effects, artifacts, and handlers.
+ */
 export type RunPayload = CliDiagnosticValue;
 
+/**
+ * Request envelope consumed by {@link runCli}.
+ */
 export interface RunRequest {
+  /** Selects planning without handlers or apply execution with handlers. */
   readonly mode?: RunMode;
+  /** Correlation identifier for this run. */
   readonly runId?: RunIdentifier;
+  /** Tokens parsed when an invocation is not supplied. */
   readonly argv?: readonly string[];
+  /** Parsed invocation used by this run. */
   readonly invocation?: ParsedInvocation;
+  /** Run handlers keyed by command id, path, or name. */
   readonly handlers?: Readonly<Record<string, RunHandler>>;
+  /** Config resolution whose diagnostics participate in exit classification. */
   readonly config?: ConfigResolution;
+  /** Semantic validation result supplied by the caller. */
   readonly validation?: SemanticValidationResult;
+  /** Effects supplied before handler execution. */
   readonly effects?: readonly RunEffect[];
+  /** Artifacts supplied before handler execution. */
   readonly artifacts?: readonly RunArtifact[];
+  /** Caller-provided JSON-compatible context. */
   readonly context?: RunPayload;
+  /** Plugin host used for lifecycle hooks. */
   readonly pluginHost?: CliPluginHost;
+  /** Context passed to plugin hooks. */
   readonly pluginContext?: RunPayload;
+  /** Exit status overrides keyed by exit kind. */
   readonly exitStatusPolicy?: ExitStatusPolicy;
+  /** Redaction options applied to returned data. */
   readonly redaction?: CliRedactionOptions;
+  /** Whether the request was cancelled before execution. */
   readonly cancelled?: boolean;
+  /** Whether the request was interrupted before execution. */
   readonly interrupted?: boolean;
+  /** Timeout budget in milliseconds. */
   readonly timeoutMs?: number;
+  /** Elapsed time in milliseconds. */
   readonly elapsedMs?: number;
+  /** Optional sink that receives run events. */
   readonly eventSink?: RunEventSink;
 }
 
+/**
+ * Observer called as run events are recorded.
+ */
 export type RunEventSink = (event: RunEvent) => void;
 
+/**
+ * Command handler invoked in apply mode.
+ */
 export type RunHandler = (context: RunHandlerContext) => RunHandlerOutput | Promise<RunHandlerOutput>;
 
+/**
+ * Immutable data passed to a run handler.
+ */
 export interface RunHandlerContext {
+  /** Correlation identifier for this run. */
   readonly runId: RunIdentifier;
+  /** Mode selected for this run. */
   readonly mode: RunMode;
+  /** Command whose handler is being invoked. */
   readonly command: CliCommand;
+  /** Parsed invocation used by this run. */
   readonly invocation: ParsedInvocation;
+  /** Caller-provided JSON-compatible context. */
   readonly context: RunPayload;
 }
 
+/**
+ * Data returned by a run handler.
+ */
 export interface RunHandlerOutput {
+  /** Machine-readable exit classification. */
   readonly exitKind?: ExitKind;
+  /** Process-style numeric exit status. */
   readonly exitStatus?: number;
+  /** Effects produced by the handler. */
   readonly effects?: readonly RunEffect[];
+  /** Artifacts produced by the handler. */
   readonly artifacts?: readonly RunArtifact[];
+  /** Handler diagnostics folded into the run result. */
   readonly diagnostics?: readonly CliDiagnostic[];
 }
 
+/**
+ * Structured result envelope returned by {@link runCli}.
+ */
 export interface RunResult {
+  /** Schema version for this document. */
   readonly schemaVersion: 'cli-core.run-result.v1';
+  /** Correlation identifier for this run. */
   readonly runId: RunIdentifier;
+  /** Mode selected for this run. */
   readonly mode: RunMode;
+  /** Parsed invocation used by this run. */
   readonly invocation: ParsedInvocation;
+  /** False when diagnostics or exit policy classify the run as failing. */
   readonly ok: boolean;
+  /** Machine-readable exit classification. */
   readonly exitKind: ExitKind;
+  /** Process-style numeric exit status. */
   readonly exitStatus: number;
+  /** Ordered events emitted during the run. */
   readonly events: readonly RunEvent[];
+  /** Planned or emitted effects; adapters decide whether they are applied. */
   readonly effects: readonly RunEffect[];
+  /** Artifacts planned or emitted by handlers and lifecycle hooks. */
   readonly artifacts: readonly RunArtifact[];
+  /** Diagnostics from parse, config, validation, handlers, effects, and hooks. */
   readonly diagnostics: readonly CliDiagnostic[];
 }
 
+/**
+ * Ordered lifecycle event emitted during a run.
+ */
 export interface RunEvent {
+  /** Schema version for this document. */
   readonly schemaVersion: 'cli-core.run-event.v1';
+  /** Correlation identifier for this run. */
   readonly runId: RunIdentifier;
+  /** Monotonic event sequence number. */
   readonly sequence: number;
+  /** Lifecycle event name in chronological run order. */
   readonly name: RunEventName;
+  /** Event-specific structured data. */
   readonly payload: RunPayload;
 }
 
+/**
+ * Stable run event names.
+ */
 export type RunEventName =
   | 'parse.completed'
   | 'config.resolved'
@@ -106,46 +187,94 @@ export type RunEventName =
   | 'plugin.hooks.completed'
   | 'run.completed';
 
+/**
+ * Effect envelope produced or planned by a run.
+ */
 export type RunEffect = SpawnRunEffect | FileRunEffect | PluginRunEffect | CustomRunEffect;
 
+/**
+ * Structured spawn effect; shell interpolation is not implied.
+ */
 export interface SpawnRunEffect {
+  /** Effect category used by policy and adapters. */
   readonly kind: 'spawn';
+  /** Executable name or path; shell interpolation is not implied. */
   readonly command: string;
+  /** Arguments passed as structured tokens to the host adapter. */
   readonly argv: readonly string[];
+  /** Working directory when one is provided. */
   readonly cwd?: string;
+  /** Environment overrides passed to the host adapter. */
   readonly env?: Readonly<Record<string, string>>;
 }
 
+/**
+ * Structured file effect that requires an explicit adapter to apply.
+ */
 export interface FileRunEffect {
+  /** File operation requested from an explicit adapter. */
   readonly kind: 'write_file' | 'delete_path';
+  /** Filesystem path targeted by the file effect. */
   readonly path: string;
+  /** Content to write when the action needs it. */
   readonly content?: string;
 }
 
+/**
+ * Effect emitted from a plugin hook.
+ */
 export interface PluginRunEffect {
+  /** Effect category used to preserve plugin-originated effects. */
   readonly kind: 'plugin';
+  /** Plugin that emitted the effect. */
   readonly pluginName: string;
+  /** Name of the plugin hook. */
   readonly hookName: string;
+  /** Plugin hook event. */
   readonly event: CliPluginHookEvent;
+  /** Plugin-specific effect kind. */
   readonly effectKind: string;
+  /** Plugin-defined structured effect data. */
   readonly payload?: RunPayload;
 }
 
+/**
+ * Custom effect envelope for adapters that understand it.
+ */
 export interface CustomRunEffect {
+  /** Effect category for custom adapters. */
   readonly kind: 'custom';
+  /** Adapter-specific effect name. */
   readonly name: string;
+  /** Adapter-specific structured effect data. */
   readonly payload?: RunPayload;
 }
 
+/**
+ * Artifact emitted or planned by a command handler.
+ */
 export interface RunArtifact {
+  /** Artifact identifier chosen by the handler or plugin. */
   readonly id: string;
+  /** Artifact category understood by downstream consumers. */
   readonly kind: string;
+  /** Human-facing label for rendered output. */
   readonly label?: string;
+  /** Artifact data retained for machine consumers. */
   readonly payload: RunPayload;
 }
 
+/**
+ * Exit status override map keyed by exit kind.
+ */
 export type ExitStatusPolicy = Partial<Record<ExitKind, number>>;
 
+/**
+ * Plans or applies a parsed command invocation.
+ *
+ * @remarks
+ * The result is the truth surface: events, effects, artifacts, diagnostics, and exit status are returned as data.
+ */
 export async function runCli(program: CliProgram, request: RunRequest): Promise<RunResult> {
   const mode = request.mode ?? 'plan';
   const invocation = request.invocation ?? parseCli(program, { argv: request.argv ?? [] });

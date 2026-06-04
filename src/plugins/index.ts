@@ -19,8 +19,14 @@ import {
 } from '../diagnostics.ts';
 import { cliCorePackage } from '../package.ts';
 
+/**
+ * Runtime names accepted by plugin compatibility checks.
+ */
 export type CliPluginRuntime = 'node' | 'deno' | 'bun';
 
+/**
+ * Lifecycle hook events that plugins may declare.
+ */
 export type CliPluginHookEvent =
   | 'init'
   | 'preparse'
@@ -29,166 +35,329 @@ export type CliPluginHookEvent =
   | 'finally'
   | 'command_not_found';
 
+/**
+ * JSON-compatible payload passed through plugin hooks.
+ */
 export type CliPluginPayload = CliDiagnosticValue;
 
+/**
+ * Plugin manifest input accepted from package authors.
+ */
 export interface CliPluginManifestDefinition {
+  /** Plugin identity used for trust policy, diagnostics, and provenance. */
   readonly name: string;
+  /** Plugin version recorded in compatibility results and command provenance. */
   readonly version: string;
+  /** cli-core compatibility constraints for this plugin. */
   readonly cliCore?: CliPluginCoreCompatibility;
+  /** Runtime identifiers supported by a plugin. */
   readonly runtimes?: readonly CliPluginRuntime[];
+  /** Capabilities declared or allowed by a plugin. */
   readonly capabilities?: readonly string[];
+  /** Command-tree contributions applied before parsing when compatible. */
   readonly commands?: readonly CliCommandDefinition[];
+  /** Hook definitions declared by a plugin. */
   readonly hooks?: readonly CliPluginHookDefinitionInput[];
 }
 
+/**
+ * cli-core version range declared by a plugin.
+ */
 export interface CliPluginCoreCompatibility {
+  /** Minimum supported cli-core version. */
   readonly minVersion?: string;
+  /** Maximum supported cli-core version. */
   readonly maxVersion?: string;
 }
 
+/**
+ * Hook declaration input before normalization.
+ */
 export interface CliPluginHookDefinitionInput {
+  /** Hook identity used for ordering, diagnostics, and runtime lookup. */
   readonly name: string;
+  /** Plugin hook event. */
   readonly event: CliPluginHookEvent;
+  /** Execution order for this hook. */
   readonly order?: number;
+  /** Hook names or plugins that should run after this hook. */
   readonly before?: readonly string[];
+  /** Hook names or plugins that should run before this hook. */
   readonly after?: readonly string[];
 }
 
+/**
+ * Normalized plugin hook declaration.
+ */
 export interface CliPluginHookDefinition {
+  /** Hook identity used for ordering, diagnostics, and runtime lookup. */
   readonly name: string;
+  /** Plugin hook event. */
   readonly event: CliPluginHookEvent;
+  /** Execution order for this hook. */
   readonly order: number;
+  /** Hook names or plugins that should run after this hook. */
   readonly before: readonly string[];
+  /** Hook names or plugins that should run before this hook. */
   readonly after: readonly string[];
 }
 
+/**
+ * Normalized plugin manifest used for compatibility checks.
+ */
 export interface CliPluginManifest {
+  /** Schema version for this document. */
   readonly schemaVersion: 'cli-core.plugin.v1';
+  /** Plugin identity used for trust policy, diagnostics, and provenance. */
   readonly name: string;
+  /** Plugin version recorded in compatibility results and command provenance. */
   readonly version: string;
+  /** cli-core compatibility constraints for this plugin. */
   readonly cliCore: CliPluginCoreCompatibility;
+  /** Runtime identifiers supported by a plugin. */
   readonly runtimes: readonly CliPluginRuntime[];
+  /** Capabilities declared or allowed by a plugin. */
   readonly capabilities: readonly string[];
+  /** Normalized command-tree contributions from this plugin. */
   readonly commands: readonly CliCommandDefinition[];
+  /** Hook definitions declared by a plugin. */
   readonly hooks: readonly CliPluginHookDefinition[];
 }
 
+/**
+ * Lazy plugin registration used by plugin hosts.
+ */
 export interface CliPluginRegistration {
+  /** Plugin manifest associated with this module. */
   readonly manifest: CliPluginManifestDefinition | CliPluginManifest;
+  /** Lazy loader for a plugin module. */
   readonly load: CliPluginLoader;
 }
 
+/**
+ * Lazy loader for a plugin module.
+ */
 export type CliPluginLoader = () => CliPluginModule | Promise<CliPluginModule>;
 
+/**
+ * Runtime module returned by a plugin loader.
+ */
 export interface CliPluginModule {
+  /** Plugin manifest associated with this module. */
   readonly manifest?: CliPluginManifest;
+  /** Hook definitions declared by a plugin. */
   readonly hooks?: Readonly<Record<string, CliPluginHookHandler>>;
 }
 
+/**
+ * Hook handler invoked by a plugin host.
+ */
 export type CliPluginHookHandler = (
   context: CliPluginHookContext
 ) => CliPluginHookOutput | void | Promise<CliPluginHookOutput | void>;
 
+/**
+ * Immutable context passed to plugin hook handlers.
+ */
 export interface CliPluginHookContext {
+  /** Plugin hook event. */
   readonly event: CliPluginHookEvent;
+  /** Plugin whose hook is currently running. */
   readonly pluginName: string;
+  /** Name of the plugin hook. */
   readonly hookName: string;
+  /** Caller-provided hook payload after freezing. */
   readonly payload: CliPluginPayload;
 }
 
+/**
+ * Data returned by plugin hook handlers.
+ */
 export interface CliPluginHookOutput {
+  /** Plugin effects returned to the host as data. */
   readonly effects?: readonly CliPluginEffect[];
+  /** Hook diagnostics isolated to this plugin invocation. */
   readonly diagnostics?: readonly CliDiagnostic[];
 }
 
+/**
+ * Effect envelope emitted by plugin hooks.
+ */
 export interface CliPluginEffect {
+  /** Plugin-defined effect category. */
   readonly kind: string;
+  /** Plugin-defined structured effect data. */
   readonly payload?: CliPluginPayload;
 }
 
+/**
+ * Policy and compatibility input for creating a plugin host.
+ */
 export interface CliPluginHostInput {
+  /** cli-core version used for compatibility checks. */
   readonly cliCoreVersion?: string;
+  /** Runtime identifier for compatibility checks. */
   readonly runtime?: CliPluginRuntime;
+  /** Plugin identities allowed by policy. */
   readonly trustedPlugins?: readonly string[];
+  /** Whether capability allow-lists are required. */
   readonly requireExplicitCapabilities?: boolean;
+  /** Plugin capabilities allowed by policy. */
   readonly allowedCapabilities?: readonly string[];
 }
 
+/**
+ * Compatibility result for one plugin manifest.
+ */
 export interface CliPluginCompatibilityResult {
+  /** False when version, runtime, trust, or capability policy rejects the plugin. */
   readonly ok: boolean;
+  /** Plugin manifest associated with this module. */
   readonly manifest: CliPluginManifest;
+  /** Compatibility diagnostics that explain accepted or rejected policy checks. */
   readonly diagnostics: readonly CliDiagnostic[];
 }
 
+/**
+ * Policy input used when applying plugin command contributions.
+ */
 export type CliPluginCommandApplicationInput = CliPluginHostInput;
 
+/**
+ * Result of applying plugin command contributions to a program.
+ */
 export interface CliPluginCommandApplication {
+  /** Schema version for this document. */
   readonly schemaVersion: 'cli-core.plugin-command-application.v1';
+  /** False when any contribution was rejected before rebuilding the program. */
   readonly ok: boolean;
+  /** Definition used to compile the plugin-extended program. */
   readonly definition: CliDefinition;
+  /** CLI program for this operation. */
   readonly program: CliProgram;
+  /** Accepted plugin command contributions. */
   readonly contributions: readonly CliPluginCommandContribution[];
+  /** Compatibility and command-conflict diagnostics from application. */
   readonly diagnostics: readonly CliDiagnostic[];
 }
 
+/**
+ * Accepted command and alias paths contributed by one plugin.
+ */
 export interface CliPluginCommandContribution {
+  /** Plugin that provided the accepted command paths. */
   readonly pluginName: string;
+  /** Plugin version associated with the accepted command paths. */
   readonly pluginVersion: string;
+  /** Command paths contributed by the plugin. */
   readonly commandPaths: readonly (readonly string[])[];
+  /** Alias paths contributed by the plugin. */
   readonly aliasPaths: readonly (readonly string[])[];
 }
 
+/**
+ * Plugin host with compatibility, loading, planning, and hook execution operations.
+ */
 export interface CliPluginHost {
+  /** Registered plugin manifests. */
   readonly manifests: readonly CliPluginManifest[];
+  /** Host construction diagnostics that do not require module loading. */
   readonly diagnostics: readonly CliDiagnostic[];
+  /** Checks a plugin manifest against host policy. */
   readonly checkPlugin: (name: string) => CliPluginCompatibilityResult | undefined;
+  /** Plans hooks for an event without loading modules unnecessarily. */
   readonly planHooks: (event: CliPluginHookEvent) => CliPluginHookPlan;
+  /** Loads one plugin module through its lazy loader. */
   readonly loadPlugin: (name: string) => Promise<CliPluginLoadResult>;
+  /** Runs planned plugin hooks for an event. */
   readonly runHooks: (event: CliPluginHookEvent, context?: CliPluginHookRunInput) => Promise<CliPluginHookRunResult>;
 }
 
+/**
+ * Ordered hook plan for one lifecycle event.
+ */
 export interface CliPluginHookPlan {
+  /** Plugin hook event. */
   readonly event: CliPluginHookEvent;
+  /** Ordered hook references selected for this event. */
   readonly hooks: readonly CliPluginHookReference[];
+  /** Ordering diagnostics detected without loading plugin modules. */
   readonly diagnostics: readonly CliDiagnostic[];
 }
 
+/**
+ * Hook reference inside an ordered hook plan.
+ */
 export interface CliPluginHookReference {
+  /** Stable hook reference id composed from plugin and hook names. */
   readonly id: string;
+  /** Plugin that declared this hook. */
   readonly pluginName: string;
+  /** Name of the plugin hook. */
   readonly hookName: string;
+  /** Plugin hook event. */
   readonly event: CliPluginHookEvent;
+  /** Execution order for this hook. */
   readonly order: number;
 }
 
+/**
+ * Result of loading one plugin module.
+ */
 export interface CliPluginLoadResult {
+  /** False when compatibility or lazy loading failed for this plugin. */
   readonly ok: boolean;
+  /** Plugin manifest associated with this module. */
   readonly manifest: CliPluginManifest | undefined;
+  /** Loaded module when loading succeeded. */
   readonly module: CliPluginModule | undefined;
+  /** Compatibility and loader diagnostics for this plugin. */
   readonly diagnostics: readonly CliDiagnostic[];
 }
 
+/**
+ * Input for running plugin hooks for one event.
+ */
 export interface CliPluginHookRunInput {
+  /** Payload supplied to every hook invocation for this event. */
   readonly payload?: CliPluginPayload;
 }
 
+/**
+ * Result of running plugin hooks for one event.
+ */
 export interface CliPluginHookRunResult {
+  /** Plugin hook event. */
   readonly event: CliPluginHookEvent;
+  /** False when any planned hook returned or threw an error diagnostic. */
   readonly ok: boolean;
+  /** Hook invocation results in execution order. */
   readonly hooks: readonly CliPluginHookResult[];
+  /** Diagnostics collected across hook invocations. */
   readonly diagnostics: readonly CliDiagnostic[];
 }
 
+/**
+ * Result for one plugin hook invocation.
+ */
 export interface CliPluginHookResult {
+  /** Plugin whose hook produced this result. */
   readonly pluginName: string;
+  /** Name of the plugin hook. */
   readonly hookName: string;
+  /** Outcome for this hook invocation. */
   readonly status: 'passed' | 'failed' | 'skipped';
+  /** Effects returned by this hook invocation. */
   readonly effects: readonly CliPluginEffect[];
+  /** Diagnostics returned or synthesized for this hook invocation. */
   readonly diagnostics: readonly CliDiagnostic[];
 }
 
 const allRuntimes: readonly CliPluginRuntime[] = Object.freeze(['node', 'deno', 'bun']);
 
+/**
+ * Normalizes and freezes a plugin manifest.
+ */
 export function defineCliPluginManifest(definition: CliPluginManifestDefinition | CliPluginManifest): CliPluginManifest {
   const hooks = Object.freeze(
     (definition.hooks ?? []).map((hook) =>
@@ -214,6 +383,9 @@ export function defineCliPluginManifest(definition: CliPluginManifestDefinition 
   }) as CliPluginManifest;
 }
 
+/**
+ * Checks a plugin manifest against runtime, version, trust, and capability policy.
+ */
 export function checkCliPluginCompatibility(
   manifestInput: CliPluginManifestDefinition | CliPluginManifest,
   input: CliPluginHostInput = {}
@@ -236,6 +408,9 @@ export function checkCliPluginCompatibility(
   });
 }
 
+/**
+ * Applies compatible plugin command contributions before parsing.
+ */
 export function applyCliPluginCommands(
   target: CliDefinition | CliProgram,
   plugins: readonly (CliPluginManifestDefinition | CliPluginManifest)[],
@@ -322,6 +497,9 @@ export function applyCliPluginCommands(
   });
 }
 
+/**
+ * Creates a plugin host with lazy loading and ordered hook planning.
+ */
 export function createCliPluginHost(
   registrations: readonly CliPluginRegistration[],
   input: CliPluginHostInput = {}

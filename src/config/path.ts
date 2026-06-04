@@ -1,10 +1,16 @@
 import type { ConfigDiscoveryHost } from './types.ts';
 
+/**
+ * Returns default config filenames derived from a program name.
+ */
 export function defaultConfigFilenames(programName: string): readonly string[] {
   const safeName = programName.replaceAll(/[^A-Za-z0-9._-]/g, '-');
   return Object.freeze([`.${safeName}rc.json`, `${safeName}.config.json`]);
 }
 
+/**
+ * Returns directories searched for config discovery.
+ */
 export function candidateDirectories(
   host: ConfigDiscoveryHost,
   cwd: string,
@@ -23,21 +29,33 @@ export function candidateDirectories(
   return Object.freeze(directories);
 }
 
+/**
+ * Joins a config path through host path helpers when available.
+ */
 export function joinWithHost(host: ConfigDiscoveryHost, directory: string, filename: string): string {
   return normalizePath(host.joinPath?.(directory, filename) ?? joinPath(directory, filename));
 }
 
+/**
+ * Finds a parent path through host path helpers when available.
+ */
 export function dirnameWithHost(host: ConfigDiscoveryHost, path: string): string | undefined {
   const parent = host.dirname === undefined ? dirname(path) : host.dirname(path);
   return parent === undefined ? undefined : normalizePath(parent);
 }
 
+/**
+ * Joins path segments using cli-core path normalization.
+ */
 export function joinPath(directory: string, filename: string): string {
   if (filename.startsWith('/') || drivePrefix(filename) !== undefined) return normalizePath(filename);
   if (directory === '' || directory === '.') return normalizePath(filename);
   return normalizePath(`${directory.replace(/\/+$/u, '')}/${filename}`);
 }
 
+/**
+ * Returns the normalized parent path.
+ */
 export function dirname(path: string): string | undefined {
   const normalized = normalizePath(path);
   const driveRoot = driveRootPath(normalized);
@@ -49,6 +67,9 @@ export function dirname(path: string): string | undefined {
   return normalized.slice(0, index);
 }
 
+/**
+ * Normalizes path separators and duplicate segments for config discovery.
+ */
 export function normalizePath(path: string): string {
   const slashPath = path.replaceAll('\\', '/');
   const drive = drivePrefix(slashPath);

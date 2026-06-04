@@ -1,4 +1,4 @@
-import { defineSchema, parseArgs, toJsonResult, type ParseIssue } from 'argv-flags';
+import { defineSchema, parseArgs, toJsonResult, type ParseIssue as ArgvParseIssue } from 'argv-flags';
 import {
   createOptionSchema,
   findCliCommand,
@@ -9,49 +9,117 @@ import {
 } from '../command/index.ts';
 import { createCliDiagnostic, hasErrorDiagnostics, type CliDiagnostic } from '../diagnostics.ts';
 
+/**
+ * Explicit argv input for parsing.
+ */
 export interface ParseInput {
+  /** Tokens to parse after the executable and binary name have been removed. */
   readonly argv?: readonly string[];
+  /** Preserves unknown option tokens without turning them into parse diagnostics. */
   readonly allowUnknownOptions?: boolean;
 }
 
+/**
+ * Structured parse result returned by {@link parseCli}.
+ */
 export interface ParsedInvocation {
+  /** Schema version for this document. */
   readonly schemaVersion: 'cli-core.invocation.v1';
+  /** False when command lookup, option binding, or positional binding emitted an error. */
   readonly ok: boolean;
+  /** Frozen argv tokens that were parsed. */
   readonly argv: readonly string[];
+  /** Matched command, or the root command when lookup failed. */
   readonly command: CliCommand | undefined;
+  /** Canonical command path for the invocation. */
   readonly commandPath: readonly string[];
+  /** Alias that matched the invocation, if any. */
   readonly usedAlias: ParsedAlias | undefined;
+  /** Bound option values and low-level flag issues. */
   readonly options: ParsedCliOptions;
+  /** Bound positional values keyed by positional name. */
   readonly positionals: Readonly<Record<string, ParsedPositionalValue>>;
+  /** Raw positional values in argv order. */
   readonly positionalList: readonly string[];
+  /** Tokens preserved after the pass-through boundary. */
   readonly passThrough: readonly string[];
+  /** Parse diagnostics retained as structured data. */
   readonly diagnostics: readonly CliDiagnostic[];
 }
 
+/**
+ * Alias match captured during command lookup.
+ */
 export interface ParsedAlias {
+  /** Original token from user input. */
   readonly token: string;
+  /** Alias path used in argv. */
   readonly path: readonly string[];
+  /** Canonical command path for an alias. */
   readonly canonicalPath: readonly string[];
+  /** Deprecation marker emitted because this alias was used. */
   readonly deprecated?: boolean | string;
 }
 
+/**
+ * Option value stored after argv binding.
+ */
 export type ParsedCliOptionValue = string | number | boolean | readonly string[] | undefined;
 
+/**
+ * Positional value stored after argv binding.
+ */
 export type ParsedPositionalValue = string | readonly string[] | undefined;
 
+/**
+ * Normalized argv-flags issue captured in a parsed invocation.
+ */
+export interface ParseIssue {
+  /** Stable machine-readable issue code from argv-flags. */
+  readonly code: 'UNKNOWN_FLAG' | 'MISSING_VALUE' | 'INVALID_VALUE' | 'REQUIRED' | 'DUPLICATE' | 'EMPTY_VALUE';
+  /** Severity used when computing invocation validity. */
+  readonly severity: 'error' | 'warning';
+  /** Human-readable issue message. */
+  readonly message: string;
+  /** Flag token associated with the issue when available. */
+  readonly flag?: string;
+  /** Option key associated with the issue when available. */
+  readonly key?: string;
+  /** Raw string value associated with the issue when available. */
+  readonly value?: string;
+  /** Zero-based argv index associated with the issue when available. */
+  readonly index?: number;
+}
+
+/**
+ * Bound option values and low-level flag issues.
+ */
 export interface ParsedCliOptions {
+  /** Resolved values keyed by public name. */
   readonly values: Readonly<Record<string, ParsedCliOptionValue>>;
+  /** Presence map keyed by option name. */
   readonly present: Readonly<Record<string, boolean>>;
+  /** Unknown option tokens preserved by parsing. */
   readonly unknown: readonly string[];
+  /** Low-level argv-flags issues preserved as data. */
   readonly issues: readonly ParseIssue[];
 }
 
+/**
+ * Validation envelope that preserves diagnostics as data.
+ */
 export interface SemanticValidationResult {
+  /** False when validation policy rejects diagnostics on the invocation. */
   readonly ok: boolean;
+  /** Diagnostics considered by semantic validation. */
   readonly diagnostics: readonly CliDiagnostic[];
 }
 
+/**
+ * Controls semantic validation policy.
+ */
 export interface ValidationContext {
+  /** Whether warning diagnostics still allow a valid result. */
   readonly allowWarnings?: boolean;
 }
 
@@ -63,6 +131,12 @@ interface CommandMatch {
   readonly unknownCommand: readonly string[];
 }
 
+/**
+ * Parses argv into a structured invocation.
+ *
+ * @remarks
+ * Low-level flag parsing stays delegated to argv-flags; cli-core adds command lookup, positional binding, pass-through preservation, and diagnostics.
+ */
 export function parseCli(program: CliProgram, input: ParseInput = {}): ParsedInvocation {
   const argv = Object.freeze([...(input.argv ?? [])]);
   const { leading, passThrough } = splitPassThrough(argv);
@@ -95,6 +169,9 @@ export function parseCli(program: CliProgram, input: ParseInput = {}): ParsedInv
   });
 }
 
+/**
+ * Validates a parsed invocation against accumulated diagnostics.
+ */
 export function validateCli(
   program: CliProgram,
   invocation: ParsedInvocation,
@@ -197,10 +274,25 @@ function bindOptions(command: CliCommand, argv: readonly string[]): {
       values: freezeOptionValues(json.values),
       present: Object.freeze({ ...json.present }),
       unknown: Object.freeze([...json.unknown]),
-      issues: Object.freeze([...json.issues])
+      issues: freezeParseIssues(json.issues)
     }),
     rest: Object.freeze([...json.rest])
   };
+}
+
+function freezeParseIssues(issues: readonly ArgvParseIssue[]): readonly ParseIssue[] {
+  return Object.freeze(issues.map((issue) => {
+    const normalized: ParseIssue = {
+      code: issue.code,
+      severity: issue.severity,
+      message: issue.message,
+      ...(issue.flag === undefined ? {} : { flag: issue.flag }),
+      ...(issue.key === undefined ? {} : { key: issue.key }),
+      ...(issue.value === undefined ? {} : { value: issue.value }),
+      ...(issue.index === undefined ? {} : { index: issue.index })
+    };
+    return Object.freeze(normalized);
+  }));
 }
 
 function bindPositionals(command: CliCommand, rest: readonly string[]): {

@@ -8,49 +8,95 @@ import {
   type CliProgram
 } from '../command/index.ts';
 
+/**
+ * Machine-readable help document for a selected command.
+ */
 export interface HelpDocument {
+  /** Schema version for this document. */
   readonly schemaVersion: 'cli-core.help.v1';
+  /** Name of the CLI program. */
   readonly programName: string;
+  /** Canonical command path for the invocation. */
   readonly commandPath: readonly string[];
+  /** Usage line for the selected command. */
   readonly usage: string;
+  /** Summary text for the help document. */
   readonly summary: string | undefined;
+  /** Visible child commands for the selected command. */
   readonly commands: readonly HelpCommandEntry[];
+  /** Positional entries shown for this command. */
   readonly positionals: readonly HelpPositionalEntry[];
+  /** Option entries shown for this command. */
   readonly options: readonly HelpOptionEntry[];
 }
 
+/**
+ * Command entry included in help output.
+ */
 export interface HelpCommandEntry {
+  /** Command token shown in command listings. */
   readonly name: string;
+  /** Canonical command path for this help entry. */
   readonly path: readonly string[];
+  /** Aliases declared for this command. */
   readonly aliases: readonly string[];
+  /** Summary text for the command. */
   readonly summary: string | undefined;
+  /** Deprecation marker copied from the compiled command. */
   readonly deprecated: boolean | string | undefined;
+  /** Provenance for this command. */
   readonly source: CliCommandSource;
 }
 
+/**
+ * Positional entry included in help output.
+ */
 export interface HelpPositionalEntry {
+  /** Positional key shown in usage and help output. */
   readonly name: string;
+  /** Controls angle-bracket versus square-bracket usage rendering. */
   readonly required: boolean;
+  /** Whether this positional captures remaining tokens. */
   readonly variadic: boolean;
+  /** Rendered usage label for this positional. */
   readonly label: string;
+  /** Summary text for the positional. */
   readonly summary: string | undefined;
 }
 
+/**
+ * Option entry included in help output.
+ */
 export interface HelpOptionEntry {
+  /** Option key shown beside accepted flags. */
   readonly name: string;
+  /** Flag spellings accepted for this option. */
   readonly flags: readonly string[];
+  /** Value category used to explain expected option input. */
   readonly type: string;
+  /** Indicates whether parsing requires this option. */
   readonly required: boolean;
+  /** Indicates whether the option is inherited or local. */
   readonly scope: 'global' | 'local';
+  /** Summary text for the option. */
   readonly summary: string | undefined;
 }
 
+/**
+ * Machine-readable version document.
+ */
 export interface VersionDocument {
+  /** Schema version for this document. */
   readonly schemaVersion: 'cli-core.version.v1';
+  /** Program name associated with the version. */
   readonly name: string;
+  /** Program version, or undefined when the definition omitted one. */
   readonly version: string | undefined;
 }
 
+/**
+ * Creates a machine-readable help document.
+ */
 export function createHelpDocument(program: CliProgram, commandPath: readonly string[] = []): HelpDocument {
   const command = findCliCommand(program, commandPath) ?? program.root;
   const childCommands = findCliCommandChildren(program, command.id);
@@ -66,6 +112,9 @@ export function createHelpDocument(program: CliProgram, commandPath: readonly st
   });
 }
 
+/**
+ * Creates a machine-readable version document.
+ */
 export function createVersionDocument(program: CliProgram): VersionDocument {
   return Object.freeze({
     schemaVersion: 'cli-core.version.v1',

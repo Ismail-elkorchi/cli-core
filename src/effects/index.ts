@@ -7,64 +7,126 @@ import {
 import type { FileRunEffect, RunEffect, RunPayload, SpawnRunEffect } from '../run/index.ts';
 import { redactCliDiagnostics, redactCliSecrets, type CliRedactionOptions } from '../schema/index.ts';
 
+/**
+ * Effect application mode used by effect adapters.
+ */
 export type EffectApplicationMode = 'plan' | 'apply';
 
+/**
+ * Policy that authorizes effect application by kind.
+ */
 export interface EffectApplicationPolicy {
+  /** Whether spawn effects may be applied. */
   readonly allowSpawn?: boolean;
+  /** Whether file write effects may be applied. */
   readonly allowWriteFile?: boolean;
+  /** Whether delete path effects may be applied. */
   readonly allowDeletePath?: boolean;
+  /** Whether custom effects may be applied. */
   readonly allowCustom?: boolean;
 }
 
+/**
+ * Explicit request for planning or applying run effects.
+ */
 export interface EffectApplicationRequest {
+  /** Selects planning-only reporting or host-backed application. */
   readonly mode?: EffectApplicationMode;
+  /** Effects to plan or apply in the given order. */
   readonly effects: readonly RunEffect[];
+  /** Explicit host adapter used by this operation. */
   readonly host?: CliEffectHost;
+  /** Policy that authorizes effect application. */
   readonly policy?: EffectApplicationPolicy;
+  /** Redaction options applied to returned data. */
   readonly redaction?: CliRedactionOptions;
 }
 
+/**
+ * Host adapter that performs effects only when policy allows them.
+ */
 export interface CliEffectHost {
+  /** Applies a structured spawn effect. */
   readonly applySpawn?: (effect: SpawnRunEffect) => EffectHostResult | Promise<EffectHostResult>;
+  /** Applies a structured file-write effect. */
   readonly writeFile?: (effect: FileRunEffect) => EffectHostResult | Promise<EffectHostResult>;
+  /** Applies a structured delete-path effect. */
   readonly deletePath?: (effect: FileRunEffect) => EffectHostResult | Promise<EffectHostResult>;
+  /** Applies a custom effect envelope. */
   readonly applyCustom?: (effect: RunEffect) => EffectHostResult | Promise<EffectHostResult>;
 }
 
+/**
+ * Result returned by an effect host operation.
+ */
 export interface EffectHostResult {
+  /** Marks a host operation as failed even when it did not throw. */
   readonly ok?: boolean;
+  /** Host-specific result data included in the item report. */
   readonly payload?: RunPayload;
+  /** Host diagnostics folded into the item and aggregate reports. */
   readonly diagnostics?: readonly CliDiagnostic[];
 }
 
+/**
+ * Report returned after effect planning or application.
+ */
 export interface EffectApplicationReport {
+  /** Schema version for this document. */
   readonly schemaVersion: 'cli-core.effect-application.v1';
+  /** Mode used for every item in this report. */
   readonly mode: EffectApplicationMode;
+  /** False when any item was denied, failed, or emitted error diagnostics. */
   readonly ok: boolean;
+  /** Per-item application reports. */
   readonly reports: readonly EffectApplicationItemReport[];
+  /** Aggregate diagnostics from policy checks and host operations. */
   readonly diagnostics: readonly CliDiagnostic[];
 }
 
+/**
+ * Per-effect planning or application report.
+ */
 export interface EffectApplicationItemReport {
+  /** Effect associated with this application report. */
   readonly effect: RunEffect;
+  /** Policy or host outcome for this effect. */
   readonly status: 'planned' | 'applied' | 'denied' | 'failed';
+  /** Host result data after redaction. */
   readonly payload: RunPayload;
+  /** Diagnostics specific to this effect. */
   readonly diagnostics: readonly CliDiagnostic[];
 }
 
+/**
+ * In-memory effect host for tests and examples.
+ */
 export interface MemoryEffectHost {
+  /** Explicit host adapter used by this operation. */
   readonly host: CliEffectHost;
+  /** Returns file writes currently recorded by the host. */
   readonly files: () => Readonly<Record<string, string>>;
+  /** Returns spawn requests currently recorded by the host. */
   readonly spawns: () => readonly MemorySpawnRecord[];
 }
 
+/**
+ * Spawn effect captured by the memory effect host.
+ */
 export interface MemorySpawnRecord {
+  /** Executable requested by the spawn effect. */
   readonly command: string;
+  /** Structured spawn arguments recorded without shell parsing. */
   readonly argv: readonly string[];
+  /** Working directory when one is provided. */
   readonly cwd: string | undefined;
+  /** Environment overrides recorded for this spawn. */
   readonly env: Readonly<Record<string, string>> | undefined;
 }
 
+/**
+ * Returns a report for effects without applying a host.
+ */
 export function planCliEffects(effects: readonly RunEffect[], redaction?: CliRedactionOptions): EffectApplicationReport {
   return finishEffectReport({
     mode: 'plan',
@@ -74,6 +136,9 @@ export function planCliEffects(effects: readonly RunEffect[], redaction?: CliRed
   });
 }
 
+/**
+ * Applies run effects through an explicit host and policy.
+ */
 export async function applyCliEffects(request: EffectApplicationRequest): Promise<EffectApplicationReport> {
   if ((request.mode ?? 'apply') === 'plan') {
     return planCliEffects(request.effects, request.redaction);
@@ -107,6 +172,9 @@ export async function applyCliEffects(request: EffectApplicationRequest): Promis
   return finishEffectReport({ mode: 'apply', reports, diagnostics, redaction: request.redaction });
 }
 
+/**
+ * Creates an in-memory effect host for tests and examples.
+ */
 export function createMemoryEffectHost(): MemoryEffectHost {
   const files = new Map<string, string>();
   const spawns: MemorySpawnRecord[] = [];

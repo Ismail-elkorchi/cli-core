@@ -11,6 +11,9 @@ import type {
   MemoryConfigDiscoveryHostInput
 } from './types.ts';
 
+/**
+ * Creates an in-memory config discovery host.
+ */
 export function createMemoryConfigDiscoveryHost(
   input: MemoryConfigDiscoveryHostInput = {}
 ): MemoryConfigDiscoveryHost {
