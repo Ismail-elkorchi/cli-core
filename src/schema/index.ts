@@ -3,8 +3,8 @@ import {
   hasErrorDiagnostics,
   type CliDiagnostic,
   type CliDiagnosticValue
-} from '../diagnostics.js';
-import { cliCorePackage } from '../package.js';
+} from '../diagnostics.ts';
+import { cliCorePackage } from '../package.ts';
 
 export type CliSchemaName =
   | 'program'

@@ -1,7 +1,7 @@
-import type { CliProgram } from '../command/index.js';
-import { createCliDiagnostic, hasErrorDiagnostics, type CliDiagnostic } from '../diagnostics.js';
-import { buildDiscovery } from './discovery.js';
-import { migrateConfigFile } from './migration.js';
+import type { CliProgram } from '../command/index.ts';
+import { createCliDiagnostic, hasErrorDiagnostics, type CliDiagnostic } from '../diagnostics.ts';
+import { buildDiscovery } from './discovery.ts';
+import { migrateConfigFile } from './migration.ts';
 import type {
   ConfigFieldDefinition,
   ConfigInput,
@@ -11,7 +11,7 @@ import type {
   ConfigExplanation,
   ConfigSource,
   ConfigValue
-} from './types.js';
+} from './types.ts';
 
 export function resolveCliConfig(program: CliProgram, input: ConfigInput = {}): ConfigResolution {
   const definition = program.config;

@@ -1,5 +1,5 @@
-import { createCliDiagnostic, type CliDiagnostic } from '../diagnostics.js';
-import type { ConfigFileInput, ConfigMigration, ConfigValue } from './types.js';
+import { createCliDiagnostic, type CliDiagnostic } from '../diagnostics.ts';
+import type { ConfigFileInput, ConfigMigration, ConfigValue } from './types.ts';
 
 export function migrateConfigFile(
   file: ConfigFileInput,

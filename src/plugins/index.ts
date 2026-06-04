@@ -10,14 +10,14 @@ import {
   type CliPositional,
   type CliPositionalDefinition,
   type CliProgram
-} from '../command/index.js';
+} from '../command/index.ts';
 import {
   createCliDiagnostic,
   hasErrorDiagnostics,
   type CliDiagnostic,
   type CliDiagnosticValue
-} from '../diagnostics.js';
-import { cliCorePackage } from '../package.js';
+} from '../diagnostics.ts';
+import { cliCorePackage } from '../package.ts';
 
 export type CliPluginRuntime = 'node' | 'deno' | 'bun';
 

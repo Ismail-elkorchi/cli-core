@@ -1,14 +1,14 @@
-import type { CliCommand, CliProgram } from '../command/index.js';
-import type { ConfigResolution } from '../config/index.js';
+import type { CliCommand, CliProgram } from '../command/index.ts';
+import type { ConfigResolution } from '../config/index.ts';
 import {
   createCliDiagnostic,
   hasErrorDiagnostics,
   type CliDiagnostic,
   type CliDiagnosticValue
-} from '../diagnostics.js';
-import { parseCli, type ParsedInvocation, type SemanticValidationResult } from '../parse/index.js';
-import type { CliPluginHookEvent, CliPluginHookRunResult, CliPluginHost } from '../plugins/index.js';
-import { redactCliDiagnostics, redactCliSecrets, type CliRedactionOptions } from '../schema/index.js';
+} from '../diagnostics.ts';
+import { parseCli, type ParsedInvocation, type SemanticValidationResult } from '../parse/index.ts';
+import type { CliPluginHookEvent, CliPluginHookRunResult, CliPluginHost } from '../plugins/index.ts';
+import { redactCliDiagnostics, redactCliSecrets, type CliRedactionOptions } from '../schema/index.ts';
 
 export type RunMode = 'plan' | 'apply';
 

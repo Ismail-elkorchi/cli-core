@@ -6,7 +6,7 @@ import {
   type CliOption,
   type CliPositional,
   type CliProgram
-} from '../command/index.js';
+} from '../command/index.ts';
 
 export interface HelpDocument {
   readonly schemaVersion: 'cli-core.help.v1';

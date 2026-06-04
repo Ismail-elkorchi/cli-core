@@ -1,15 +1,15 @@
-export { cliCorePackage } from './package.js';
-export type { CliCorePackage } from './package.js';
-export { defineCli } from './command/index.js';
+export { cliCorePackage } from './package.ts';
+export type { CliCorePackage } from './package.ts';
+export { defineCli } from './command/index.ts';
 export {
   completeCli,
   createCompletionPayload
-} from './completion/index.js';
-export { resolveCliConfig } from './config/index.js';
-export { createHelpDocument } from './help/index.js';
-export { describeCli } from './manifest/index.js';
-export { parseCli, validateCli } from './parse/index.js';
-export { runCli } from './run/index.js';
+} from './completion/index.ts';
+export { resolveCliConfig } from './config/index.ts';
+export { createHelpDocument } from './help/index.ts';
+export { describeCli } from './manifest/index.ts';
+export { parseCli, validateCli } from './parse/index.ts';
+export { runCli } from './run/index.ts';
 export type {
   CliAlias,
   CliAliasDefinition,
@@ -27,13 +27,13 @@ export type {
   CliPositional,
   CliPositionalDefinition,
   CliProgram
-} from './command/index.js';
+} from './command/index.ts';
 export type {
   CompletionInput,
   CompletionItem,
   CompletionPayload,
   CompletionResponse
-} from './completion/index.js';
+} from './completion/index.ts';
 export type {
   ParsedAlias,
   ParsedCliOptionValue,
@@ -43,7 +43,7 @@ export type {
   ParseInput,
   SemanticValidationResult,
   ValidationContext
-} from './parse/index.js';
+} from './parse/index.ts';
 export type {
   ConfigCandidate,
   ConfigDefinition,
@@ -57,20 +57,20 @@ export type {
   ConfigSource,
   ConfigValue,
   ConfigValueType
-} from './config/index.js';
+} from './config/index.ts';
 export type {
   CliDiagnostic,
   CliDiagnosticCode,
   CliDiagnosticSeverity,
   CliDiagnosticValue
-} from './diagnostics.js';
+} from './diagnostics.ts';
 export type {
   HelpCommandEntry,
   HelpDocument,
   HelpOptionEntry,
   HelpPositionalEntry,
   VersionDocument
-} from './help/index.js';
+} from './help/index.ts';
 export type {
   CommandManifest,
   ManifestAlias,
@@ -79,7 +79,7 @@ export type {
   ManifestOption,
   ManifestPositional,
   ManifestProgram
-} from './manifest/index.js';
+} from './manifest/index.ts';
 export type {
   CustomRunEffect,
   ExitKind,
@@ -100,4 +100,4 @@ export type {
   RunRequest,
   RunResult,
   SpawnRunEffect
-} from './run/index.js';
+} from './run/index.ts';

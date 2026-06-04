@@ -286,7 +286,8 @@ and optional trusted-plugin checks before they participate in parsing or running
 
 ## Runtime Support
 
-The package is built as ESM and requires Node `>=24`. The repository keeps smoke
+The npm package is built as ESM and requires Node `>=24`. JSR publishing uses the
+TypeScript source entrypoints declared in `jsr.json`. The repository keeps smoke
 tests for Node, Deno, and Bun imports. These checks are not exhaustive operating
 system, shell, filesystem, or package-manager compatibility guarantees.
 
@@ -324,6 +325,9 @@ npm run test:mutation:dry
 npm run test:mutation:file -- src/config/path.ts
 npm run test:mutation:all
 npm run check:exports
+npm run check:deno:source
+npm run check:deno:lint
+npm run check:jsr
 npm run check:leakage
 ```
 

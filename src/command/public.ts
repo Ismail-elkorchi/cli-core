@@ -1,4 +1,4 @@
-export { defineCli, findCliCommand, findCliCommandByAlias } from './index.js';
+export { defineCli, findCliCommand, findCliCommandByAlias } from './index.ts';
 export type {
   CliAlias,
   CliAliasDefinition,
@@ -16,4 +16,4 @@ export type {
   CliPositional,
   CliPositionalDefinition,
   CliProgram
-} from './index.js';
+} from './index.ts';

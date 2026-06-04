@@ -1,10 +1,10 @@
-import type { CliProgram } from '../command/index.js';
-import { createCliDiagnostic, hasErrorDiagnostics, type CliDiagnostic } from '../diagnostics.js';
+import type { CliProgram } from '../command/index.ts';
+import { createCliDiagnostic, hasErrorDiagnostics, type CliDiagnostic } from '../diagnostics.ts';
 import {
   candidateDirectories,
   defaultConfigFilenames,
   joinWithHost
-} from './path.js';
+} from './path.ts';
 import type {
   ConfigDiscoveryCollection,
   ConfigDiscoveryEnvironmentInput,
@@ -16,7 +16,7 @@ import type {
   ConfigFileInput,
   ConfigInput,
   ConfigValue
-} from './types.js';
+} from './types.ts';
 
 export async function discoverCliConfigInput(
   program: CliProgram,

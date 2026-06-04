@@ -1,4 +1,4 @@
-import type { CliProgram } from '../command/index.js';
+import type { CliProgram } from '../command/index.ts';
 import {
   applyCliEffects,
   planCliEffects,
@@ -6,8 +6,8 @@ import {
   type EffectApplicationRequest,
   type EffectApplicationPolicy,
   type EffectApplicationReport
-} from '../effects/index.js';
-import type { CliPluginHost } from '../plugins/index.js';
+} from '../effects/index.ts';
+import type { CliPluginHost } from '../plugins/index.ts';
 import {
   runCli,
   type ExitStatusPolicy,
@@ -17,8 +17,8 @@ import {
   type RunHandler,
   type RunMode,
   type RunResult
-} from '../run/index.js';
-import { redactCliDiagnostics, redactCliSecrets, type CliRedactionOptions } from '../schema/index.js';
+} from '../run/index.ts';
+import { redactCliDiagnostics, redactCliSecrets, type CliRedactionOptions } from '../schema/index.ts';
 
 export type CliMainEffectMode = 'none' | 'plan' | 'apply';
 
@@ -177,10 +177,10 @@ function buildRunRequest(request: CliMainRequest, host: CliMainHost) {
   return runRequest;
 }
 
-async function runEffectsForMain(
+function runEffectsForMain(
   request: CliMainRequest,
   run: RunResult
-): Promise<EffectApplicationReport | undefined> {
+): EffectApplicationReport | Promise<EffectApplicationReport> | undefined {
   const effectMode = request.effectMode ?? 'none';
   if (effectMode === 'none') return undefined;
   if (effectMode === 'plan') return planCliEffects(run.effects, request.redaction);

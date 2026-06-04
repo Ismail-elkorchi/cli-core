@@ -1,6 +1,6 @@
 import type { FlagSpec, FlagType, FlagValue } from 'argv-flags';
-import type { ConfigDefinition } from '../config/types.js';
-import { createCliDiagnostic, type CliDiagnostic } from '../diagnostics.js';
+import type { ConfigDefinition } from '../config/types.ts';
+import { createCliDiagnostic, type CliDiagnostic } from '../diagnostics.ts';
 
 export type CliOptionType = FlagType;
 

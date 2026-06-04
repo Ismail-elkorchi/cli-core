@@ -1,6 +1,6 @@
-import type { CliCommand, CliCommandSource, CliOption, CliPositional, CliProgram } from '../command/index.js';
-import type { CliDiagnostic } from '../diagnostics.js';
-import { cliCorePackage } from '../package.js';
+import type { CliCommand, CliCommandSource, CliOption, CliPositional, CliProgram } from '../command/index.ts';
+import type { CliDiagnostic } from '../diagnostics.ts';
+import { cliCorePackage } from '../package.ts';
 
 export interface CommandManifest {
   readonly schemaVersion: 'cli-core.manifest.v1';

@@ -1,9 +1,9 @@
-import { defineCli, type CliDefinition } from '../command/index.js';
-import { resolveCliConfig, type ConfigInput, type ConfigValue } from '../config/index.js';
-import type { CliDiagnosticCode } from '../diagnostics.js';
-import { parseCli } from '../parse/index.js';
-import { applyCliPluginCommands, type CliPluginManifest, type CliPluginManifestDefinition } from '../plugins/index.js';
-import { runCli, type ExitKind, type RunArtifact, type RunEffect, type RunMode, type RunPayload } from '../run/index.js';
+import { defineCli, type CliDefinition } from '../command/index.ts';
+import { resolveCliConfig, type ConfigInput, type ConfigValue } from '../config/index.ts';
+import type { CliDiagnosticCode } from '../diagnostics.ts';
+import { parseCli } from '../parse/index.ts';
+import { applyCliPluginCommands, type CliPluginManifest, type CliPluginManifestDefinition } from '../plugins/index.ts';
+import { runCli, type ExitKind, type RunArtifact, type RunEffect, type RunMode, type RunPayload } from '../run/index.ts';
 
 export type CliFixtureValue =
   | null
@@ -184,7 +184,7 @@ export interface CliScenarioResult {
 }
 
 // Stryker disable all: built-in fixture corpus is static sample data; behavior tests cover public consumers and selected generated fixtures, not exact inventory strings.
-export const commandFixtures = Object.freeze([
+export const commandFixtures: readonly CliFixture[] = Object.freeze([
   defineCliFixture({
     id: 'commands.minimal-program',
     family: 'commands',
@@ -275,7 +275,7 @@ export const commandFixtures = Object.freeze([
   })
 ]);
 
-export const configFixtures = Object.freeze([
+export const configFixtures: readonly CliFixture[] = Object.freeze([
   defineCliFixture({
     id: 'config.config-layer-stack',
     family: 'config',
@@ -331,7 +331,7 @@ export const configFixtures = Object.freeze([
   })
 ]);
 
-export const pluginFixtures = Object.freeze([
+export const pluginFixtures: readonly CliFixture[] = Object.freeze([
   defineCliFixture({
     id: 'plugins.compatible-plugin',
     family: 'plugins',
@@ -416,7 +416,7 @@ export const pluginFixtures = Object.freeze([
   })
 ]);
 
-export const runFixtures = Object.freeze([
+export const runFixtures: readonly CliFixture[] = Object.freeze([
   defineCliFixture({
     id: 'runs.apply-run',
     family: 'runs',
@@ -483,7 +483,7 @@ export const runFixtures = Object.freeze([
   })
 ]);
 
-export const cliCoreFixtures = Object.freeze([
+export const cliCoreFixtures: readonly CliFixture[] = Object.freeze([
   ...commandFixtures,
   ...configFixtures,
   ...pluginFixtures,
@@ -676,7 +676,10 @@ async function runScenarioStep(harness: CliHarness, step: CliScenarioStep, index
   });
 }
 
-async function inspectScenarioStep(harness: CliHarness, step: CliScenarioStep): Promise<readonly CliTestDiagnostic[]> {
+function inspectScenarioStep(
+  harness: CliHarness,
+  step: CliScenarioStep
+): readonly CliTestDiagnostic[] | Promise<readonly CliTestDiagnostic[]> {
   if (step.kind === 'entrypoint-load') return inspectEntrypointStep(harness, step);
   if (step.kind === 'fixture-available') return inspectFixtureStep(harness, step);
   if (step.kind === 'parse') return inspectParseStep(step);

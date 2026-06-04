@@ -6,8 +6,8 @@ import {
   type CliCommand,
   type CliCommandAliasIndexEntry,
   type CliProgram
-} from '../command/index.js';
-import { createCliDiagnostic, hasErrorDiagnostics, type CliDiagnostic } from '../diagnostics.js';
+} from '../command/index.ts';
+import { createCliDiagnostic, hasErrorDiagnostics, type CliDiagnostic } from '../diagnostics.ts';
 
 export interface ParseInput {
   readonly argv?: readonly string[];
@@ -95,7 +95,7 @@ export function parseCli(program: CliProgram, input: ParseInput = {}): ParsedInv
   });
 }
 
-export async function validateCli(
+export function validateCli(
   program: CliProgram,
   invocation: ParsedInvocation,
   context: ValidationContext = {}
@@ -103,10 +103,10 @@ export async function validateCli(
   const diagnostics = uniqueDiagnostics([...program.diagnostics, ...invocation.diagnostics]);
   const warningsAreAllowed = context.allowWarnings ?? true;
   const hasWarningDiagnostics = diagnostics.some((item) => item.severity === 'warning');
-  return Object.freeze({
+  return Promise.resolve(Object.freeze({
     ok: !hasErrorDiagnostics(diagnostics) && (warningsAreAllowed || !hasWarningDiagnostics),
     diagnostics
-  });
+  }));
 }
 
 function uniqueDiagnostics(diagnostics: readonly CliDiagnostic[]): readonly CliDiagnostic[] {
