@@ -82,7 +82,7 @@ export interface ConfigDiscoveryInput {
 }
 
 /**
- * Explicit config layers consumed by {@link resolveCliConfig}.
+ * Explicit config layers consumed by resolveCliConfig.
  */
 export interface ConfigInput {
   /** Workspace default config values. */
@@ -253,7 +253,7 @@ export interface ConfigDiscoveryCollection {
   readonly schemaVersion: 'cli-core.config-discovery.v1';
   /** False when collection produced an error diagnostic. */
   readonly ok: boolean;
-  /** Config input assembled for {@link resolveCliConfig}. */
+  /** Config input assembled for resolveCliConfig. */
   readonly input: ConfigInput;
   /** Config files successfully read and parsed by the host. */
   readonly files: readonly ConfigFileInput[];

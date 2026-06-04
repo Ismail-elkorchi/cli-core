@@ -410,6 +410,27 @@ export function checkCliPluginCompatibility(
 
 /**
  * Applies compatible plugin command contributions before parsing.
+ *
+ * @example
+ * ```ts
+ * import { defineCli } from '@ismail-elkorchi/cli-core';
+ * import { applyCliPluginCommands } from '@ismail-elkorchi/cli-core/plugins';
+ *
+ * const base = defineCli({ name: 'ship' });
+ * const extended = applyCliPluginCommands(base, [
+ *   {
+ *     name: 'audit-plugin',
+ *     version: '1.0.0',
+ *     capabilities: ['commands'],
+ *     commands: [{ name: 'audit' }]
+ *   }
+ * ], {
+ *   trustedPlugins: ['audit-plugin'],
+ *   allowedCapabilities: ['commands']
+ * });
+ *
+ * extended.program.commands.some((command) => command.path.join(' ') === 'audit');
+ * ```
  */
 export function applyCliPluginCommands(
   target: CliDefinition | CliProgram,

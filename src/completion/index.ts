@@ -97,7 +97,7 @@ export interface CompletionRequestInput {
 }
 
 /**
- * Normalized completion request used by {@link completeCli}.
+ * Normalized completion request used by completeCli.
  */
 export interface CompletionRequest {
   /** Schema version for this document. */
@@ -298,6 +298,24 @@ export function createCompletionRequest(input: CompletionRequestInput | readonly
 
 /**
  * Completes command, alias, option, and positional candidates from shell words.
+ *
+ * @example
+ * ```ts
+ * import { defineCli, completeCli } from '@ismail-elkorchi/cli-core';
+ *
+ * const program = defineCli({
+ *   name: 'ship',
+ *   commands: [{ name: 'deploy', options: [{ name: 'region', type: 'string', flags: ['--region'] }] }]
+ * });
+ *
+ * const response = completeCli(program, {
+ *   words: ['ship', 'deploy', '--'],
+ *   currentWord: '--',
+ *   cursor: 2
+ * });
+ *
+ * response.payload.items.map((item) => item.value); // ["--region"]
+ * ```
  */
 export function completeCli(
   program: CliProgram,

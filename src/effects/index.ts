@@ -138,6 +138,21 @@ export function planCliEffects(effects: readonly RunEffect[], redaction?: CliRed
 
 /**
  * Applies run effects through an explicit host and policy.
+ *
+ * @example
+ * ```ts
+ * import { applyCliEffects, createMemoryEffectHost } from '@ismail-elkorchi/cli-core/effects';
+ *
+ * const memory = createMemoryEffectHost();
+ * const report = await applyCliEffects({
+ *   effects: [{ kind: 'write_file', path: 'out.txt', content: 'ok' }],
+ *   host: memory.host,
+ *   policy: { allowWriteFile: true }
+ * });
+ *
+ * report.ok; // true
+ * memory.files()['out.txt']; // "ok"
+ * ```
  */
 export async function applyCliEffects(request: EffectApplicationRequest): Promise<EffectApplicationReport> {
   if ((request.mode ?? 'apply') === 'plan') {

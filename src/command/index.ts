@@ -42,7 +42,7 @@ export interface CliDefinition {
 }
 
 /**
- * Command-tree node accepted by {@link defineCli}.
+ * Command-tree node accepted by defineCli.
  */
 export interface CliCommandDefinition {
   /** Command path token relative to the parent command. */
@@ -131,7 +131,7 @@ export interface CliOptionDefinition<T extends CliOptionType = CliOptionType> {
 }
 
 /**
- * Immutable command program returned by {@link defineCli}.
+ * Immutable command program returned by defineCli.
  *
  * @remarks
  * Arrays remain available for serialization, while lookup helpers use internal indexes for command, alias, and child lookup.
@@ -279,6 +279,20 @@ const commandLookupIndexes = new WeakMap<CliProgram, CliCommandLookupIndex>();
  *
  * @remarks
  * The returned program carries diagnostics for invalid definitions instead of throwing, which keeps definition review machine-readable.
+ *
+ * @example
+ * ```ts
+ * import { defineCli } from '@ismail-elkorchi/cli-core';
+ *
+ * const program = defineCli({
+ *   name: 'ship',
+ *   commands: [{ name: 'deploy', aliases: ['d'] }]
+ * });
+ *
+ * if (program.diagnostics.length > 0) {
+ *   // Invalid definitions are reported as data rather than thrown.
+ * }
+ * ```
  */
 export function defineCli(definition: CliDefinition): CliProgram {
   const diagnostics: CliDiagnostic[] = [];

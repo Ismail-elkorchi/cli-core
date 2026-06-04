@@ -52,7 +52,7 @@ export interface CliMainRequest {
   readonly program: CliProgram;
   /** Default argv tokens used when the host does not supply argv. */
   readonly argv?: readonly string[];
-  /** Run mode forwarded to {@link runCli}. */
+  /** Run mode forwarded to runCli. */
   readonly mode?: RunMode;
   /** Run handlers keyed by command id, path, or name. */
   readonly handlers?: Readonly<Record<string, RunHandler>>;
@@ -140,6 +140,29 @@ export interface CliWritableStream {
 
 /**
  * Creates a reusable CLI main function from a request.
+ *
+ * @example
+ * ```ts
+ * import { defineCli } from '@ismail-elkorchi/cli-core';
+ * import { createCliMain } from '@ismail-elkorchi/cli-core/adapter';
+ *
+ * const program = defineCli({ name: 'ship', commands: [{ name: 'status' }] });
+ * const main = createCliMain({
+ *   program,
+ *   mode: 'apply',
+ *   handlers: { status: () => ({ artifacts: [{ id: 'status', kind: 'text', payload: 'ok' }] }) }
+ * });
+ *
+ * const stdout: string[] = [];
+ * const stderr: string[] = [];
+ * let exitCode: number | undefined;
+ * await main({
+ *   argv: ['status'],
+ *   writeStdout: (text) => stdout.push(text),
+ *   writeStderr: (text) => stderr.push(text),
+ *   setExitCode: (status) => { exitCode = status; }
+ * });
+ * ```
  */
 export function createCliMain(request: CliMainRequest): CliMain {
   return (host: CliMainHost = {}) => runCliMain(request, host);
