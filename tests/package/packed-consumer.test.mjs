@@ -9,6 +9,7 @@ import test from 'node:test';
 
 const execFileAsync = promisify(execFile);
 const repoRoot = fileURLToPath(new URL('../..', import.meta.url));
+const tscBin = join(repoRoot, 'node_modules', 'typescript', 'bin', 'tsc');
 
 test('packed package installs and runs from an outside Node consumer', async (context) => {
   const workspace = await mkdtemp(join(tmpdir(), 'cli-core-consumer-'));
@@ -27,6 +28,20 @@ test('packed package installs and runs from an outside Node consumer', async (co
   await execNpm(['install', '--ignore-scripts', '--no-audit', '--no-fund', join(workspace, pack.filename)], {
     cwd: workspace
   });
+  await writeFile(join(workspace, 'consumer-types.ts'), consumerTypesSource());
+  await execFileAsync(process.execPath, [
+    tscBin,
+    '--noEmit',
+    '--strict',
+    '--target',
+    'ES2022',
+    '--module',
+    'NodeNext',
+    '--moduleResolution',
+    'NodeNext',
+    '--resolveJsonModule',
+    'consumer-types.ts'
+  ], { cwd: workspace });
   await writeFile(join(workspace, 'consumer.mjs'), consumerScenarioSource());
 
   const { stdout } = await execFileAsync(process.execPath, ['consumer.mjs'], {
@@ -34,22 +49,40 @@ test('packed package installs and runs from an outside Node consumer', async (co
   });
   const result = JSON.parse(stdout);
 
-  assert.equal(result.packageName, '@ismail-elkorchi/cli-core');
-  assert.equal(result.invocationOk, true);
-  assert.equal(result.configProfile, 'ci');
-  assert.equal(result.helpCommand, 'deploy');
-  assert.equal(result.manifestHasPluginCommand, true);
-  assert.equal(result.completionCandidate, 'audit');
-  assert.equal(result.repairCode, 'REPAIR_UNKNOWN_COMMAND');
-  assert.equal(result.runOk, true);
-  assert.equal(result.mainExitStatus, 0);
-  assert.equal(result.effectReportOk, true);
-  assert.equal(result.redactedToken, '[REDACTED]');
-  assert.equal(result.harnessStatus, 'passed');
-  assert.equal(result.schemaArtifactsIncludeManifest, true);
+  assertFullConsumerResult(result);
 });
 
-test('packed package can be imported by Bun from an outside consumer when Bun is available', async (context) => {
+test('packed package installs and runs from an outside Deno consumer when Deno is available', async (context) => {
+  if (!(await commandAvailable('deno'))) {
+    context.skip('deno is not available in this environment');
+    return;
+  }
+
+  const workspace = await mkdtemp(join(tmpdir(), 'cli-core-deno-consumer-'));
+  context.after(async () => {
+    await rm(workspace, { recursive: true, force: true });
+  });
+
+  const pack = await packPackage(workspace);
+  await writeFile(join(workspace, 'package.json'), `${JSON.stringify({
+    name: 'cli-core-packed-deno-consumer',
+    private: true,
+    type: 'module'
+  }, null, 2)}\n`);
+  await execNpm(['install', '--ignore-scripts', '--no-audit', '--no-fund', join(workspace, pack.filename)], {
+    cwd: workspace
+  });
+  await writeFile(join(workspace, 'consumer-deno.mjs'), consumerScenarioSource());
+
+  const { stdout } = await execFileAsync(platformCommand('deno'), ['run', '--allow-read', 'consumer-deno.mjs'], {
+    cwd: workspace
+  });
+  const result = JSON.parse(stdout);
+
+  assertFullConsumerResult(result);
+});
+
+test('packed package installs and runs from an outside Bun consumer when Bun is available', async (context) => {
   if (!(await commandAvailable('bun'))) {
     context.skip('bun is not available in this environment');
     return;
@@ -69,18 +102,14 @@ test('packed package can be imported by Bun from an outside consumer when Bun is
   await execNpm(['install', '--ignore-scripts', '--no-audit', '--no-fund', join(workspace, pack.filename)], {
     cwd: workspace
   });
-  await writeFile(join(workspace, 'consumer-bun.mjs'), bunConsumerSource());
+  await writeFile(join(workspace, 'consumer-bun.mjs'), consumerScenarioSource());
 
-  const { stdout } = await execFileAsync('bun', ['consumer-bun.mjs'], {
+  const { stdout } = await execFileAsync(platformCommand('bun'), ['consumer-bun.mjs'], {
     cwd: workspace
   });
   const result = JSON.parse(stdout);
 
-  assert.equal(result.packageName, '@ismail-elkorchi/cli-core');
-  assert.equal(result.invocationOk, true);
-  assert.equal(result.completionCandidate, 'check');
-  assert.equal(result.runSchemaVersion, 'cli-core.run-result.v1');
-  assert.equal(result.mainExitStatus, 0);
+  assertFullConsumerResult(result);
 });
 
 async function packPackage(destination) {
@@ -142,7 +171,69 @@ async function commandAvailable(command) {
 function platformCommand(command) {
   if (process.platform === 'win32' && command === 'npm') return 'npm.cmd';
   if (process.platform === 'win32' && command === 'bun') return 'bun.exe';
+  if (process.platform === 'win32' && command === 'deno') return 'deno.exe';
   return command;
+}
+
+function assertFullConsumerResult(result) {
+  assert.equal(result.packageName, '@ismail-elkorchi/cli-core');
+  assert.equal(result.invocationOk, true);
+  assert.equal(result.configProfile, 'ci');
+  assert.equal(result.helpCommand, 'deploy');
+  assert.equal(result.manifestHasPluginCommand, true);
+  assert.equal(result.completionCandidate, 'audit');
+  assert.equal(result.repairCode, 'REPAIR_UNKNOWN_COMMAND');
+  assert.equal(result.runOk, true);
+  assert.equal(result.mainExitStatus, 0);
+  assert.equal(result.effectReportOk, true);
+  assert.equal(result.redactedToken, '[REDACTED]');
+  assert.equal(result.harnessStatus, 'passed');
+  assert.equal(result.schemaArtifactsIncludeManifest, true);
+}
+
+function consumerTypesSource() {
+  return `
+import { defineCli, parseCli, runCli, type CliProgram, type ParsedInvocation } from '@ismail-elkorchi/cli-core';
+import { findCliCommand } from '@ismail-elkorchi/cli-core/command';
+import { runCliMain, type CliMainResult } from '@ismail-elkorchi/cli-core/adapter';
+import { completeCli, type CompletionResponse } from '@ismail-elkorchi/cli-core/completion';
+import { resolveCliConfig, type ConfigResolution } from '@ismail-elkorchi/cli-core/config';
+import { applyCliEffects, type EffectApplicationReport } from '@ismail-elkorchi/cli-core/effects';
+import { createHelpDocument, type HelpDocument } from '@ismail-elkorchi/cli-core/help';
+import { describeCli, type CommandManifest } from '@ismail-elkorchi/cli-core/manifest';
+import { applyCliPluginCommands, defineCliPluginManifest, type CliPluginCommandApplication } from '@ismail-elkorchi/cli-core/plugins';
+import { createRepairSuggestionResult, type RepairSuggestionResult } from '@ismail-elkorchi/cli-core/repair';
+import { createCliSchemaEnvelope, type CliSchemaEnvelope } from '@ismail-elkorchi/cli-core/schema';
+import { createCliHarness, type CliHarness } from '@ismail-elkorchi/cli-core/testing';
+import schemaIndex from '@ismail-elkorchi/cli-core/schemas' with { type: 'json' };
+
+const program: CliProgram = defineCli({ name: 'typed', commands: [{ name: 'run' }] });
+const invocation: ParsedInvocation = parseCli(program, { argv: ['run'] });
+const config: ConfigResolution = resolveCliConfig(program);
+const help: HelpDocument = createHelpDocument(program);
+const manifest: CommandManifest = describeCli(program);
+const completion: CompletionResponse = completeCli(program, { words: ['typed', 'r'], cursor: 2 });
+const plugin = defineCliPluginManifest({ name: 'typed-plugin', version: '1.0.0', commands: [{ name: 'audit' }] });
+const application: CliPluginCommandApplication = applyCliPluginCommands(program, [plugin]);
+const repair: RepairSuggestionResult = createRepairSuggestionResult(parseCli(program, { argv: ['rn'] }), program);
+const run = await runCli(program, { mode: 'plan', invocation });
+const main: CliMainResult = await runCliMain({ program, mode: 'plan', argv: ['run'] });
+const effects: EffectApplicationReport = await applyCliEffects({ mode: 'plan', effects: run.effects });
+const envelope: CliSchemaEnvelope = createCliSchemaEnvelope({ payloadSchemaVersion: run.schemaVersion, payload: run });
+const harness: CliHarness = createCliHarness();
+
+void findCliCommand(application.program, ['audit']);
+void config;
+void help;
+void manifest;
+void completion;
+void repair;
+void main;
+void effects;
+void envelope;
+void harness;
+void schemaIndex;
+`;
 }
 
 function consumerScenarioSource() {
@@ -256,42 +347,6 @@ console.log(JSON.stringify({
   redactedToken: redaction.value.token,
   harnessStatus: scenario.status,
   schemaArtifactsIncludeManifest: schemaIndex.artifacts.some((artifact) => artifact.version === 'cli-core.manifest.v1')
-}));
-`;
-}
-
-function bunConsumerSource() {
-  return `
-import * as root from '@ismail-elkorchi/cli-core';
-import * as adapter from '@ismail-elkorchi/cli-core/adapter';
-import * as completion from '@ismail-elkorchi/cli-core/completion';
-import * as config from '@ismail-elkorchi/cli-core/config';
-import * as schema from '@ismail-elkorchi/cli-core/schema';
-
-const program = root.defineCli({
-  name: 'ship',
-  config: { fields: [{ name: 'profile', type: 'string', default: 'local', env: 'SHIP_PROFILE' }] },
-  commands: [{ name: 'check', aliases: ['c'], positionals: [{ name: 'target' }] }]
-});
-const invocation = root.parseCli(program, { argv: ['c', 'api'] });
-const memory = config.createMemoryConfigDiscoveryHost({ env: { SHIP_PROFILE: 'ci' } });
-const discovered = await config.discoverCliConfigInput(program, {
-  host: memory.host,
-  scope: 'none',
-  environment: { includeConfigFields: true }
-});
-const resolved = config.resolveCliConfig(program, discovered.input);
-const completions = completion.completeCli(program, { words: ['ship', 'ch'], cursor: 2 });
-const run = await root.runCli(program, { mode: 'plan', invocation });
-const main = await adapter.runCliMain({ program, mode: 'plan', argv: ['check', 'api'] });
-const envelope = schema.createCliSchemaEnvelope({ payloadSchemaVersion: run.schemaVersion, payload: run });
-
-console.log(JSON.stringify({
-  packageName: root.cliCorePackage.name,
-  invocationOk: invocation.ok && resolved.values.profile === 'ci',
-  completionCandidate: completions.payload.items[0]?.value,
-  runSchemaVersion: envelope.payloadSchemaVersion,
-  mainExitStatus: main.exitStatus
 }));
 `;
 }

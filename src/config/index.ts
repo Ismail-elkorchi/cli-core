@@ -1,6 +1,6 @@
-export { discoverCliConfigInput } from './discovery.js';
-export { createMemoryConfigDiscoveryHost } from './memory-host.js';
-export { resolveCliConfig } from './resolve.js';
+export { discoverCliConfigInput } from './discovery.ts';
+export { createMemoryConfigDiscoveryHost } from './memory-host.ts';
+export { resolveCliConfig } from './resolve.ts';
 export type {
   ConfigCandidate,
   ConfigDefinition,
@@ -24,4 +24,4 @@ export type {
   ConfigValueType,
   MemoryConfigDiscoveryHost,
   MemoryConfigDiscoveryHostInput
-} from './types.js';
+} from './types.ts';

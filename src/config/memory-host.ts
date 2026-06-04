@@ -2,14 +2,14 @@ import {
   dirname,
   joinPath,
   normalizePath
-} from './path.js';
+} from './path.ts';
 import type {
   ConfigFileInput,
   ConfigValue,
   ConfigDiscoveryHost,
   MemoryConfigDiscoveryHost,
   MemoryConfigDiscoveryHostInput
-} from './types.js';
+} from './types.ts';
 
 export function createMemoryConfigDiscoveryHost(
   input: MemoryConfigDiscoveryHostInput = {}

@@ -1,4 +1,4 @@
-import type { CliDiagnostic } from '../diagnostics.js';
+import type { CliDiagnostic } from '../diagnostics.ts';
 
 export type ConfigValue =
   | null

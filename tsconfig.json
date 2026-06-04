@@ -13,6 +13,8 @@
     "outDir": "dist",
     "rootDir": "src",
     "verbatimModuleSyntax": true,
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": false
   },

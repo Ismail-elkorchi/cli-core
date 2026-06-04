@@ -31,6 +31,9 @@
 - `npm run test:package`
 - `npm run test:runtime:os`
 - `npm run test:shells`
+- `npm run check:deno:source`
+- `npm run check:deno:lint`
+- `npm run check:jsr`
 - `npm run test:mutation:dry`
 - `npm run test:mutation:file -- src/config/path.ts`
 - `npm run test:mutation:all`

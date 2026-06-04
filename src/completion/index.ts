@@ -4,8 +4,8 @@ import {
   type CliCommand,
   type CliCommandSource,
   type CliProgram
-} from '../command/index.js';
-import type { CliDiagnostic } from '../diagnostics.js';
+} from '../command/index.ts';
+import type { CliDiagnostic } from '../diagnostics.ts';
 
 export type CompletionShell = 'bash' | 'zsh' | 'fish' | 'pwsh';
 

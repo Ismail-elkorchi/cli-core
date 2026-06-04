@@ -67,10 +67,18 @@ jobs:
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
       - name: Install
         run: npm ci
+      - name: Deno source check
+        run: npm run check:deno:source
+      - name: Deno lint
+        run: npm run check:deno:lint
       - name: Deno runtime
         run: npm run test:runtime:deno
       - name: Bun runtime
         run: npm run test:runtime:bun
+      - name: Packed package consumers
+        run: npm run test:package
+      - name: JSR dry run
+        run: npm run check:jsr
 
   os-runtime:
     name: ci / os-runtime (${{ matrix.os }})

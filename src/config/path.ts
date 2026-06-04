@@ -1,4 +1,4 @@
-import type { ConfigDiscoveryHost } from './types.js';
+import type { ConfigDiscoveryHost } from './types.ts';
 
 export function defaultConfigFilenames(programName: string): readonly string[] {
   const safeName = programName.replaceAll(/[^A-Za-z0-9._-]/g, '-');

@@ -3,9 +3,9 @@ import {
   hasErrorDiagnostics,
   type CliDiagnostic,
   type CliDiagnosticValue
-} from '../diagnostics.js';
-import type { FileRunEffect, RunEffect, RunPayload, SpawnRunEffect } from '../run/index.js';
-import { redactCliDiagnostics, redactCliSecrets, type CliRedactionOptions } from '../schema/index.js';
+} from '../diagnostics.ts';
+import type { FileRunEffect, RunEffect, RunPayload, SpawnRunEffect } from '../run/index.ts';
+import { redactCliDiagnostics, redactCliSecrets, type CliRedactionOptions } from '../schema/index.ts';
 
 export type EffectApplicationMode = 'plan' | 'apply';
 
