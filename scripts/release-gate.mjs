@@ -42,19 +42,92 @@ function assertEqual(actual, expected, label) {
 }
 
 function assertPackageMetadataSource(source, version) {
-  const matches = [...source.matchAll(/\b(version|contractVersion):\s*'([^']+)'/gu)];
-  if (matches.length === 0) {
-    throw new Error('release-gate: src/package.ts does not expose package metadata literals');
+  const packageVersions = extractMetadataLiteralValues(source, 'version');
+  if (packageVersions.length === 0) {
+    throw new Error('release-gate: src/package.ts does not expose package version literals');
+  }
+  assertSameValues(packageVersions, 'src/package.ts version');
+  assertEqual(packageVersions[0], version, 'src/package.ts version');
+
+  const contractVersions = extractMetadataLiteralValues(source, 'contractVersion');
+  if (contractVersions.length === 0) {
+    throw new Error('release-gate: src/package.ts does not expose contractVersion literals');
+  }
+  assertSameValues(contractVersions, 'src/package.ts contractVersion');
+  if (!isSemverLike(contractVersions[0])) {
+    throw new Error(
+      `release-gate: src/package.ts contractVersion must be semver-like (actual=${contractVersions[0]})`
+    );
+  }
+}
+
+function extractMetadataLiteralValues(source, field) {
+  const token = `${field}: '`;
+  const values = [];
+  let cursor = 0;
+
+  while (cursor < source.length) {
+    const start = source.indexOf(token, cursor);
+    if (start === -1) break;
+
+    const valueStart = start + token.length;
+    const valueEnd = source.indexOf("'", valueStart);
+    if (valueEnd === -1) break;
+
+    values.push(source.slice(valueStart, valueEnd));
+    cursor = valueEnd + 1;
   }
 
-  const mismatches = matches
-    .map((match) => ({ field: match[1] ?? 'unknown', value: match[2] ?? '' }))
-    .filter((entry) => entry.value !== version);
+  return values;
+}
 
+function assertSameValues(values, label) {
+  const [expected] = values;
+  const mismatches = values.filter((value) => value !== expected);
   if (mismatches.length > 0) {
-    const rendered = mismatches.map((entry) => `${entry.field}=${entry.value}`).join(', ');
-    throw new Error(`release-gate: src/package.ts metadata mismatch (${rendered}, expected=${version})`);
+    throw new Error(`release-gate: ${label} literals are not consistent`);
   }
+}
+
+function isSemverLike(value) {
+  const suffixStart = firstSuffixIndex(value);
+  const base = suffixStart === -1 ? value : value.slice(0, suffixStart);
+  const suffix = suffixStart === -1 ? '' : value.slice(suffixStart + 1);
+  const parts = base.split('.');
+
+  return parts.length === 3
+    && parts.every(isDigits)
+    && (suffixStart === -1 || isSemverSuffix(suffix));
+}
+
+function firstSuffixIndex(value) {
+  const prerelease = value.indexOf('-');
+  const build = value.indexOf('+');
+  if (prerelease === -1) return build;
+  if (build === -1) return prerelease;
+  return Math.min(prerelease, build);
+}
+
+function isSemverSuffix(value) {
+  if (value.length === 0) return false;
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    const isDigit = code >= 48 && code <= 57;
+    const isUpper = code >= 65 && code <= 90;
+    const isLower = code >= 97 && code <= 122;
+    const isSeparator = code === 45 || code === 46;
+    if (!isDigit && !isUpper && !isLower && !isSeparator) return false;
+  }
+  return true;
+}
+
+function isDigits(value) {
+  if (value.length === 0) return false;
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if (code < 48 || code > 57) return false;
+  }
+  return true;
 }
 
 function assertPackageFileList(packageJson) {
