@@ -14,6 +14,7 @@ writes.
 
 ```sh
 npm install @ismail-elkorchi/cli-core
+deno add jsr:@ismail-elkorchi/cli-core
 ```
 
 ## Quickstart
@@ -313,6 +314,8 @@ system, shell, filesystem, or package-manager compatibility guarantees.
 ```sh
 npm run lint
 npm run typecheck
+npm run check:runtime-policy
+npm run check:workflow-policy
 npm run test:core
 npm run test:contracts
 npm run test:examples

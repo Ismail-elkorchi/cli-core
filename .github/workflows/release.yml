@@ -1,0 +1,196 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate release
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+      - name: Load runtime policy
+        id: runtime-policy
+        shell: bash
+        run: |
+          node -e "const fs=require('node:fs');const p=JSON.parse(fs.readFileSync('tools/runtime-versions.json','utf8'));fs.appendFileSync(process.env.GITHUB_OUTPUT,'node_pinned='+p.node.pinned+'\\n');fs.appendFileSync(process.env.GITHUB_OUTPUT,'deno_pinned='+p.deno.pinned+'\\n');fs.appendFileSync(process.env.GITHUB_OUTPUT,'bun_pinned='+p.bun.pinned+'\\n');"
+      - name: Setup Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: ${{ steps.runtime-policy.outputs.node_pinned }}
+          cache: npm
+      - name: Setup Deno
+        uses: denoland/setup-deno@667a34cdef165d8d2b2e98dde39547c9daac7282 # v2.0.4
+        with:
+          deno-version: ${{ steps.runtime-policy.outputs.deno_pinned }}
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: ${{ steps.runtime-policy.outputs.bun_pinned }}
+      - name: Install
+        run: npm ci
+      - name: Release gate
+        run: npm run release:gate
+      - name: Quality gates
+        run: npm run check
+      - name: Fail on tracked-file churn
+        shell: bash
+        run: |
+          if [[ -n "$(git status --porcelain=v1)" ]]; then
+            echo "Tracked files changed during CI run:"
+            git status --porcelain=v1
+            exit 1
+          fi
+
+  github_release:
+    name: Publish GitHub release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [validate]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+      - name: Load runtime policy
+        id: runtime-policy
+        shell: bash
+        run: |
+          node -e "const fs=require('node:fs');const p=JSON.parse(fs.readFileSync('tools/runtime-versions.json','utf8'));fs.appendFileSync(process.env.GITHUB_OUTPUT,'node_pinned='+p.node.pinned+'\\n');"
+      - name: Setup Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: ${{ steps.runtime-policy.outputs.node_pinned }}
+      - name: Build release notes
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          node scripts/release/render-notes.mjs --tag "${TAG_NAME}" > release-notes.md
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          if gh release view "${TAG_NAME}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            echo "Release ${TAG_NAME} already exists; skipping create."
+          else
+            gh release create "${TAG_NAME}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --title "${TAG_NAME#v}" \
+              --notes-file release-notes.md
+          fi
+
+  jsr:
+    name: Publish JSR
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [github_release]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+      - name: Load runtime policy
+        id: runtime-policy
+        shell: bash
+        run: |
+          node -e "const fs=require('node:fs');const p=JSON.parse(fs.readFileSync('tools/runtime-versions.json','utf8'));fs.appendFileSync(process.env.GITHUB_OUTPUT,'node_pinned='+p.node.pinned+'\\n');fs.appendFileSync(process.env.GITHUB_OUTPUT,'deno_pinned='+p.deno.pinned+'\\n');fs.appendFileSync(process.env.GITHUB_OUTPUT,'bun_pinned='+p.bun.pinned+'\\n');"
+      - name: Setup Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: ${{ steps.runtime-policy.outputs.node_pinned }}
+      - name: Setup Deno
+        uses: denoland/setup-deno@667a34cdef165d8d2b2e98dde39547c9daac7282 # v2.0.4
+        with:
+          deno-version: ${{ steps.runtime-policy.outputs.deno_pinned }}
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: ${{ steps.runtime-policy.outputs.bun_pinned }}
+      - name: Install
+        run: npm ci
+      - name: Quality gates
+        run: npm run check
+      - name: Fail on tracked-file churn
+        shell: bash
+        run: |
+          if [[ -n "$(git status --porcelain=v1)" ]]; then
+            echo "Tracked files changed during CI run:"
+            git status --porcelain=v1
+            exit 1
+          fi
+      - name: Publish to JSR
+        run: deno publish
+
+  npm:
+    name: Publish npm
+    if: startsWith(github.ref, 'refs/tags/v') && github.ref_name != 'v0.1.0'
+    needs: [github_release]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+      - name: Load runtime policy
+        id: runtime-policy
+        shell: bash
+        run: |
+          node -e "const fs=require('node:fs');const p=JSON.parse(fs.readFileSync('tools/runtime-versions.json','utf8'));fs.appendFileSync(process.env.GITHUB_OUTPUT,'node_pinned='+p.node.pinned+'\\n');fs.appendFileSync(process.env.GITHUB_OUTPUT,'deno_pinned='+p.deno.pinned+'\\n');fs.appendFileSync(process.env.GITHUB_OUTPUT,'bun_pinned='+p.bun.pinned+'\\n');"
+      - name: Setup Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: ${{ steps.runtime-policy.outputs.node_pinned }}
+          registry-url: https://registry.npmjs.org
+      - name: Setup Deno
+        uses: denoland/setup-deno@667a34cdef165d8d2b2e98dde39547c9daac7282 # v2.0.4
+        with:
+          deno-version: ${{ steps.runtime-policy.outputs.deno_pinned }}
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: ${{ steps.runtime-policy.outputs.bun_pinned }}
+      - name: Install
+        run: npm ci
+      - name: Quality gates
+        run: npm run check
+      - name: Fail on tracked-file churn
+        shell: bash
+        run: |
+          if [[ -n "$(git status --porcelain=v1)" ]]; then
+            echo "Tracked files changed during CI run:"
+            git status --porcelain=v1
+            exit 1
+          fi
+      - name: Publish to npm
+        run: npm publish --access public

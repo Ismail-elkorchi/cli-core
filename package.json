@@ -60,14 +60,15 @@
     "./package.json": "./package.json"
   },
   "files": [
+    "CHANGELOG.md",
     "dist",
     "schemas",
     "README.md",
-    "AGENTS.md",
     "LICENSE"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json && node scripts/rewrite-declaration-imports.mjs",
+    "prepack": "npm run build",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test:core": "npm run build && node --test tests/core/*.test.mjs",
@@ -86,6 +87,9 @@
     "check:deno:lint": "deno lint src tests/integration/runtime-deno-smoke.mjs",
     "check:deno:docs": "deno doc --lint src/index.ts src/command/public.ts src/adapter/index.ts src/help/index.ts src/completion/index.ts src/manifest/index.ts src/config/index.ts src/effects/index.ts src/plugins/index.ts src/repair/index.ts src/schema/index.ts src/testing/index.ts",
     "check:jsr": "deno publish --dry-run --allow-dirty",
+    "check:runtime-policy": "node scripts/verify-runtime-versions.js",
+    "check:runtime-staleness": "node scripts/runtime-staleness-check.mjs",
+    "check:workflow-policy": "node scripts/workflow-policy-check.mjs",
     "test:mutation:dry": "stryker run --dryRunOnly",
     "test:mutation:file": "node scripts/run-mutation.mjs file",
     "test:mutation:config": "node scripts/run-mutation.mjs config",
@@ -107,7 +111,9 @@
     "test:scale:manual": "npm run build && node --test tests/manual/large-command-surface.manual.test.mjs",
     "check:exports": "node scripts/check-exports.mjs",
     "check:leakage": "node scripts/no-private-leakage.mjs",
-    "check": "npm run lint && npm run typecheck && npm run test:core && npm run test:contracts && npm run test:examples && npm run test:integration && npm run test:security && npm run test:package && npm run check:exports && npm run check:deno:source && npm run check:deno:lint && npm run check:jsr && npm run check:leakage",
+    "release:gate": "node scripts/release-gate.mjs",
+    "release:notes:dry-run": "node scripts/release/render-notes.mjs --dry-run",
+    "check": "npm run check:runtime-policy && npm run check:workflow-policy && npm run lint && npm run typecheck && npm run test:core && npm run test:contracts && npm run test:examples && npm run test:integration && npm run test:security && npm run test:package && npm run check:exports && npm run check:deno:source && npm run check:deno:lint && npm run check:deno:docs && npm run check:jsr && npm run check:leakage",
     "precommit": "npm run lint && npm run typecheck && npm run test:core && npm run check:leakage",
     "prepush": "npm run check"
   },
