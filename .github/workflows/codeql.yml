@@ -9,12 +9,18 @@ on:
     - cron: '31 3 * * 1'
 
 permissions:
+  actions: read
   contents: read
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   analyze:
     name: codeql / analyze
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     permissions:
       actions: read
       contents: read
@@ -29,4 +35,5 @@ jobs:
       - name: Autobuild
         uses: github/codeql-action/autobuild@9e0d7b8d25671d64c341c19c0152d693099fb5ba
       - name: Analyze
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false
         uses: github/codeql-action/analyze@9e0d7b8d25671d64c341c19c0152d693099fb5ba

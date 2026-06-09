@@ -2,19 +2,30 @@ name: Scorecard
 
 on:
   pull_request:
+  push:
+    branches:
+      - main
   workflow_dispatch:
   schedule:
     - cron: '17 4 * * 2'
 
 permissions:
+  actions: read
   contents: read
+
+concurrency:
+  group: scorecard-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   scorecard:
     name: scorecard / ossf
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
+      actions: read
       contents: read
+      id-token: write
       security-events: write
     steps:
       - name: Checkout

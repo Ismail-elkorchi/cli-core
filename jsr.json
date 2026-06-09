@@ -49,6 +49,7 @@
       "src/**/*.ts",
       "schemas/**/*.json",
       "README.md",
+      "CHANGELOG.md",
       "LICENSE",
       "package.json"
     ]
