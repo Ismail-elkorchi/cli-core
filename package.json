@@ -153,7 +153,7 @@
     "@eslint/js": "^10.0.1",
     "@stryker-mutator/core": "^9.6.1",
     "@types/node": "^25.9.1",
-    "@typescript-eslint/eslint-plugin": "^8.59.4",
+    "@typescript-eslint/eslint-plugin": "^8.61.0",
     "@typescript-eslint/parser": "^8.59.4",
     "eslint": "^10.4.0",
     "eslint-plugin-n": "^18.0.1",
