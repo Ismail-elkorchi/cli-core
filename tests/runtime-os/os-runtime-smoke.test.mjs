@@ -37,8 +37,17 @@ function osRuntimeEntrypointSource() {
   const rootUrl = new URL('../../dist/index.js', import.meta.url).href;
   const adapterUrl = new URL('../../dist/adapter/index.js', import.meta.url).href;
   return `
-import { defineCli } from ${JSON.stringify(rootUrl)};
+import { createCliInvocationParser, defineCli } from ${JSON.stringify(rootUrl)};
 import { createNodeCliAdapter, runCliMain } from ${JSON.stringify(adapterUrl)};
+
+const parser = createCliInvocationParser(({ argv }) => ({
+  values: {},
+  present: {},
+  positionals: argv,
+  afterDoubleDash: [],
+  unknownOptions: [],
+  diagnostics: []
+}));
 
 const program = defineCli({
   name: 'ship',
@@ -52,6 +61,7 @@ const program = defineCli({
 
 await runCliMain({
   program,
+  parser,
   mode: 'apply',
   handlers: {
     deploy: ({ invocation }) => ({
