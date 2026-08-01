@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.3.0 - 2026-08-01
+## 0.2.0 - 2026-08-01
 
 - Moved all raw option-token classification behind a scanner/binder contract
   and validate that scanning and final binding agree.
@@ -16,9 +16,6 @@
   longer fall back to the root command.
 - Corrected the integration package name to `clivoke` on npm and
   `@ismail-elkorchi/clivoke` on JSR.
-
-## 0.2.0 - 2026-08-01
-
 - Contracted the package to command compilation and lookup, invocation routing,
   positional binding, diagnostics, renderer-neutral help, completion candidates,
   and small handler dispatch.
