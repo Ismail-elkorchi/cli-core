@@ -23,24 +23,17 @@
 - `npm run build`
 - `npm run lint`
 - `npm run typecheck`
+- `npm test`
 - `npm run test:core`
 - `npm run test:contracts`
-- `npm run test:examples`
 - `npm run test:integration`
 - `npm run test:security`
 - `npm run test:package`
 - `npm run test:runtime:os`
 - `npm run test:shells`
-- `npm run check:deno:source`
-- `npm run check:deno:lint`
-- `npm run check:deno:docs`
-- `npm run check:jsr`
-- `npm run test:mutation:dry`
-- `npm run test:mutation:file -- src/config/path.ts`
-- `npm run test:mutation:all`
+- `npm run test:mutation`
 - `npm run check`
 
-Use targeted tests while developing; reserve broad checks for PR gates and
-larger release checks. Mutation testing is a manual investigation tool; run dry
-mode for setup changes, then targeted file or source-area commands before the
-full mutation set.
+Use targeted tests while developing. Run `npm run check` before opening or
+updating a pull request and before a release. Run mutation testing when changing
+parser, policy, validation, or security-sensitive behavior.

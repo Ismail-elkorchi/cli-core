@@ -8,7 +8,7 @@ import tsParser from '@typescript-eslint/parser';
 
 export default [
   {
-    ignores: ['dist/**', 'node_modules/**', 'coverage/**', 'reports/**', '.stryker-tmp/**', 'mutation-report/**']
+    ignores: ['dist/**', 'node_modules/**', 'coverage/**', '.stryker-tmp/**']
   },
   js.configs.recommended,
   node.configs['flat/recommended-module'],
