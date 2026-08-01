@@ -2,14 +2,13 @@
 
 Parser-independent command semantics for TypeScript and JavaScript CLIs.
 
-`cli-core` compiles command trees, routes command tokens, binds positionals,
-creates help and completion data, and dispatches successful invocations. It has
-no runtime dependencies and deliberately does not parse flags, access a
-process, discover configuration, generate shell scripts, load plugins, or own
-an effects framework.
+`cli-core` compiles command trees, routes binder-classified command tokens,
+binds positionals, creates renderer-neutral help and completion data, and
+dispatches successful invocations. It does not parse flag syntax, access a
+process, or generate shell scripts.
 
-Use `@ismail-elkorchi/cli` when you want the ready-made integration with
-`argv-flags` and an explicit process adapter.
+Use [`clivoke`](https://www.npmjs.com/package/clivoke) on npm or
+`@ismail-elkorchi/clivoke` on JSR for the ready-made `argv-flags` integration.
 
 ## Install
 
@@ -26,100 +25,78 @@ import { createCliHelp, defineCli } from "@ismail-elkorchi/cli-core";
 const program = defineCli({
   name: "ship",
   options: [
-    { name: "verbose", flags: ["-v", "--verbose"], valueMode: "none" },
+    { name: "verbose", kind: "boolean", flags: ["-v", "--verbose"] },
   ],
-  commands: [
-    {
-      name: "deploy",
-      aliases: ["d"],
-      options: [
-        {
-          name: "region",
-          flags: ["--region"],
-          valueMode: "required",
-          valueLabel: "region",
-        },
-      ],
-      positionals: [{ name: "service" }],
-    },
-  ],
+  commands: [{
+    name: "deploy",
+    aliases: ["d"],
+    options: [{
+      name: "region",
+      kind: "value",
+      flags: ["--region"],
+      valueMode: "required",
+      required: true,
+      valueCandidates: ["eu", "us"],
+    }],
+    positionals: [{ name: "service" }],
+  }],
 });
 
-const help = createCliHelp(program, ["deploy"]);
-console.log(help.usage);
+console.log(createCliHelp(program, ["deploy"]));
 ```
 
-Option definitions in this package are presentation metadata. A binder owns
-decoding, defaults, repetition, and token grammar. `defineCli` copies and
-freezes a valid definition. Invalid or ambiguous definitions throw one
-`CliDefinitionError` containing structured issues; no partial program is
-returned.
+Definitions are closed in TypeScript and at runtime. Compilation returns an
+immutable program or throws one `CliDefinitionError` with structured issues.
+Global and ancestor options are inherited by descendants. A command cannot
+declare both child commands and positionals because the same token would be
+ambiguous.
 
-## Connect an option binder
+## Connect an option grammar
+
+`createCliInvocationParser()` accepts a binder with two operations:
+
+- `scan()` classifies recognized option spans, ordinary arguments, unknown
+  flags, and `--` without decoding values.
+- `bind()` performs the final option parse after command tokens are removed.
+
+Both operations receive the visible option metadata and an `argvIndexes` map
+back to the complete invocation. Core validates their results and requires
+scanning and binding to agree about positionals, post-`--` arguments, and
+unknown flags. This keeps raw option grammar in one integration while letting
+core route commands without interpreting flag syntax.
+
+Command-local options must follow the command that defines them. Ancestor
+options may appear around descendant command tokens because descendants inherit
+them. An unknown option before a child command stops routing: core cannot safely
+guess whether a following token is its value.
+
+For an HTTP endpoint, TUI, or other non-argv input, use
+`createCliInvocation()` with already decoded option and positional values.
+
+## Results and dispatch
+
+Successful invocations expose a top-level `commandKey` discriminant as well as
+the compiled `command`. Integrations can use `commandKey` to produce exact
+command-specific option, positional, and handler types. Failed invocations
+contain diagnostics and unknown flags, never partial values.
 
 ```ts
-import {
-  createCliInvocationParser,
-  type CliOptionBinder,
-} from "@ismail-elkorchi/cli-core";
+import { dispatchCli, type ParsedInvocation } from "@ismail-elkorchi/cli-core";
 
-const bindOptions: CliOptionBinder = ({ options, argv }) => ({
-  status: "bound",
-  values: {},
-  specified: Object.fromEntries(options.map((option) => [option.name, false])),
-  positionals: argv,
-  afterDoubleDash: [],
-  unknownFlags: [],
-});
-
-const parser = createCliInvocationParser(bindOptions);
-const result = parser.parse(program, { argv: ["deploy", "api"] });
-
-if (result.status === "parsed") {
-  console.log(result.command.key, result.positionalValues.service);
-} else {
-  console.error(result.diagnostics);
+async function handle(result: ParsedInvocation) {
+  if (result.status === "parsed") {
+    await dispatchCli(result, {
+      "ship deploy": ({ invocation }) => {
+        console.log(invocation.positionalValues.service);
+      },
+    }, undefined);
+  }
 }
 ```
 
-A binder receives an `argvIndexes` array that maps each remaining token back to
-the complete invocation after command tokens are removed. This preserves exact
-locations even when global flags precede a command.
-
-A failed binder result contains diagnostics only. Consequently, rejected
-invocations never expose partial option values, defaults, or positional values
-as successful-looking state. Unknown options retain their complete argv index,
-and tokens after `--` remain separate.
-
-## Help, completion, and dispatch
-
-`createCliHelp` returns renderer-neutral help data. `completeCli` returns
-command-local command, alias, flag, and positional candidates.
-`findCliCommandForArgv` applies the same routing rules as invocation parsing to
-an incomplete argv prefix, so higher-level completion adapters do not need a
-second command router. Shell protocol handling and script generation belong in
-the higher-level package.
-
-`dispatchCli` accepts only a successfully parsed invocation:
-
-```ts
-import { dispatchCli } from "@ismail-elkorchi/cli-core";
-
-if (result.status === "parsed") {
-  const deployed = await dispatchCli(
-    result,
-    {
-      "ship deploy": ({ invocation }) => invocation.positionalValues.service,
-    },
-    undefined,
-  );
-  console.log(deployed);
-}
-```
-
-Handler errors propagate unchanged. Missing handlers throw
-`CliHandlerNotFoundError`. Process exit codes, output, retries, cancellation,
-events, and effects remain application or adapter concerns.
+`createCliHelp()` and `completeCli()` return `undefined` for an unknown command
+path. Completion returns actual command, alias, flag, and finite option-value
+candidates; positional definitions remain metadata rather than fake values.
 
 ## Runtime support
 

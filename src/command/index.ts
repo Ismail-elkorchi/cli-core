@@ -1,62 +1,68 @@
-/** How a displayed option accepts a value. */
-export type CliOptionValueMode = 'none' | 'required' | 'optional-inline';
+/** How a value-taking flag obtains its value. */
+export type CliOptionValueMode = 'required' | 'optional-inline';
 
-/** A flag that does not accept a value. */
-export interface CliSwitchOptionDefinition {
-  /** Logical option name used in parsed values. */
+/** Scalar repetition behavior retained for integrations and presentation. */
+export type CliOptionRepeat = 'error' | 'first' | 'last' | 'append' | 'count';
+
+interface CliOptionDefinitionBase {
+  /** Logical option name used in invocation values. */
   readonly name: string;
-  /** Accepted flag spellings. */
+  /** Concrete flag spellings that select the option. */
   readonly flags: readonly [string, ...string[]];
-  /** This option does not accept a value. */
-  readonly valueMode: 'none';
-  /** A value label is meaningless for a switch. */
-  readonly valueLabel?: never;
-  /** Whether the option must occur. */
-  readonly required?: boolean;
   /** User-facing explanation. */
   readonly description?: string;
   /** Whether default help and completion omit the option. */
   readonly hidden?: boolean;
 }
 
-/** A flag that accepts a required or optional-inline value. */
-export interface CliValueOptionDefinition {
-  /** Logical option name used in parsed values. */
-  readonly name: string;
-  /** Accepted flag spellings. */
-  readonly flags: readonly [string, ...string[]];
-  /** How the flag obtains its value. */
-  readonly valueMode: 'required' | 'optional-inline';
-  /** Label used for the value in help output. */
+/** Parser-independent facts about a boolean option. */
+export interface CliBooleanOptionDefinition extends CliOptionDefinitionBase {
+  readonly kind: 'boolean';
+  readonly falseFlags?: readonly [string, ...string[]];
+  readonly required?: boolean;
+  readonly repeat?: 'error' | 'first' | 'last';
+  readonly hasDefault?: boolean;
+  readonly defaultLabel?: string;
+}
+
+/** Parser-independent facts about an occurrence-counting option. */
+export interface CliCountOptionDefinition extends CliOptionDefinitionBase {
+  readonly kind: 'count';
+}
+
+/** Parser-independent facts about a value-taking option. */
+export interface CliValueOptionDefinition extends CliOptionDefinitionBase {
+  readonly kind: 'value';
+  readonly valueMode: CliOptionValueMode;
   readonly valueLabel?: string;
-  /** Whether the option must occur. */
   readonly required?: boolean;
-  /** User-facing explanation. */
-  readonly description?: string;
-  /** Whether default help and completion omit the option. */
-  readonly hidden?: boolean;
+  readonly multiple?: boolean;
+  readonly repeat?: 'error' | 'first' | 'last';
+  readonly hasDefault?: boolean;
+  readonly defaultLabel?: string;
+  /** Finite raw values suitable for help and completion. */
+  readonly valueCandidates?: readonly string[];
 }
 
-/** Parser-independent option metadata used by routing, help, and completion. */
-export type CliOptionDefinition = CliSwitchOptionDefinition | CliValueOptionDefinition;
+/** Neutral option metadata used by routing, help, completion, and validation. */
+export type CliOptionDefinition =
+  | CliBooleanOptionDefinition
+  | CliCountOptionDefinition
+  | CliValueOptionDefinition;
 
 /** One positional input accepted by a command. */
 export interface CliPositionalDefinition {
-  /** Logical positional name. */
   readonly name: string;
   /** Whether absence is an error. Defaults to true. */
   readonly required?: boolean;
-  /** Whether this positional consumes all remaining positional tokens. */
+  /** Whether this positional consumes all remaining positional arguments. */
   readonly variadic?: boolean;
-  /** User-facing explanation. */
   readonly description?: string;
 }
 
 /** An alternate command token. */
 export interface CliAliasDefinition {
-  /** Alias token relative to the command parent. */
   readonly name: string;
-  /** Optional deprecation explanation. */
   readonly deprecated?: boolean | string;
 }
 
@@ -65,35 +71,110 @@ export type CliAliasInput = string | CliAliasDefinition;
 
 /** One command in a command definition tree. */
 export interface CliCommandDefinition {
-  /** Command token relative to its parent. */
   readonly name: string;
-  /** Alternate tokens relative to its parent. */
   readonly aliases?: readonly CliAliasInput[];
-  /** User-facing explanation. */
   readonly description?: string;
-  /** Optional command deprecation explanation. */
   readonly deprecated?: boolean | string;
-  /** Local positional definitions. */
   readonly positionals?: readonly CliPositionalDefinition[];
-  /** Local option metadata. */
   readonly options?: readonly CliOptionDefinition[];
-  /** Nested commands. */
   readonly commands?: readonly CliCommandDefinition[];
-  /** Whether tokens after `--` are accepted by this command. */
   readonly acceptsAfterDoubleDash?: boolean;
 }
 
 /** A complete command tree. */
 export interface CliDefinition {
-  /** Program token used in help and command keys. */
   readonly name: string;
-  /** User-facing program explanation. */
   readonly description?: string;
   /** Options available to every command. */
   readonly options?: readonly CliOptionDefinition[];
-  /** Top-level commands. */
   readonly commands?: readonly CliCommandDefinition[];
 }
+
+type OptionShape<Definition> = Definition extends { readonly kind: 'boolean' }
+  ? CliBooleanOptionDefinition
+  : Definition extends { readonly kind: 'count' }
+    ? CliCountOptionDefinition
+    : Definition extends { readonly kind: 'value' }
+      ? CliValueOptionDefinition
+      : never;
+
+type ExactOption<Definition> = OptionShape<Definition> & Record<
+  Exclude<keyof Definition, keyof OptionShape<Definition>>,
+  never
+>;
+
+type ExactOptions<Options extends readonly CliOptionDefinition[]> = {
+  readonly [Index in keyof Options]: ExactOption<Options[Index]>;
+};
+
+type ExactCommands<Commands extends readonly CliCommandDefinition[]> = {
+  readonly [Index in keyof Commands]: Commands[Index] extends CliCommandDefinition
+    ? ExactCommand<Commands[Index]>
+    : never;
+};
+
+type ExactCommand<Command extends CliCommandDefinition> = Command & Record<
+  Exclude<keyof Command, keyof CliCommandDefinition>,
+  never
+> & (Command extends { readonly options: infer Options }
+  ? Options extends readonly CliOptionDefinition[]
+    ? { readonly options: ExactOptions<Options> }
+    : never
+  : object) & (Command extends { readonly commands: infer Commands }
+  ? Commands extends readonly CliCommandDefinition[]
+    ? { readonly commands: ExactCommands<Commands> }
+    : never
+  : object);
+
+type ExactDefinition<Definition extends CliDefinition> = Definition & Record<
+  Exclude<keyof Definition, keyof CliDefinition>,
+  never
+> & (Definition extends { readonly options: infer Options }
+  ? Options extends readonly CliOptionDefinition[]
+    ? { readonly options: ExactOptions<Options> }
+    : never
+  : object) & (Definition extends { readonly commands: infer Commands }
+  ? Commands extends readonly CliCommandDefinition[]
+    ? { readonly commands: ExactCommands<Commands> }
+    : never
+  : object);
+
+type CommandsOf<Definition> = Definition extends { readonly commands?: infer Commands }
+  ? Commands extends readonly CliCommandDefinition[]
+    ? Commands[number]
+    : never
+  : never;
+
+type CommandKeyFor<
+  ProgramName extends string,
+  Command,
+  Prefix extends string = ''
+> = Command extends { readonly name: infer Name extends string }
+  ? `${ProgramName} ${Prefix}${Name}` | CommandKeyFor<
+      ProgramName,
+      CommandsOf<Command>,
+      `${Prefix}${Name} `
+    >
+  : never;
+
+/** Canonical handler keys retained from a literal definition. */
+export type CliCommandKey<Definition extends CliDefinition> =
+  string extends Definition['name']
+    ? string
+    : Definition['name'] | CommandKeyFor<Definition['name'], CommandsOf<Definition>>;
+
+type CommandPathFor<
+  Command,
+  Prefix extends readonly string[] = readonly []
+> = Command extends { readonly name: infer Name extends string }
+  ? readonly [...Prefix, Name] | CommandPathFor<CommandsOf<Command>, readonly [...Prefix, Name]>
+  : never;
+
+/** Canonical command paths retained from a literal definition. */
+export type CliCommandPath<Definition extends CliDefinition> =
+  string extends Definition['name']
+    ? readonly string[]
+    : readonly [] | CommandPathFor<CommandsOf<Definition>>;
 
 /** Why a CLI definition could not be compiled. */
 export type CliDefinitionIssue =
@@ -149,28 +230,39 @@ export type CliDefinitionIssue =
       readonly message: string;
       readonly commandPath: readonly string[];
       readonly index: number;
-      readonly reason: 'definition' | 'name' | 'duplicate-name' | 'flags' | 'duplicate-flag' | 'value-mode' | 'value-label';
+      readonly reason:
+        | 'definition'
+        | 'name'
+        | 'duplicate-name'
+        | 'flags'
+        | 'duplicate-flag'
+        | 'kind'
+        | 'value-mode'
+        | 'value-label'
+        | 'repeat'
+        | 'candidates';
+    }
+  | {
+      readonly code: 'AMBIGUOUS_COMMAND_INPUT';
+      readonly message: string;
+      readonly commandPath: readonly string[];
     };
 
 /** Error thrown when a command definition is malformed or ambiguous. */
 export class CliDefinitionError extends TypeError {
-  /** Every issue found in the rejected definition. */
   public readonly issues: readonly CliDefinitionIssue[];
 
   public constructor(issues: readonly CliDefinitionIssue[]) {
     super(`Invalid CLI definition (${String(issues.length)} ${issues.length === 1 ? 'issue' : 'issues'}).`);
     this.name = 'CliDefinitionError';
-    this.issues = Object.freeze([...issues]);
+    this.issues = Object.freeze(issues.map((issue) => Object.freeze(issue)));
   }
 }
 
 /** An immutable compiled alias. */
 export interface CliAlias {
-  /** Alias token relative to the command parent. */
   readonly name: string;
-  /** Complete alias path. */
   readonly path: readonly string[];
-  /** Optional deprecation explanation. */
   readonly deprecated?: boolean | string;
 }
 
@@ -182,42 +274,59 @@ export interface CliPositional {
   readonly description?: string;
 }
 
-/** An immutable compiled option presentation. */
+/** Immutable parser-independent option facts. */
 export interface CliOption {
   readonly name: string;
+  readonly kind: 'boolean' | 'count' | 'value';
   readonly flags: readonly [string, ...string[]];
-  readonly valueMode: CliOptionValueMode;
+  readonly falseFlags: readonly string[];
+  readonly valueMode: 'none' | CliOptionValueMode;
   readonly valueLabel?: string;
   readonly required: boolean;
+  readonly multiple: boolean;
+  readonly repeat: CliOptionRepeat;
+  readonly hasDefault: boolean;
+  readonly defaultLabel?: string;
+  readonly valueCandidates: readonly string[];
   readonly description?: string;
   readonly hidden: boolean;
-  readonly scope: 'global' | 'local';
+  readonly definedAt: readonly string[];
 }
 
 /** One immutable command in a compiled program. */
-export interface CliCommand {
-  /** Unambiguous key containing the program name and canonical command path. */
-  readonly key: string;
+export interface CliCommand<out Key extends string = string> {
+  readonly key: Key;
   readonly name: string;
-  /** Canonical path below the program root. */
   readonly path: readonly string[];
   readonly parentPath?: readonly string[];
   readonly aliases: readonly CliAlias[];
   readonly description?: string;
   readonly deprecated?: boolean | string;
   readonly positionals: readonly CliPositional[];
-  /** Global and local options visible at this command. */
+  /** Global, ancestor, and local options visible at this command. */
   readonly options: readonly CliOption[];
   readonly acceptsAfterDoubleDash: boolean;
 }
 
-/** A valid immutable command program. */
-export interface CliProgram {
+interface CliProgramRuntime {
   readonly name: string;
   readonly description?: string;
   readonly root: CliCommand;
   readonly commands: readonly CliCommand[];
+  readonly commandKeys: readonly string[];
+  readonly commandPaths: readonly (readonly string[])[];
 }
+
+/** A valid immutable command program retaining literal keys and paths. */
+export type CliProgram<Definition extends CliDefinition = CliDefinition> =
+  CliProgramRuntime & (string extends Definition['name']
+    ? object
+    : {
+        readonly name: Definition['name'];
+        readonly root: CliCommand<Definition['name']>;
+        readonly commandKeys: readonly CliCommandKey<Definition>[];
+        readonly commandPaths: readonly CliCommandPath<Definition>[];
+      });
 
 /** Details about a command alias lookup. */
 export interface CliAliasMatch {
@@ -236,7 +345,7 @@ interface OptionIdentity {
   readonly flags: readonly string[];
 }
 
-const commandLookups = new WeakMap<CliProgram, CliCommandLookup>();
+const commandLookups = new WeakMap<object, CliCommandLookup>();
 
 const definitionProperties = new Set(['name', 'description', 'options', 'commands']);
 const commandProperties = new Set([
@@ -251,14 +360,36 @@ const commandProperties = new Set([
 ]);
 const aliasProperties = new Set(['name', 'deprecated']);
 const positionalProperties = new Set(['name', 'required', 'variadic', 'description']);
-const optionProperties = new Set(['name', 'flags', 'valueMode', 'valueLabel', 'required', 'description', 'hidden']);
+const optionBaseProperties = ['name', 'kind', 'flags', 'description', 'hidden'] as const;
+const booleanOptionProperties = new Set([
+  ...optionBaseProperties,
+  'falseFlags',
+  'required',
+  'repeat',
+  'hasDefault',
+  'defaultLabel'
+]);
+const countOptionProperties = new Set(optionBaseProperties);
+const valueOptionProperties = new Set([
+  ...optionBaseProperties,
+  'valueMode',
+  'valueLabel',
+  'required',
+  'multiple',
+  'repeat',
+  'hasDefault',
+  'defaultLabel',
+  'valueCandidates'
+]);
 
-/** Compiles a command tree or throws a structured definition error. */
-export function defineCli(definition: CliDefinition): CliProgram {
+/** Compiles a command tree or throws one structured definition error. */
+export function defineCli<const Definition extends CliDefinition>(
+  definition: ExactDefinition<Definition>
+): CliProgram<Definition> {
   const issues = validateDefinition(definition);
   if (issues.length > 0) throw new CliDefinitionError(issues);
 
-  const globalOptions = compileOptions(definition.options ?? [], 'global');
+  const globalOptions = compileOptions(definition.options ?? [], 'global', []);
   const root = compileCommand(
     {
       name: definition.name,
@@ -270,29 +401,48 @@ export function defineCli(definition: CliDefinition): CliProgram {
     definition.name
   );
   const commands: CliCommand[] = [root];
-  compileChildren(definition.commands ?? [], [], globalOptions, definition.name, commands);
+  compileChildren(
+    definition.commands ?? [],
+    [],
+    globalOptions,
+    definition.name,
+    commands
+  );
+  const commandKeys = Object.freeze(commands.map((command) => command.key));
+  const commandPaths = Object.freeze(commands.map((command) => command.path));
   const program = Object.freeze({
     name: definition.name,
     ...(definition.description === undefined ? {} : { description: definition.description }),
     root,
-    commands: Object.freeze(commands)
-  });
+    commands: Object.freeze(commands),
+    commandKeys,
+    commandPaths
+  }) as CliProgram<Definition>;
   commandLookups.set(program, createLookup(program));
   return program;
 }
 
 /** Looks up a command by its canonical path below the program root. */
-export function findCliCommand(program: CliProgram, path: readonly string[]): CliCommand | undefined {
+export function findCliCommand<Definition extends CliDefinition>(
+  program: CliProgram<Definition>,
+  path: readonly string[]
+): CliCommand | undefined {
   return lookupFor(program).byPath.get(pathKey(path));
 }
 
 /** Looks up a command by a complete alias path below the program root. */
-export function findCliCommandByAlias(program: CliProgram, path: readonly string[]): CliAliasMatch | undefined {
+export function findCliCommandByAlias<Definition extends CliDefinition>(
+  program: CliProgram<Definition>,
+  path: readonly string[]
+): CliAliasMatch | undefined {
   return lookupFor(program).byAliasPath.get(pathKey(path));
 }
 
 /** Returns the direct children of a compiled command. */
-export function findCliCommandChildren(program: CliProgram, command: CliCommand): readonly CliCommand[] {
+export function findCliCommandChildren<Definition extends CliDefinition>(
+  program: CliProgram<Definition>,
+  command: CliCommand
+): readonly CliCommand[] {
   return lookupFor(program).childrenByPath.get(pathKey(command.path)) ?? Object.freeze([]);
 }
 
@@ -307,12 +457,16 @@ function validateDefinition(definition: CliDefinition): readonly CliDefinitionIs
   }
   reportUnknownProperties(definition, definitionProperties, [], issues);
   if (!isCommandToken(definition.name)) {
-    issues.push({ code: 'INVALID_PROGRAM_NAME', message: 'Program name must be one non-option token.', name: definition.name });
+    issues.push({
+      code: 'INVALID_PROGRAM_NAME',
+      message: 'Program name must be one non-option token.',
+      name: definition.name
+    });
   }
   validateOptionalString(definition, 'description', [], issues);
   const globalOptions = validateOptions(definition.options, [], [], issues);
   validateCommands(definition.commands, [], globalOptions, issues);
-  return Object.freeze(issues.map(freezeIssue));
+  return Object.freeze(issues.map((issue) => Object.freeze(issue)));
 }
 
 function validateCommands(
@@ -343,14 +497,26 @@ function validateCommands(
       continue;
     }
     const name = entry['name'];
-    const commandPath = Object.freeze([...parentPath, typeof name === 'string' ? name : '']);
+    const commandPath = Object.freeze([
+      ...parentPath,
+      typeof name === 'string' ? name : ''
+    ]);
     reportUnknownProperties(entry, commandProperties, commandPath, issues);
     if (!isCommandToken(name)) {
-      issues.push({ code: 'INVALID_COMMAND_NAME', message: 'Command name must be one non-option token.', commandPath, name });
+      issues.push({
+        code: 'INVALID_COMMAND_NAME',
+        message: 'Command name must be one non-option token.',
+        commandPath,
+        name
+      });
       continue;
     }
     if (siblingTokens.has(name)) {
-      issues.push({ code: 'DUPLICATE_COMMAND', message: 'Sibling command names and aliases must be unique.', commandPath });
+      issues.push({
+        code: 'DUPLICATE_COMMAND',
+        message: 'Sibling command names and aliases must be unique.',
+        commandPath
+      });
     }
     siblingTokens.add(name);
     validateOptionalString(entry, 'description', commandPath, issues);
@@ -358,8 +524,30 @@ function validateCommands(
     validateAliases(entry['aliases'], commandPath, siblingTokens, issues);
     validatePositionals(entry['positionals'], commandPath, issues);
     validateBoolean(entry, 'acceptsAfterDoubleDash', commandPath, issues);
-    validateOptions(entry['options'], commandPath, inheritedOptions, issues);
-    validateCommands(entry['commands'], commandPath, inheritedOptions, issues);
+    if (
+      Array.isArray(entry['commands']) &&
+      entry['commands'].length > 0 &&
+      Array.isArray(entry['positionals']) &&
+      entry['positionals'].length > 0
+    ) {
+      issues.push({
+        code: 'AMBIGUOUS_COMMAND_INPUT',
+        message: 'A command cannot declare both child commands and positional arguments.',
+        commandPath
+      });
+    }
+    const localOptions = validateOptions(
+      entry['options'],
+      commandPath,
+      inheritedOptions,
+      issues
+    );
+    validateCommands(
+      entry['commands'],
+      commandPath,
+      [...inheritedOptions, ...localOptions],
+      issues
+    );
   }
 }
 
@@ -371,31 +559,59 @@ function validateAliases(
 ): void {
   if (value === undefined) return;
   if (!Array.isArray(value)) {
-    issues.push({ code: 'INVALID_ALIAS', message: 'Aliases must be an array.', commandPath, alias: value });
+    issues.push({
+      code: 'INVALID_ALIAS',
+      message: 'Aliases must be an array.',
+      commandPath,
+      alias: value
+    });
     return;
   }
   for (const entry of value) {
-    const alias = typeof entry === 'string' ? entry : isRecord(entry) ? entry['name'] : undefined;
+    const alias = typeof entry === 'string'
+      ? entry
+      : isRecord(entry)
+        ? entry['name']
+        : undefined;
     if (isRecord(entry)) {
       reportUnknownProperties(entry, aliasProperties, [...commandPath, '<alias>'], issues);
       validateDeprecation(entry['deprecated'], commandPath, issues);
     }
     if (!isCommandToken(alias)) {
-      issues.push({ code: 'INVALID_ALIAS', message: 'Alias must be one non-option token.', commandPath, alias: entry });
+      issues.push({
+        code: 'INVALID_ALIAS',
+        message: 'Alias must be one non-option token.',
+        commandPath,
+        alias: entry
+      });
       continue;
     }
     const aliasPath = Object.freeze([...commandPath.slice(0, -1), alias]);
     if (siblingTokens.has(alias)) {
-      issues.push({ code: 'DUPLICATE_ALIAS', message: 'Sibling command names and aliases must be unique.', aliasPath });
+      issues.push({
+        code: 'DUPLICATE_ALIAS',
+        message: 'Sibling command names and aliases must be unique.',
+        aliasPath
+      });
     }
     siblingTokens.add(alias);
   }
 }
 
-function validatePositionals(value: unknown, commandPath: readonly string[], issues: CliDefinitionIssue[]): void {
+function validatePositionals(
+  value: unknown,
+  commandPath: readonly string[],
+  issues: CliDefinitionIssue[]
+): void {
   if (value === undefined) return;
   if (!Array.isArray(value)) {
-    issues.push({ code: 'INVALID_POSITIONAL', message: 'Positionals must be an array.', commandPath, index: 0, reason: 'definition' });
+    issues.push({
+      code: 'INVALID_POSITIONAL',
+      message: 'Positionals must be an array.',
+      commandPath,
+      index: 0,
+      reason: 'definition'
+    });
     return;
   }
   const names = new Set<string>();
@@ -403,15 +619,38 @@ function validatePositionals(value: unknown, commandPath: readonly string[], iss
   let variadicSeen = false;
   for (const [index, entry] of value.entries()) {
     if (!isRecord(entry)) {
-      issues.push({ code: 'INVALID_POSITIONAL', message: 'Each positional must be an object.', commandPath, index, reason: 'definition' });
+      issues.push({
+        code: 'INVALID_POSITIONAL',
+        message: 'Each positional must be an object.',
+        commandPath,
+        index,
+        reason: 'definition'
+      });
       continue;
     }
-    reportUnknownProperties(entry, positionalProperties, [...commandPath, `positionals[${String(index)}]`], issues);
+    reportUnknownProperties(
+      entry,
+      positionalProperties,
+      [...commandPath, `positionals[${String(index)}]`],
+      issues
+    );
     const name = entry['name'];
-    if (!isIdentifier(name)) {
-      issues.push({ code: 'INVALID_POSITIONAL', message: 'Positional name must be a non-empty identifier.', commandPath, index, reason: 'name' });
+    if (!isLogicalName(name)) {
+      issues.push({
+        code: 'INVALID_POSITIONAL',
+        message: 'Positional name must be a non-empty string.',
+        commandPath,
+        index,
+        reason: 'name'
+      });
     } else if (names.has(name)) {
-      issues.push({ code: 'INVALID_POSITIONAL', message: 'Positional names must be unique within a command.', commandPath, index, reason: 'duplicate' });
+      issues.push({
+        code: 'INVALID_POSITIONAL',
+        message: 'Positional names must be unique within a command.',
+        commandPath,
+        index,
+        reason: 'duplicate'
+      });
     } else {
       names.add(name);
     }
@@ -421,13 +660,31 @@ function validatePositionals(value: unknown, commandPath: readonly string[], iss
     const required = entry['required'] !== false;
     const variadic = entry['variadic'] === true;
     if (variadicSeen) {
-      issues.push({ code: 'INVALID_POSITIONAL', message: 'Nothing may follow a variadic positional.', commandPath, index, reason: 'after-variadic' });
+      issues.push({
+        code: 'INVALID_POSITIONAL',
+        message: 'Nothing may follow a variadic positional.',
+        commandPath,
+        index,
+        reason: 'after-variadic'
+      });
     }
     if (required && optionalSeen) {
-      issues.push({ code: 'INVALID_POSITIONAL', message: 'A required positional may not follow an optional positional.', commandPath, index, reason: 'required-after-optional' });
+      issues.push({
+        code: 'INVALID_POSITIONAL',
+        message: 'A required positional may not follow an optional positional.',
+        commandPath,
+        index,
+        reason: 'required-after-optional'
+      });
     }
     if (variadic && index !== value.length - 1) {
-      issues.push({ code: 'INVALID_POSITIONAL', message: 'A variadic positional must be last.', commandPath, index, reason: 'variadic-not-last' });
+      issues.push({
+        code: 'INVALID_POSITIONAL',
+        message: 'A variadic positional must be last.',
+        commandPath,
+        index,
+        reason: 'variadic-not-last'
+      });
     }
     optionalSeen ||= !required;
     variadicSeen ||= variadic;
@@ -442,7 +699,13 @@ function validateOptions(
 ): readonly OptionIdentity[] {
   if (value === undefined) return [];
   if (!Array.isArray(value)) {
-    issues.push({ code: 'INVALID_OPTION', message: 'Options must be an array.', commandPath, index: 0, reason: 'definition' });
+    issues.push({
+      code: 'INVALID_OPTION',
+      message: 'Options must be an array.',
+      commandPath,
+      index: 0,
+      reason: 'definition'
+    });
     return [];
   }
   const names = new Set(inherited.map((option) => option.name));
@@ -450,42 +713,142 @@ function validateOptions(
   const valid: OptionIdentity[] = [];
   for (const [index, entry] of value.entries()) {
     if (!isRecord(entry)) {
-      issues.push({ code: 'INVALID_OPTION', message: 'Each option must be an object.', commandPath, index, reason: 'definition' });
+      issues.push({
+        code: 'INVALID_OPTION',
+        message: 'Each option must be an object.',
+        commandPath,
+        index,
+        reason: 'definition'
+      });
       continue;
     }
-    reportUnknownProperties(entry, optionProperties, [...commandPath, `options[${String(index)}]`], issues);
+    const kind = entry['kind'];
+    const allowed = kind === 'boolean'
+      ? booleanOptionProperties
+      : kind === 'count'
+        ? countOptionProperties
+        : valueOptionProperties;
+    reportUnknownProperties(
+      entry,
+      allowed,
+      [...commandPath, `options[${String(index)}]`],
+      issues
+    );
+    if (kind !== 'boolean' && kind !== 'count' && kind !== 'value') {
+      issues.push({
+        code: 'INVALID_OPTION',
+        message: 'Option kind must be boolean, count, or value.',
+        commandPath,
+        index,
+        reason: 'kind'
+      });
+    }
     const name = entry['name'];
-    if (!isIdentifier(name)) {
-      issues.push({ code: 'INVALID_OPTION', message: 'Option name must be a non-empty identifier.', commandPath, index, reason: 'name' });
+    if (!isLogicalName(name)) {
+      issues.push({
+        code: 'INVALID_OPTION',
+        message: 'Option name must be a non-empty string.',
+        commandPath,
+        index,
+        reason: 'name'
+      });
     } else if (names.has(name)) {
-      issues.push({ code: 'INVALID_OPTION', message: 'Visible option names must be unique.', commandPath, index, reason: 'duplicate-name' });
+      issues.push({
+        code: 'INVALID_OPTION',
+        message: 'Inherited and local option names must be unique.',
+        commandPath,
+        index,
+        reason: 'duplicate-name'
+      });
     } else {
       names.add(name);
     }
-    const optionFlags = entry['flags'];
-    if (!Array.isArray(optionFlags) || optionFlags.length === 0 || optionFlags.some((flag) => !isFlag(flag))) {
-      issues.push({ code: 'INVALID_OPTION', message: 'Option flags must be a non-empty array of flag spellings.', commandPath, index, reason: 'flags' });
+    const optionFlags = readValidFlags(entry['flags']);
+    const falseFlags = kind === 'boolean'
+      ? readValidFlags(entry['falseFlags'], true)
+      : [];
+    if (optionFlags === undefined || falseFlags === undefined) {
+      issues.push({
+        code: 'INVALID_OPTION',
+        message: 'Option flags must be non-empty strings.',
+        commandPath,
+        index,
+        reason: 'flags'
+      });
     } else {
-      for (const flag of optionFlags) {
-        if (flags.has(flag as string)) {
-          issues.push({ code: 'INVALID_OPTION', message: 'Visible flag spellings must be unique.', commandPath, index, reason: 'duplicate-flag' });
+      for (const flag of [...optionFlags, ...falseFlags]) {
+        if (flags.has(flag)) {
+          issues.push({
+            code: 'INVALID_OPTION',
+            message: 'Inherited and local flag spellings must be unique.',
+            commandPath,
+            index,
+            reason: 'duplicate-flag'
+          });
         }
-        flags.add(flag as string);
+        flags.add(flag);
       }
     }
-    const valueMode = entry['valueMode'];
-    if (valueMode !== 'none' && valueMode !== 'required' && valueMode !== 'optional-inline') {
-      issues.push({ code: 'INVALID_OPTION', message: 'Option valueMode is invalid.', commandPath, index, reason: 'value-mode' });
+    if (
+      kind === 'value' &&
+      entry['valueMode'] !== 'required' &&
+      entry['valueMode'] !== 'optional-inline'
+    ) {
+      issues.push({
+        code: 'INVALID_OPTION',
+        message: 'Value option valueMode is invalid.',
+        commandPath,
+        index,
+        reason: 'value-mode'
+      });
     }
-    if ((valueMode === 'none' && entry['valueLabel'] !== undefined)
-      || (entry['valueLabel'] !== undefined && !isNonEmptyString(entry['valueLabel']))) {
-      issues.push({ code: 'INVALID_OPTION', message: 'Only value-taking options may have a non-empty value label.', commandPath, index, reason: 'value-label' });
+    if (
+      entry['valueLabel'] !== undefined &&
+      (kind !== 'value' || !isNonEmptyString(entry['valueLabel']))
+    ) {
+      issues.push({
+        code: 'INVALID_OPTION',
+        message: 'Only value options may have a non-empty value label.',
+        commandPath,
+        index,
+        reason: 'value-label'
+      });
+    }
+    if (
+      entry['repeat'] !== undefined &&
+      entry['repeat'] !== 'error' &&
+      entry['repeat'] !== 'first' &&
+      entry['repeat'] !== 'last'
+    ) {
+      issues.push({
+        code: 'INVALID_OPTION',
+        message: 'Scalar repeat must be error, first, or last.',
+        commandPath,
+        index,
+        reason: 'repeat'
+      });
+    }
+    if (
+      entry['valueCandidates'] !== undefined &&
+      (!Array.isArray(entry['valueCandidates']) ||
+        entry['valueCandidates'].some((candidate) => typeof candidate !== 'string'))
+    ) {
+      issues.push({
+        code: 'INVALID_OPTION',
+        message: 'Value candidates must be an array of strings.',
+        commandPath,
+        index,
+        reason: 'candidates'
+      });
     }
     validateOptionalString(entry, 'description', commandPath, issues);
+    validateOptionalString(entry, 'defaultLabel', commandPath, issues);
     validateBoolean(entry, 'required', commandPath, issues);
     validateBoolean(entry, 'hidden', commandPath, issues);
-    if (isIdentifier(name) && Array.isArray(optionFlags) && optionFlags.length > 0 && optionFlags.every(isFlag)) {
-      valid.push({ name, flags: Object.freeze([...optionFlags]) });
+    validateBoolean(entry, 'multiple', commandPath, issues);
+    validateBoolean(entry, 'hasDefault', commandPath, issues);
+    if (isLogicalName(name) && optionFlags !== undefined && falseFlags !== undefined) {
+      valid.push({ name, flags: Object.freeze([...optionFlags, ...falseFlags]) });
     }
   }
   return valid;
@@ -544,7 +907,11 @@ function validateBoolean(
   }
 }
 
-function validateDeprecation(value: unknown, path: readonly string[], issues: CliDefinitionIssue[]): void {
+function validateDeprecation(
+  value: unknown,
+  path: readonly string[],
+  issues: CliDefinitionIssue[]
+): void {
   if (value !== undefined && typeof value !== 'boolean' && typeof value !== 'string') {
     issues.push({
       code: 'INVALID_PROPERTY',
@@ -559,14 +926,27 @@ function validateDeprecation(value: unknown, path: readonly string[], issues: Cl
 function compileChildren(
   definitions: readonly CliCommandDefinition[],
   parentPath: readonly string[],
-  globalOptions: readonly CliOption[],
+  inheritedOptions: readonly CliOption[],
   programName: string,
   commands: CliCommand[]
 ): void {
   for (const definition of definitions) {
-    const command = compileCommand(definition, [...parentPath, definition.name], parentPath, globalOptions, programName);
+    const path = [...parentPath, definition.name];
+    const command = compileCommand(
+      definition,
+      path,
+      parentPath,
+      inheritedOptions,
+      programName
+    );
     commands.push(command);
-    compileChildren(definition.commands ?? [], command.path, globalOptions, programName, commands);
+    compileChildren(
+      definition.commands ?? [],
+      command.path,
+      command.options,
+      programName,
+      commands
+    );
   }
 }
 
@@ -574,20 +954,22 @@ function compileCommand(
   definition: CliCommandDefinition,
   path: readonly string[],
   parentPath: readonly string[] | undefined,
-  globalOptions: readonly CliOption[],
+  inheritedOptions: readonly CliOption[],
   programName: string
 ): CliCommand {
-  const localOptions = compileOptions(definition.options ?? [], 'local');
+  const localOptions = compileOptions(definition.options ?? [], 'command', path);
   return Object.freeze({
     key: [programName, ...path].join(' '),
     name: definition.name,
     path: Object.freeze([...path]),
     ...(parentPath === undefined ? {} : { parentPath: Object.freeze([...parentPath]) }),
-    aliases: Object.freeze((definition.aliases ?? []).map((alias) => compileAlias(alias, parentPath ?? []))),
+    aliases: Object.freeze(
+      (definition.aliases ?? []).map((alias) => compileAlias(alias, parentPath ?? []))
+    ),
     ...(definition.description === undefined ? {} : { description: definition.description }),
     ...(definition.deprecated === undefined ? {} : { deprecated: definition.deprecated }),
     positionals: Object.freeze((definition.positionals ?? []).map(compilePositional)),
-    options: Object.freeze([...globalOptions, ...localOptions]),
+    options: Object.freeze([...inheritedOptions, ...localOptions]),
     acceptsAfterDoubleDash: definition.acceptsAfterDoubleDash ?? false
   });
 }
@@ -610,26 +992,60 @@ function compilePositional(definition: CliPositionalDefinition): CliPositional {
   });
 }
 
-function compileOptions(definitions: readonly CliOptionDefinition[], scope: 'global' | 'local'): readonly CliOption[] {
-  return Object.freeze(definitions.map((definition) => Object.freeze({
-    name: definition.name,
-    flags: freezeFlags(definition.flags),
-    valueMode: definition.valueMode,
-    ...(definition.valueLabel === undefined ? {} : { valueLabel: definition.valueLabel }),
-    required: definition.required ?? false,
-    ...(definition.description === undefined ? {} : { description: definition.description }),
-    hidden: definition.hidden ?? false,
-    scope
-  })));
+function compileOptions(
+  definitions: readonly CliOptionDefinition[],
+  scope: 'global' | 'command',
+  path: readonly string[]
+): readonly CliOption[] {
+  return Object.freeze(definitions.map((definition) => {
+    const falseFlags = definition.kind === 'boolean'
+      ? Object.freeze([...(definition.falseFlags ?? [])])
+      : Object.freeze([]);
+    const valueCandidates = definition.kind === 'value'
+      ? Object.freeze([...(definition.valueCandidates ?? [])])
+      : Object.freeze([]);
+    const multiple = definition.kind === 'value' && definition.multiple === true;
+    const hasDefault = definition.kind === 'count'
+      ? true
+      : multiple || definition.hasDefault === true;
+    const repeat: CliOptionRepeat = definition.kind === 'count'
+      ? 'count'
+      : multiple
+        ? 'append'
+        : definition.repeat ?? 'error';
+    return Object.freeze({
+      name: definition.name,
+      kind: definition.kind,
+      flags: freezeFlags(definition.flags),
+      falseFlags,
+      valueMode: definition.kind === 'value' ? definition.valueMode : 'none',
+      ...(definition.kind === 'value' && definition.valueLabel !== undefined
+        ? { valueLabel: definition.valueLabel }
+        : {}),
+      required: definition.kind === 'count' ? false : definition.required ?? false,
+      multiple,
+      repeat,
+      hasDefault,
+      ...(definition.kind !== 'count' && definition.defaultLabel !== undefined
+        ? { defaultLabel: definition.defaultLabel }
+        : {}),
+      valueCandidates,
+      ...(definition.description === undefined ? {} : { description: definition.description }),
+      hidden: definition.hidden ?? false,
+      definedAt: scope === 'global' ? Object.freeze([]) : Object.freeze([...path])
+    });
+  }));
 }
 
-function createLookup(program: CliProgram): CliCommandLookup {
+function createLookup(program: { readonly commands: readonly CliCommand[] }): CliCommandLookup {
   const byPath = new Map<string, CliCommand>();
   const byAliasPath = new Map<string, CliAliasMatch>();
   const mutableChildren = new Map<string, CliCommand[]>();
   for (const command of program.commands) {
     byPath.set(pathKey(command.path), command);
-    for (const alias of command.aliases) byAliasPath.set(pathKey(alias.path), Object.freeze({ command, alias }));
+    for (const alias of command.aliases) {
+      byAliasPath.set(pathKey(alias.path), Object.freeze({ command, alias }));
+    }
     if (command.parentPath !== undefined) {
       const key = pathKey(command.parentPath);
       const children = mutableChildren.get(key) ?? [];
@@ -638,11 +1054,13 @@ function createLookup(program: CliProgram): CliCommandLookup {
     }
   }
   const childrenByPath = new Map<string, readonly CliCommand[]>();
-  for (const [key, children] of mutableChildren) childrenByPath.set(key, Object.freeze(children));
+  for (const [key, children] of mutableChildren) {
+    childrenByPath.set(key, Object.freeze(children));
+  }
   return { byPath, byAliasPath, childrenByPath };
 }
 
-function lookupFor(program: CliProgram): CliCommandLookup {
+function lookupFor(program: object & { readonly commands: readonly CliCommand[] }): CliCommandLookup {
   const existing = commandLookups.get(program);
   if (existing !== undefined) return existing;
   const lookup = createLookup(program);
@@ -666,19 +1084,22 @@ function isCommandToken(value: unknown): value is string {
   return isNonEmptyString(value) && !value.startsWith('-') && !/\s/u.test(value) && value !== '--';
 }
 
-function isIdentifier(value: unknown): value is string {
-  return isNonEmptyString(value) && !/\s/u.test(value);
+function isLogicalName(value: unknown): value is string {
+  return isNonEmptyString(value);
 }
 
 function isFlag(value: unknown): value is string {
-  return typeof value === 'string' && /^(?:-[^-\s=]|--[^-\s=][^\s=]*)$/u.test(value);
+  return isNonEmptyString(value);
+}
+
+function readValidFlags(value: unknown, optional = false): readonly string[] | undefined {
+  if (value === undefined && optional) return [];
+  return Array.isArray(value) && value.length > 0 && value.every(isFlag)
+    ? value
+    : undefined;
 }
 
 function freezeFlags(flags: readonly [string, ...string[]]): readonly [string, ...string[]] {
   const [first, ...rest] = flags;
   return Object.freeze([first, ...rest]);
-}
-
-function freezeIssue(issue: CliDefinitionIssue): CliDefinitionIssue {
-  return Object.freeze(issue);
 }

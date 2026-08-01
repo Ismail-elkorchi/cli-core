@@ -57,6 +57,7 @@ async function pack(destination) {
   const [archive] = JSON.parse(stdout);
   const paths = new Set(archive.files.map((file) => file.path));
   assert.equal(paths.has('dist/index.js'), true);
+  assert.equal(paths.has('src/index.ts'), true);
   assert.equal([...paths].some((path) => path.startsWith('schemas/')), false);
   assert.equal([...paths].some((path) => path.includes('node_modules')), false);
   return archive;

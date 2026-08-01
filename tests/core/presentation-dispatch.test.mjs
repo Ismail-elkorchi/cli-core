@@ -4,59 +4,80 @@ import {
   CliHandlerNotFoundError,
   completeCli,
   createCliHelp,
-  createCliInvocationParser,
+  createCliInvocation,
   defineCli,
   dispatchCli
 } from '../../dist/index.js';
 
 const program = defineCli({
   name: 'ship',
-  options: [{ name: 'verbose', flags: ['-v', '--verbose'], valueMode: 'none', description: 'Show details.' }],
+  options: [{
+    name: 'verbose',
+    kind: 'boolean',
+    flags: ['-v', '--verbose'],
+    falseFlags: ['--no-verbose'],
+    description: 'Show details.'
+  }],
   commands: [{
     name: 'deploy',
     aliases: ['d'],
     description: 'Deploy one service.',
-    options: [
-      { name: 'region', flags: ['-r', '--region'], valueMode: 'required', valueLabel: 'region' },
-      { name: 'secret', flags: ['--secret'], valueMode: 'required', hidden: true }
-    ],
+    options: [{
+      name: 'region',
+      kind: 'value',
+      flags: ['-r', '--region'],
+      valueMode: 'required',
+      valueLabel: 'region',
+      valueCandidates: ['eu', 'us'],
+      hasDefault: true,
+      defaultLabel: 'eu'
+    }],
     positionals: [{ name: 'service' }]
   }]
 });
 
-test('help contains only presentation data needed by renderers', () => {
+test('help retains neutral option semantics and rejects unknown paths', () => {
   const help = createCliHelp(program, ['deploy']);
-  assert.equal(help.usage, 'ship deploy [options] <service>');
-  assert.deepEqual(help.options.map((option) => option.name), ['verbose', 'region']);
-  assert.equal('schemaVersion' in help, false);
+  assert.equal(help?.usage, 'ship deploy [options] <service>');
+  assert.deepEqual(help?.options[0].falseFlags, ['--no-verbose']);
+  assert.deepEqual(help?.options[1].valueCandidates, ['eu', 'us']);
+  assert.equal(help?.options[1].defaultLabel, 'eu');
+  assert.equal(createCliHelp(program, ['typo']), undefined);
 });
 
-test('completion distinguishes logical options from concrete flag spellings', () => {
+test('completion returns commands, unused flags, and option values but not positional labels', () => {
   assert.deepEqual(
     completeCli(program, { commandPath: ['deploy'], prefix: '--r' }),
     [{ kind: 'flag', value: '--region', option: 'region' }]
   );
   assert.deepEqual(
-    completeCli(program, { prefix: 'd' }).map((candidate) => [candidate.kind, candidate.value]),
-    [['command', 'deploy'], ['alias', 'd']]
+    completeCli(program, { commandPath: ['deploy'], option: 'region', prefix: 'u' }),
+    [{ kind: 'option-value', value: 'us', option: 'region' }]
   );
+  assert.deepEqual(
+    completeCli(program, {
+      commandPath: ['deploy'],
+      prefix: '',
+      specifiedOptions: { verbose: true, region: true }
+    }),
+    []
+  );
+  assert.equal(completeCli(program, { commandPath: ['typo'] }), undefined);
 });
 
-test('dispatch accepts only a successful invocation and propagates handler results', async () => {
-  const parser = createCliInvocationParser(() => ({
-    status: 'bound',
-    values: {},
-    specified: {},
-    positionals: ['api'],
-    afterDoubleDash: [],
-    unknownFlags: []
-  }));
-  const invocation = parser.parse(program, { argv: ['deploy', 'api'] });
+test('dispatch propagates results and reports missing handlers', async () => {
+  const invocation = createCliInvocation(program, {
+    commandPath: ['deploy'],
+    optionValues: { region: 'eu' },
+    specifiedOptions: { verbose: false, region: false },
+    positionalValues: { service: 'api' }
+  });
   assert.equal(invocation.status, 'parsed');
   if (invocation.status !== 'parsed') return;
 
   const value = await dispatchCli(invocation, {
-    'ship deploy': ({ invocation: parsed, context }) => `${parsed.positionalValues.service}:${context}`
+    'ship deploy': ({ invocation: parsed, context }) =>
+      `${String(parsed.positionalValues.service)}:${context}`
   }, 'production');
   assert.equal(value, 'api:production');
 
