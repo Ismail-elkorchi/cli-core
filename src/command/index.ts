@@ -1,9 +1,8 @@
-import type { FlagSpec } from 'argv-flags';
 import type { ConfigDefinition } from '../config/types.ts';
 import { createCliDiagnostic, type CliDiagnostic } from '../diagnostics.ts';
 
 /**
- * Option categories that cli-core accepts before delegating token binding to argv-flags.
+ * Option categories exposed to an option-binding integration.
  */
 export type CliOptionType = 'string' | 'boolean' | 'number' | 'array';
 
@@ -107,12 +106,12 @@ export interface CliPositionalDefinition {
 }
 
 /**
- * Logical option declaration that is converted into an argv-flags schema.
+ * Logical option declaration compiled into command metadata.
  */
 export interface CliOptionDefinition<T extends CliOptionType = CliOptionType> {
   /** Option key used in parsed values and config argv bindings. */
   readonly name: string;
-  /** Value category delegated to argv-flags for binding. */
+  /** Value category supplied to option-binding integrations. */
   readonly type: T;
   /** Flag spellings accepted for this option. */
   readonly flags: readonly string[];
@@ -124,7 +123,7 @@ export interface CliOptionDefinition<T extends CliOptionType = CliOptionType> {
   readonly default?: CliOptionValue<T>;
   /** Whether an empty string value is accepted. */
   readonly allowEmpty?: boolean;
-  /** Enables argv-flags boolean negation for long boolean flags. */
+  /** Enables boolean negation for long boolean flags. */
   readonly allowNo?: boolean;
   /** Omits this option from default help and completion output. */
   readonly hidden?: boolean;
@@ -221,7 +220,7 @@ export interface CliPositional {
 export interface CliOption<T extends CliOptionType = CliOptionType> {
   /** Option key used in parsed option output. */
   readonly name: string;
-  /** Value category delegated to argv-flags for binding. */
+  /** Value category supplied to option-binding integrations. */
   readonly type: T;
   /** Flag spellings accepted for this option. */
   readonly flags: readonly string[];
@@ -233,7 +232,7 @@ export interface CliOption<T extends CliOptionType = CliOptionType> {
   readonly default?: CliOptionValue<T>;
   /** Whether an empty string value is accepted. */
   readonly allowEmpty?: boolean;
-  /** Enables argv-flags boolean negation for long boolean flags. */
+  /** Enables boolean negation for long boolean flags. */
   readonly allowNo?: boolean;
   /** Omits this option from default help and completion output. */
   readonly hidden: boolean;
@@ -359,25 +358,6 @@ export function findCliCommandByAlias(
  */
 export function findCliCommandChildren(program: CliProgram, parentId: string): readonly CliCommand[] {
   return commandLookup(program).childrenByParentId.get(parentId) ?? Object.freeze([]);
-}
-
-/**
- * Builds the argv-flags schema for compiled command options.
- */
-export function createOptionSchema(options: readonly CliOption[]): Record<string, FlagSpec> {
-  return Object.fromEntries(
-    options.map((option) => [
-      option.name,
-      {
-        type: option.type,
-        flags: option.flags,
-        required: option.required || undefined,
-        default: option.default,
-        allowEmpty: option.allowEmpty,
-        allowNo: option.allowNo
-      }
-    ])
-  ) as Record<string, FlagSpec>;
 }
 
 function compileCommandTree(

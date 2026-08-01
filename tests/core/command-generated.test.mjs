@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { defineCli, parseCli } from '../../dist/index.js';
+import { defineCli, parseCli } from '../support/invocation-parser.mjs';
 
 test('command index lookup remains deterministic for a generated command set', () => {
   const commands = Array.from({ length: 24 }, (_unused, index) => ({

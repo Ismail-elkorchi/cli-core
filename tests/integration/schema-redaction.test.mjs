@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { defineCli, parseCli, runCli } from '../../dist/index.js';
+import { defineCli, parseCli, runCli } from '../support/invocation-parser.mjs';
 import {
   createCliFailureEnvelope,
   createCliSchemaEnvelope,

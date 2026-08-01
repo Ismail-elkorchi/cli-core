@@ -14,7 +14,7 @@ import {
   resolveCliConfig,
   runCli,
   validateCli
-} from '../../dist/index.js';
+} from '../support/invocation-parser.mjs';
 import {
   createCompletionCommand,
   createCompletionInstallPlan,

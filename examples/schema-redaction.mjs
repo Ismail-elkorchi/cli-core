@@ -1,17 +1,18 @@
-import { defineCli, parseCli, runCli } from '../dist/index.js';
+import { defineCli, runCli } from '../dist/index.js';
 import {
   createCliFailureEnvelope,
   createCliSchemaEnvelope,
   describeCliSchemas,
   redactCliSecretsWithReport
 } from '../dist/schema/index.js';
+import { createExampleInvocationParser } from './invocation.mjs';
 
 export async function runSchemaRedactionExample() {
   const program = defineCli({
     name: 'ship',
     commands: [{ name: 'deploy' }]
   });
-  const invocation = parseCli(program, { argv: ['deploy'] });
+  const invocation = createExampleInvocationParser().parse(program, { argv: ['deploy'] });
   const run = await runCli(program, {
     mode: 'plan',
     invocation,

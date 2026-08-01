@@ -7,7 +7,7 @@ test('root and command subpath expose the intended command model APIs', async ()
   const command = await import('../../dist/command/public.js');
 
   assert.equal(typeof root.defineCli, 'function');
-  assert.equal(typeof root.parseCli, 'function');
+  assert.equal(typeof root.createCliInvocationParser, 'function');
   assert.equal(typeof root.validateCli, 'function');
   assert.equal(typeof root.findCliCommand, 'undefined');
   assert.equal(typeof root.findCliCommandByAlias, 'undefined');
@@ -23,6 +23,7 @@ test('root declarations include command and parse result contracts', async () =>
   assert.match(text, /CliDefinition/);
   assert.match(text, /CliProgram/);
   assert.match(text, /ParsedInvocation/);
+  assert.match(text, /CliOptionBinder/);
   assert.doesNotMatch(text, /findCliCommand/);
   assert.doesNotMatch(text, /internal\//);
 });

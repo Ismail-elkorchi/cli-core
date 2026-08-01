@@ -1,8 +1,7 @@
 import {
   completeCli,
   createCompletionPayload,
-  defineCli,
-  parseCli
+  defineCli
 } from '@ismail-elkorchi/cli-core';
 import {
   createCompletionCommand,
@@ -11,6 +10,7 @@ import {
   createCompletionScript
 } from '@ismail-elkorchi/cli-core/completion';
 import { createRepairSuggestionResult } from '@ismail-elkorchi/cli-core/repair';
+import { createExampleInvocationParser } from './invocation.mjs';
 
 export function runCompletionRepairExample() {
   const program = defineCli({
@@ -25,7 +25,7 @@ export function runCompletionRepairExample() {
       }
     ]
   });
-  const invocation = parseCli(program, { argv: ['deply', 'api'] });
+  const invocation = createExampleInvocationParser().parse(program, { argv: ['deply', 'api'] });
 
   return {
     completion: createCompletionPayload(program, { word: 'd' }),

@@ -4,7 +4,7 @@
 
 - Keep command semantics, config, manifests, completion, plugins, diagnostics,
   run results, effects, and testing helpers in this package.
-- Keep low-level argv token parsing delegated to `argv-flags`.
+- Keep low-level argv token parsing behind the `CliOptionBinder` boundary.
 - Do not add prompt loops, raw terminal control, or full-screen terminal UI.
 - Do not use hidden `process.exit()`, stdout, or stderr writes as truth
   surfaces.

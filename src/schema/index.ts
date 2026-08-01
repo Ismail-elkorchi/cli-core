@@ -43,7 +43,7 @@ export type CliSchemaName =
  */
 export type CliSchemaVersion =
   | 'cli-core.program.v1'
-  | 'cli-core.invocation.v1'
+  | 'cli-core.invocation.v2'
   | 'cli-core.semantic-validation.v1'
   | 'cli-core.help.v1'
   | 'cli-core.version.v1'
@@ -214,7 +214,7 @@ export interface CliRedactionResult<TData = unknown> {
 
 const schemaDescriptors: readonly CliSchemaDescriptor[] = Object.freeze([
   descriptor('program', 'cli-core.program.v1', 'Compiled immutable command program.'),
-  descriptor('invocation', 'cli-core.invocation.v1', 'Parsed command invocation.'),
+  descriptor('invocation', 'cli-core.invocation.v2', 'Parsed command invocation.'),
   descriptor('semantic-validation', 'cli-core.semantic-validation.v1', 'Semantic validation result.'),
   descriptor('help', 'cli-core.help.v1', 'Structured help document.'),
   descriptor('version', 'cli-core.version.v1', 'Structured version document.'),
@@ -417,7 +417,7 @@ export function failureKindForDiagnostics(diagnostics: readonly CliDiagnostic[])
   if (codes.includes('CLI_RUN_TIMEOUT')) return 'timeout';
   if (codes.some((code) => code.startsWith('CLI_CONFIG_'))) return 'config';
   if (
-    codes.includes('CLI_ARGV_FLAG_ISSUE') ||
+    codes.includes('CLI_OPTION_BINDING_FAILED') ||
     codes.includes('CLI_UNKNOWN_COMMAND') ||
     codes.includes('CLI_UNKNOWN_OPTION') ||
     codes.includes('CLI_MISSING_POSITIONAL')

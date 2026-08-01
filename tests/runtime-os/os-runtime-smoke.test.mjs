@@ -36,9 +36,11 @@ test('node CLI adapter runs from an outside entrypoint with OS-native argv and p
 function osRuntimeEntrypointSource() {
   const rootUrl = new URL('../../dist/index.js', import.meta.url).href;
   const adapterUrl = new URL('../../dist/adapter/index.js', import.meta.url).href;
+  const parserUrl = new URL('../support/invocation-parser.mjs', import.meta.url).href;
   return `
 import { defineCli } from ${JSON.stringify(rootUrl)};
 import { createNodeCliAdapter, runCliMain } from ${JSON.stringify(adapterUrl)};
+import { testInvocationParser } from ${JSON.stringify(parserUrl)};
 
 const program = defineCli({
   name: 'ship',
@@ -52,6 +54,7 @@ const program = defineCli({
 
 await runCliMain({
   program,
+  parser: testInvocationParser,
   mode: 'apply',
   handlers: {
     deploy: ({ invocation }) => ({

@@ -119,9 +119,6 @@
   "engines": {
     "node": ">=24"
   },
-  "dependencies": {
-    "argv-flags": "^1.0.5"
-  },
   "overrides": {
     "qs": "6.15.2"
   },

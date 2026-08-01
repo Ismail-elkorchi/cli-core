@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createCliDiagnostic } from '../../dist/diagnostics.js';
-import { defineCli, parseCli, resolveCliConfig, runCli, validateCli } from '../../dist/index.js';
+import { defineCli, parseCli, resolveCliConfig, runCli, validateCli } from '../support/invocation-parser.mjs';
 import { createCliPluginHost } from '../../dist/plugins/index.js';
 
 const program = defineCli({

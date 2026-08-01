@@ -9,6 +9,7 @@ import {
   defineCliFixture,
   runCliScenario
 } from '../../dist/testing/index.js';
+import { testInvocationParser } from '../support/invocation-parser.mjs';
 
 test('fixture definitions are cloned and immutable', () => {
   const source = {
@@ -279,7 +280,7 @@ test('scenario runner passes when entrypoint exports and fixture family match', 
 });
 
 test('scenario runner replays parse, config, plugin command, and run behavior', async () => {
-  const result = await runCliScenario(createCliHarness(), {
+  const result = await runCliScenario(createCliHarness({ parser: testInvocationParser }), {
     id: 'unit.testing-harness.replay',
     steps: [
       {
@@ -327,7 +328,7 @@ test('scenario runner replays parse, config, plugin command, and run behavior', 
 });
 
 test('scenario runner reports replay expectation failures as data', async () => {
-  const result = await runCliScenario(createCliHarness(), {
+  const result = await runCliScenario(createCliHarness({ parser: testInvocationParser }), {
     id: 'unit.testing-harness.replay-failure',
     steps: [
       {

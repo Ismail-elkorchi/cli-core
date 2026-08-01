@@ -3,7 +3,7 @@
   "packageName": "@ismail-elkorchi/cli-core",
   "artifacts": [
     { "name": "program", "version": "cli-core.program.v1", "path": "./program.schema.json" },
-    { "name": "invocation", "version": "cli-core.invocation.v1", "path": "./invocation.schema.json" },
+    { "name": "invocation", "version": "cli-core.invocation.v2", "path": "./invocation.schema.json" },
     { "name": "semantic-validation", "version": "cli-core.semantic-validation.v1", "path": "./semantic-validation.schema.json" },
     { "name": "help", "version": "cli-core.help.v1", "path": "./help.schema.json" },
     { "name": "version", "version": "cli-core.version.v1", "path": "./version.schema.json" },

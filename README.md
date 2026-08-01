@@ -2,13 +2,12 @@
 
 Structured command-core primitives for TypeScript and JavaScript CLIs.
 
-`cli-core` compiles command definitions, parses invocations through
-`argv-flags`, resolves explicit configuration input, returns structured help and
-manifest documents, produces completion payloads, applies plugin command
-contributions, plans or runs command handlers, reports effects and artifacts,
-redacts secrets, and provides a small testing harness. It does not own prompts,
-shell loops, raw terminal control, full-screen terminal UI, or hidden process
-writes.
+`cli-core` compiles command definitions, routes commands through an explicit
+option-binding interface, resolves configuration input, returns structured help
+and manifest documents, produces completion payloads, applies plugin command
+contributions, and plans or runs normalized invocations. It has no runtime
+dependencies and does not implement low-level argv parsing or select a parser
+implementation.
 
 ## Install
 
@@ -20,7 +19,7 @@ deno add jsr:@ismail-elkorchi/cli-core
 ## Quickstart
 
 ```ts
-import { defineCli, parseCli, validateCli } from '@ismail-elkorchi/cli-core';
+import { createHelpDocument, defineCli } from '@ismail-elkorchi/cli-core';
 
 const program = defineCli({
   name: 'ship',
@@ -35,15 +34,12 @@ const program = defineCli({
   ]
 });
 
-const invocation = parseCli(program, {
-  argv: ['d', '--verbose', '--region', 'eu', 'api']
-});
-const validation = await validateCli(program, invocation);
+const help = createHelpDocument(program, ['deploy']);
 ```
 
 ## API Entrypoints
 
-- `@ismail-elkorchi/cli-core`: core program, parse, validation, config, help,
+- `@ismail-elkorchi/cli-core`: core program, invocation, validation, config, help,
   manifest, completion payload, and run APIs.
 - `@ismail-elkorchi/cli-core/command`: command definition and lookup APIs.
 - `@ismail-elkorchi/cli-core/adapter`: explicit argv/stdout/stderr/exit-code
@@ -68,23 +64,37 @@ const validation = await validateCli(program, invocation);
 
 ## Core Examples
 
-### Define And Parse
+### Connect An Option Binder
 
 ```ts
-import { defineCli, parseCli } from '@ismail-elkorchi/cli-core';
+import {
+  createCliInvocationParser,
+  defineCli,
+  type CliOptionBinder
+} from '@ismail-elkorchi/cli-core';
+
+declare const bindOptions: CliOptionBinder;
 
 const program = defineCli({
   name: 'ship',
   commands: [{ name: 'status', aliases: ['st'] }]
 });
 
-const invocation = parseCli(program, { argv: ['st'] });
+const parser = createCliInvocationParser(bindOptions);
+const invocation = parser.parse(program, { argv: ['st'] });
 ```
+
+`CliOptionBinder` is the integration boundary. It receives the matched command,
+its options, and the remaining argv. The command object is stable and can key a
+compiled-parser cache. The binder returns decoded values, raw positionals,
+post-`--` tokens, indexed unknown options, and translated diagnostics. A
+higher-level package can adapt an argv parser once and provide the resulting
+`CliInvocationParser` to the rest of the application.
 
 ### Config
 
 ```ts
-import { defineCli, parseCli, resolveCliConfig } from '@ismail-elkorchi/cli-core';
+import { defineCli, resolveCliConfig } from '@ismail-elkorchi/cli-core';
 import {
   createMemoryConfigDiscoveryHost,
   discoverCliConfigInput
@@ -101,7 +111,6 @@ const program = defineCli({
   commands: [{ name: 'deploy', options: [{ name: 'profile', type: 'string', flags: ['--profile'] }] }]
 });
 
-const invocation = parseCli(program, { argv: ['deploy', '--profile', 'prod'] });
 const memory = createMemoryConfigDiscoveryHost({
   files: { '/workspace/.shiprc.json': { profile: 'file', dryRun: true } },
   env: { SHIP_PROFILE: 'env' }
@@ -113,12 +122,9 @@ const discovered = await discoverCliConfigInput(program, {
   filenames: ['.shiprc.json'],
   environment: { includeConfigFields: true }
 });
-const argvConfig = typeof invocation.options.values.profile === 'string'
-  ? { profile: invocation.options.values.profile }
-  : {};
 const config = resolveCliConfig(program, {
   ...discovered.input,
-  argv: argvConfig
+  argv: { profile: 'prod' }
 });
 ```
 
@@ -200,14 +206,18 @@ capability allow-list; hosts can also restrict accepted plugin identities.
 ### Run
 
 ```ts
-import { defineCli, parseCli, runCli } from '@ismail-elkorchi/cli-core';
+import {
+  defineCli,
+  runCli,
+  type ParsedInvocation
+} from '@ismail-elkorchi/cli-core';
+
+declare const invocation: ParsedInvocation;
 
 const program = defineCli({
   name: 'ship',
   commands: [{ name: 'deploy', positionals: [{ name: 'service' }] }]
 });
-const invocation = parseCli(program, { argv: ['deploy', 'api'] });
-
 const result = await runCli(program, {
   mode: 'apply',
   invocation,
@@ -223,7 +233,10 @@ const result = await runCli(program, {
 
 ```ts
 import { defineCli } from '@ismail-elkorchi/cli-core';
+import type { CliInvocationParser } from '@ismail-elkorchi/cli-core';
 import { createNodeCliAdapter, runCliMain } from '@ismail-elkorchi/cli-core/adapter';
+
+declare const parser: CliInvocationParser;
 
 const program = defineCli({
   name: 'ship',
@@ -232,6 +245,7 @@ const program = defineCli({
 
 await runCliMain({
   program,
+  parser,
   mode: 'plan',
   handlers: {
     deploy: ({ invocation }) => ({
@@ -283,7 +297,8 @@ effect application require caller-supplied hosts. Spawn effects use argv arrays
 and do not imply shell interpolation. Run results, failure envelopes, and schema
 envelopes redact secret-like keys and common token patterns by default. Plugin
 command contributions and hook modules are gated by compatibility, capability,
-and optional trusted-plugin checks before they participate in parsing or running.
+and optional trusted-plugin checks before they participate in invocation
+handling or running.
 
 ## Runtime Support
 
@@ -294,8 +309,9 @@ system, shell, filesystem, or package-manager compatibility guarantees.
 
 ## Limitations
 
-- Low-level argv tokenization, coercion, and flag issue semantics are delegated
-  to `argv-flags`.
+- Raw argv parsing is not built in. Integrations provide a `CliOptionBinder` and
+  use `createCliInvocationParser` to combine it with command routing and
+  positional binding.
 - Config resolution consumes explicit input. File discovery and environment
   capture happen only through caller-supplied discovery hosts.
 - Completion scripts and install plans are data. Consumers decide whether and

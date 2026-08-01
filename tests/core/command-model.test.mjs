@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { defineCli, parseCli, validateCli } from '../../dist/index.js';
+import { defineCli, parseCli, validateCli } from '../support/invocation-parser.mjs';
 import { findCliCommand, findCliCommandByAlias } from '../../dist/command/public.js';
 
 const treeDefinition = {
@@ -347,7 +347,11 @@ test('parseCli returns structured diagnostics for unknown commands and missing i
   assert.equal(missing.diagnostics[0].code, 'CLI_MISSING_POSITIONAL');
   assert.equal(unknownOption.ok, false);
   assert.equal(unknownOption.diagnostics[0].code, 'CLI_UNKNOWN_OPTION');
-  assert.deepEqual(unknownOption.options.unknown, ['--missing']);
+  assert.deepEqual(unknownOption.options.unknown, [{
+    argvElement: '--missing',
+    option: '--missing',
+    argvIndex: 1
+  }]);
 });
 
 test('validateCli preserves parse failures as semantic validation failures', async () => {

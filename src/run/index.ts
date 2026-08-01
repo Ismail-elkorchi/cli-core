@@ -6,7 +6,7 @@ import {
   type CliDiagnostic,
   type CliDiagnosticValue
 } from '../diagnostics.ts';
-import { parseCli, type ParsedInvocation, type SemanticValidationResult } from '../parse/index.ts';
+import type { ParsedInvocation, SemanticValidationResult } from '../parse/index.ts';
 import type { CliPluginHookEvent, CliPluginHookRunResult, CliPluginHost } from '../plugins/index.ts';
 import { redactCliDiagnostics, redactCliSecrets, type CliRedactionOptions } from '../schema/index.ts';
 
@@ -48,10 +48,8 @@ export interface RunRequest {
   readonly mode?: RunMode;
   /** Correlation identifier for this run. */
   readonly runId?: RunIdentifier;
-  /** Tokens parsed when an invocation is not supplied. */
-  readonly argv?: readonly string[];
   /** Parsed invocation used by this run. */
-  readonly invocation?: ParsedInvocation;
+  readonly invocation: ParsedInvocation;
   /** Run handlers keyed by command id, path, or name. */
   readonly handlers?: Readonly<Record<string, RunHandler>>;
   /** Config resolution whose diagnostics participate in exit classification. */
@@ -277,7 +275,7 @@ export type ExitStatusPolicy = Partial<Record<ExitKind, number>>;
  */
 export async function runCli(program: CliProgram, request: RunRequest): Promise<RunResult> {
   const mode = request.mode ?? 'plan';
-  const invocation = request.invocation ?? parseCli(program, { argv: request.argv ?? [] });
+  const invocation = request.invocation;
   const runId = request.runId ?? createRunIdentifier(program, invocation, mode);
   const diagnostics: CliDiagnostic[] = [
     ...invocation.diagnostics,

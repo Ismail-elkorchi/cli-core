@@ -4,7 +4,7 @@ import {
   defineCli,
   parseCli,
   resolveCliConfig
-} from '../../dist/index.js';
+} from '../support/invocation-parser.mjs';
 import {
   createMemoryConfigDiscoveryHost,
   discoverCliConfigInput

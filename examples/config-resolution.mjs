@@ -1,12 +1,12 @@
 import {
   defineCli,
-  parseCli,
   resolveCliConfig
 } from '@ismail-elkorchi/cli-core';
 import {
   createMemoryConfigDiscoveryHost,
   discoverCliConfigInput
 } from '@ismail-elkorchi/cli-core/config';
+import { createExampleInvocationParser } from './invocation.mjs';
 
 export async function runConfigResolutionExample() {
   const program = defineCli({
@@ -24,7 +24,8 @@ export async function runConfigResolutionExample() {
       }
     ]
   });
-  const invocation = parseCli(program, { argv: ['deploy', '--profile', 'prod'] });
+  const parser = createExampleInvocationParser({ values: { profile: 'prod' }, present: ['profile'] });
+  const invocation = parser.parse(program, { argv: ['deploy', '--profile', 'prod'] });
   const memory = createMemoryConfigDiscoveryHost({
     files: { '/workspace/.shiprc.json': { profile: 'file', dryRun: true } },
     env: { SHIP_PROFILE: 'env' }

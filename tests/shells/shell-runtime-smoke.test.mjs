@@ -585,9 +585,11 @@ function shellAwareQuote(shell, value) {
 function cmdEntrypointSource() {
   const rootImport = new URL('../../dist/index.js', import.meta.url).href;
   const adapterImport = new URL('../../dist/adapter/index.js', import.meta.url).href;
+  const parserImport = new URL('../support/invocation-parser.mjs', import.meta.url).href;
   return `
 import { defineCli } from ${JSON.stringify(rootImport)};
 import { createNodeCliAdapter, runCliMain } from ${JSON.stringify(adapterImport)};
+import { testInvocationParser } from ${JSON.stringify(parserImport)};
 
 const program = defineCli({
   name: 'ship',
@@ -596,6 +598,7 @@ const program = defineCli({
 
 await runCliMain({
   program,
+  parser: testInvocationParser,
   mode: 'apply',
   handlers: {
     deploy: ({ invocation }) => ({
@@ -642,9 +645,11 @@ await runCliMain({
 function shellEntrypointSource() {
   const rootUrl = new URL('../../dist/index.js', import.meta.url).href;
   const adapterUrl = new URL('../../dist/adapter/index.js', import.meta.url).href;
+  const parserUrl = new URL('../support/invocation-parser.mjs', import.meta.url).href;
   return `
 import { defineCli } from ${JSON.stringify(rootUrl)};
 import { createNodeCliAdapter, runCliMain } from ${JSON.stringify(adapterUrl)};
+import { testInvocationParser } from ${JSON.stringify(parserUrl)};
 
 const program = defineCli({
   name: 'ship',
@@ -658,6 +663,7 @@ const program = defineCli({
 
 await runCliMain({
   program,
+  parser: testInvocationParser,
   mode: 'apply',
   handlers: {
     deploy: ({ invocation }) => ({
@@ -704,9 +710,11 @@ await runCliMain({
 function shellNestedEntrypointSource() {
   const rootUrl = new URL('../../dist/index.js', import.meta.url).href;
   const adapterUrl = new URL('../../dist/adapter/index.js', import.meta.url).href;
+  const parserUrl = new URL('../support/invocation-parser.mjs', import.meta.url).href;
   return `
 import { defineCli } from ${JSON.stringify(rootUrl)};
 import { createNodeCliAdapter, runCliMain } from ${JSON.stringify(adapterUrl)};
+import { testInvocationParser } from ${JSON.stringify(parserUrl)};
 
 const program = defineCli({
   name: 'ship',
@@ -745,6 +753,7 @@ const program = defineCli({
 
 await runCliMain({
   program,
+  parser: testInvocationParser,
   mode: 'apply',
   handlers: {
     'config set': ({ invocation }) => ({

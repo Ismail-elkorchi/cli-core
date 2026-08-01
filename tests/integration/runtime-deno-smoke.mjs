@@ -9,10 +9,12 @@ import * as repair from '../../src/repair/index.ts';
 import * as root from '../../src/index.ts';
 import * as schema from '../../src/schema/index.ts';
 import * as testing from '../../src/testing/index.ts';
+import { bindTestOptions } from '../support/invocation-parser.mjs';
 
 Deno.test('Deno can load and exercise cli-core source entrypoints', async () => {
+  const parser = root.createCliInvocationParser(bindTestOptions);
   const program = root.defineCli(runtimeDefinition());
-  const invocation = root.parseCli(program, { argv: ['c', '--region', 'eu', 'api'] });
+  const invocation = parser.parse(program, { argv: ['c', '--region', 'eu', 'api'] });
   const memoryConfig = config.createMemoryConfigDiscoveryHost({ env: { RUNTIME_PROFILE: 'ci' } });
   const discoveredConfig = await config.discoverCliConfigInput(program, {
     host: memoryConfig.host,
@@ -29,9 +31,9 @@ Deno.test('Deno can load and exercise cli-core source entrypoints', async () => 
     version: '1.0.0',
     runtimes: ['node', 'deno', 'bun']
   }), { runtime: 'deno' });
-  const repairs = repair.createRepairSuggestionResult(root.parseCli(program, { argv: ['chek'] }), program).suggestions;
+  const repairs = repair.createRepairSuggestionResult(parser.parse(program, { argv: ['chek'] }), program).suggestions;
   const run = await root.runCli(program, { mode: 'plan', invocation });
-  const main = await adapter.runCliMain({ program, mode: 'plan', argv: ['check', 'api'] });
+  const main = await adapter.runCliMain({ program, parser, mode: 'plan', argv: ['check', 'api'] });
   const memoryHost = effects.createMemoryEffectHost();
   const effectReport = await effects.applyCliEffects({
     effects: [{ kind: 'write_file', path: 'runtime.txt', content: 'ok' }],

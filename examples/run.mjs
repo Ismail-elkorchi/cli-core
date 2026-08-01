@@ -1,12 +1,14 @@
-import { defineCli, parseCli, runCli } from '@ismail-elkorchi/cli-core';
+import { defineCli, runCli } from '@ismail-elkorchi/cli-core';
 import { createCliPluginHost } from '@ismail-elkorchi/cli-core/plugins';
+import { createExampleInvocationParser } from './invocation.mjs';
 
 export async function runExecutionExample() {
   const program = defineCli({
     name: 'ship',
     commands: [{ name: 'deploy', positionals: [{ name: 'service' }] }]
   });
-  const invocation = parseCli(program, { argv: ['deploy', 'api'] });
+  const invocation = createExampleInvocationParser({ positionals: ['api'] })
+    .parse(program, { argv: ['deploy', 'api'] });
   const pluginHost = createCliPluginHost([
     {
       manifest: { name: 'audit', version: '1.0.0', hooks: [{ name: 'record', event: 'prerun' }] },

@@ -8,7 +8,7 @@ export {
 export { resolveCliConfig } from './config/index.ts';
 export { createHelpDocument } from './help/index.ts';
 export { describeCli } from './manifest/index.ts';
-export { parseCli, validateCli } from './parse/index.ts';
+export { createCliInvocationParser, validateCli } from './parse/index.ts';
 export { runCli } from './run/index.ts';
 export type {
   CliAlias,
@@ -39,7 +39,11 @@ export type {
   ParsedCliOptionValue,
   ParsedCliOptions,
   ParsedInvocation,
-  ParseIssue,
+  CliInvocationParser,
+  CliOptionBinder,
+  CliOptionBindingInput,
+  CliOptionBindingResult,
+  CliUnknownOption,
   ParsedPositionalValue,
   ParseInput,
   SemanticValidationResult,

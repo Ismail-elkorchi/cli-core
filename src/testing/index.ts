@@ -1,7 +1,7 @@
 import { defineCli, type CliDefinition } from '../command/index.ts';
 import { resolveCliConfig, type ConfigInput, type ConfigValue } from '../config/index.ts';
 import type { CliDiagnosticCode } from '../diagnostics.ts';
-import { parseCli } from '../parse/index.ts';
+import type { CliInvocationParser } from '../parse/index.ts';
 import { applyCliPluginCommands, type CliPluginManifest, type CliPluginManifestDefinition } from '../plugins/index.ts';
 import { runCli, type ExitKind, type RunArtifact, type RunEffect, type RunMode, type RunPayload } from '../run/index.ts';
 
@@ -113,6 +113,8 @@ export interface CliEntrypointModule {
 export interface CliHarnessInput {
   /** CLI program for this operation. */
   readonly program?: unknown;
+  /** Invocation parser used by parse and run scenario steps. */
+  readonly parser?: CliInvocationParser;
   /** Entrypoint modules available to harness scenarios. */
   readonly entrypoints?: Partial<Record<CliPackageEntrypoint, CliEntrypointModule>>;
   /** Fixtures registered in the harness. */
@@ -125,6 +127,8 @@ export interface CliHarnessInput {
 export interface CliHarness {
   /** CLI program for this operation. */
   readonly program: unknown | undefined;
+  /** Invocation parser used by parse and run scenario steps. */
+  readonly parser: CliInvocationParser | undefined;
   /** Fixtures registered in the harness. */
   readonly fixtures: CliFixtureRegistry;
   /** Returns an entrypoint module by name. */
@@ -294,6 +298,7 @@ export type CliTestDiagnosticCode =
   | 'CLI_TEST_EXPORT_MISSING'
   | 'CLI_TEST_FIXTURE_MISSING'
   | 'CLI_TEST_FIXTURE_FAMILY_MISMATCH'
+  | 'CLI_TEST_PARSER_MISSING'
   | 'CLI_TEST_EXPECTATION_FAILED';
 
 /**
@@ -753,6 +758,7 @@ export function createCliHarness(input: CliHarnessInput = {}): CliHarness {
 
   return Object.freeze({
     program: input.program,
+    parser: input.parser,
     fixtures,
     getEntrypoint(entrypoint: CliPackageEntrypoint): CliEntrypointModule | undefined {
       return entrypoints.get(entrypoint);
@@ -870,10 +876,10 @@ function inspectScenarioStep(
 ): readonly CliTestDiagnostic[] | Promise<readonly CliTestDiagnostic[]> {
   if (step.kind === 'entrypoint-load') return inspectEntrypointStep(harness, step);
   if (step.kind === 'fixture-available') return inspectFixtureStep(harness, step);
-  if (step.kind === 'parse') return inspectParseStep(step);
+  if (step.kind === 'parse') return inspectParseStep(harness, step);
   if (step.kind === 'config-resolution') return inspectConfigStep(step);
   if (step.kind === 'plugin-command-application') return inspectPluginCommandStep(step);
-  return inspectRunStep(step);
+  return inspectRunStep(harness, step);
 }
 
 function inspectEntrypointStep(harness: CliHarness, step: CliEntrypointLoadStep): readonly CliTestDiagnostic[] {
@@ -920,9 +926,10 @@ function inspectFixtureStep(harness: CliHarness, step: CliFixtureAvailableStep):
   return [];
 }
 
-function inspectParseStep(step: CliParseScenarioStep): readonly CliTestDiagnostic[] {
+function inspectParseStep(harness: CliHarness, step: CliParseScenarioStep): readonly CliTestDiagnostic[] {
+  if (harness.parser === undefined) return [missingParserDiagnostic(step.name)];
   const program = defineCli(step.definition);
-  const invocation = parseCli(program, { argv: step.argv ?? [] });
+  const invocation = harness.parser.parse(program, { argv: step.argv ?? [] });
   return Object.freeze([
     ...expectBoolean(step.name, 'parse ok', step.expectedOk, invocation.ok),
     ...expectStringArray(step.name, 'command path', step.expectedCommandPath, invocation.commandPath),
@@ -949,11 +956,13 @@ function inspectPluginCommandStep(step: CliPluginCommandScenarioStep): readonly 
   ]);
 }
 
-async function inspectRunStep(step: CliRunScenarioStep): Promise<readonly CliTestDiagnostic[]> {
+async function inspectRunStep(harness: CliHarness, step: CliRunScenarioStep): Promise<readonly CliTestDiagnostic[]> {
+  if (harness.parser === undefined) return [missingParserDiagnostic(step.name)];
   const program = defineCli(step.definition);
+  const invocation = harness.parser.parse(program, { argv: step.argv ?? [] });
   const result = await runCli(program, {
     mode: step.mode ?? 'plan',
-    argv: step.argv ?? [],
+    invocation,
     ...(step.effects === undefined ? {} : { effects: step.effects }),
     ...(step.artifacts === undefined ? {} : { artifacts: step.artifacts }),
     ...(step.context === undefined ? {} : { context: step.context }),
@@ -968,6 +977,12 @@ async function inspectRunStep(step: CliRunScenarioStep): Promise<readonly CliTes
     ...expectStringArray(step.name, 'event names', step.expectedEventNames, result.events.map((event) => event.name)),
     ...expectDiagnosticCodes(step.name, step.expectedDiagnosticCodes, result.diagnostics.map((item) => item.code))
   ]);
+}
+
+function missingParserDiagnostic(stepName: string): CliTestDiagnostic {
+  return diagnostic('CLI_TEST_PARSER_MISSING', 'Parse and run scenario steps require an invocation parser.', {
+    stepName
+  });
 }
 
 function expectBoolean(
