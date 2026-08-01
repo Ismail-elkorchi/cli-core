@@ -3,7 +3,7 @@ import test from 'node:test';
 import {
   defineCli,
   runCli
-} from '../../dist/index.js';
+} from '../support/invocation-parser.mjs';
 import {
   createCliFailureEnvelope,
   createCliSchemaEnvelope,
@@ -19,7 +19,7 @@ test('schema registry exposes stable public schema versions', () => {
   const schemas = describeCliSchemas();
   const expected = [
     ['program', 'cli-core.program.v1'],
-    ['invocation', 'cli-core.invocation.v1'],
+    ['invocation', 'cli-core.invocation.v2'],
     ['semantic-validation', 'cli-core.semantic-validation.v1'],
     ['help', 'cli-core.help.v1'],
     ['version', 'cli-core.version.v1'],
@@ -335,7 +335,7 @@ test('failure helpers map exit kinds and diagnostics to typed failure kinds', ()
   ]), 'config');
   assert.equal(failureKindForDiagnostics([
     {
-      code: 'CLI_ARGV_FLAG_ISSUE',
+      code: 'CLI_OPTION_BINDING_FAILED',
       severity: 'error',
       message: 'bad flag',
       fields: {}

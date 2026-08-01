@@ -8,6 +8,7 @@ import {
   type EffectApplicationReport
 } from '../effects/index.ts';
 import type { CliPluginHost } from '../plugins/index.ts';
+import type { CliInvocationParser } from '../parse/index.ts';
 import {
   runCli,
   type ExitStatusPolicy,
@@ -50,6 +51,8 @@ export interface CliMainHost {
 export interface CliMainRequest {
   /** CLI program for this operation. */
   readonly program: CliProgram;
+  /** Command-aware parser supplied by an integration package. */
+  readonly parser: CliInvocationParser;
   /** Default argv tokens used when the host does not supply argv. */
   readonly argv?: readonly string[];
   /** Run mode forwarded to runCli. */
@@ -143,12 +146,14 @@ export interface CliWritableStream {
  *
  * @example
  * ```ts
- * import { defineCli } from '@ismail-elkorchi/cli-core';
+ * import { defineCli, type CliInvocationParser } from '@ismail-elkorchi/cli-core';
  * import { createCliMain } from '@ismail-elkorchi/cli-core/adapter';
  *
+ * declare const parser: CliInvocationParser;
  * const program = defineCli({ name: 'ship', commands: [{ name: 'status' }] });
  * const main = createCliMain({
  *   program,
+ *   parser,
  *   mode: 'apply',
  *   handlers: { status: () => ({ artifacts: [{ id: 'status', kind: 'text', payload: 'ok' }] }) }
  * });
@@ -247,9 +252,10 @@ export function createNodeCliAdapter(processLike: NodeCliProcessLike): CliMainHo
 }
 
 function buildRunRequest(request: CliMainRequest, host: CliMainHost) {
+  const argv = Object.freeze([...(request.argv ?? host.argv ?? [])]);
   const runRequest: {
     mode: RunMode;
-    argv: readonly string[];
+    invocation: ReturnType<CliInvocationParser['parse']>;
     handlers?: Readonly<Record<string, RunHandler>>;
     effects?: readonly RunEffect[];
     artifacts?: readonly RunArtifact[];
@@ -260,7 +266,7 @@ function buildRunRequest(request: CliMainRequest, host: CliMainHost) {
     redaction?: CliRedactionOptions;
   } = {
     mode: request.mode ?? 'apply',
-    argv: Object.freeze([...(request.argv ?? host.argv ?? [])])
+    invocation: request.parser.parse(request.program, { argv })
   };
   if (request.handlers !== undefined) runRequest.handlers = request.handlers;
   if (request.effects !== undefined) runRequest.effects = request.effects;

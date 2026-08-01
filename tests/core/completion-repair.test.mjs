@@ -5,7 +5,7 @@ import {
   createCompletionPayload,
   defineCli,
   parseCli
-} from '../../dist/index.js';
+} from '../support/invocation-parser.mjs';
 import { createCliDiagnostic } from '../../dist/diagnostics.js';
 import {
   createCompletionCommand,

@@ -102,7 +102,7 @@ export interface ManifestPositional {
 export interface ManifestOption {
   /** Option key used in parsed output. */
   readonly name: string;
-  /** Value category delegated to argv-flags. */
+  /** Value category exposed to option-binding integrations. */
   readonly type: string;
   /** Flag spellings accepted for this option. */
   readonly flags: readonly string[];

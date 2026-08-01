@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createCliMain, runCliMain } from '../../dist/adapter/index.js';
+import { createCliMain, runCliMain } from '../support/adapter.mjs';
 import { completeCli } from '../../dist/completion/index.js';
 import {
   createMemoryConfigDiscoveryHost,
@@ -14,7 +14,7 @@ import {
   defineCliPluginManifest
 } from '../../dist/plugins/index.js';
 import { createCliSchemaEnvelope } from '../../dist/schema/index.js';
-import { defineCli, parseCli, runCli } from '../../dist/index.js';
+import { defineCli, parseCli, runCli } from '../support/invocation-parser.mjs';
 
 test('pass-through arguments are preserved and adapter output is explicit', async () => {
   const program = defineCli({
@@ -112,7 +112,7 @@ test('nested command aliases and schema envelopes stay explicit', () => {
   assert.equal(invocation.ok, true);
   assert.deepEqual(invocation.commandPath, ['project', 'install']);
   assert.equal(invocation.usedAlias?.token, 'i');
-  assert.equal(envelope.payloadSchemaVersion, 'cli-core.invocation.v1');
+  assert.equal(envelope.payloadSchemaVersion, 'cli-core.invocation.v2');
 });
 
 test('variadic positionals bind without implicit default-command routing', () => {

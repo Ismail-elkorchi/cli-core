@@ -1,4 +1,5 @@
-import { defineCli, parseCli, validateCli } from '@ismail-elkorchi/cli-core';
+import { defineCli, validateCli } from '@ismail-elkorchi/cli-core';
+import { createExampleInvocationParser } from './invocation.mjs';
 
 export async function runCommandModelExample() {
   const program = defineCli({
@@ -14,7 +15,12 @@ export async function runCommandModelExample() {
     ]
   });
 
-  const invocation = parseCli(program, {
+  const parser = createExampleInvocationParser({
+    values: { verbose: true, region: 'eu' },
+    present: ['verbose', 'region'],
+    positionals: ['api']
+  });
+  const invocation = parser.parse(program, {
     argv: ['d', '--verbose', '--region', 'eu', 'api']
   });
   const validation = await validateCli(program, invocation);

@@ -3,6 +3,7 @@ import {
   createCliMain,
   createNodeCliAdapter
 } from '@ismail-elkorchi/cli-core/adapter';
+import { createExampleInvocationParser } from './invocation.mjs';
 
 export async function runCliMainExample() {
   const program = defineCli({
@@ -17,6 +18,7 @@ export async function runCliMainExample() {
   };
   const main = createCliMain({
     program,
+    parser: createExampleInvocationParser({ positionals: ['api'] }),
     mode: 'plan',
     effects: [{ kind: 'write_file', path: 'plan.json', content: '{"service":"api"}' }],
     effectMode: 'plan',

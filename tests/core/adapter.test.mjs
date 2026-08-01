@@ -5,7 +5,7 @@ import {
   createNodeCliAdapter,
   renderRunResultText,
   runCliMain
-} from '../../dist/adapter/index.js';
+} from '../support/adapter.mjs';
 import { defineCli } from '../../dist/index.js';
 import { createMemoryEffectHost } from '../../dist/effects/index.js';
 import { createCliPluginHost } from '../../dist/plugins/index.js';

@@ -8,7 +8,7 @@ import * as help from '../../dist/help/index.js';
 import * as manifest from '../../dist/manifest/index.js';
 import * as plugins from '../../dist/plugins/index.js';
 import * as repair from '../../dist/repair/index.js';
-import * as root from '../../dist/index.js';
+import * as root from '../support/invocation-parser.mjs';
 import * as schema from '../../dist/schema/index.js';
 import * as testing from '../../dist/testing/index.js';
 
@@ -33,7 +33,7 @@ test('node runtime can load and exercise public entrypoints', async () => {
   }), { runtime: 'node' });
   const repairs = repair.createRepairSuggestionResult(root.parseCli(program, { argv: ['chek'] }), program).suggestions;
   const run = await root.runCli(program, { mode: 'plan', invocation });
-  const main = await adapter.runCliMain({ program, mode: 'plan', argv: ['check', 'api'] });
+  const main = await adapter.runCliMain({ program, parser: root.testInvocationParser, mode: 'plan', argv: ['check', 'api'] });
   const memoryHost = effects.createMemoryEffectHost();
   const effectReport = await effects.applyCliEffects({
     effects: [{ kind: 'write_file', path: 'runtime.txt', content: 'ok' }],

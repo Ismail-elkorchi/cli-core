@@ -6,7 +6,7 @@ import {
   createHelpDocument,
   parseCli,
   runCli
-} from '../../dist/index.js';
+} from '../support/invocation-parser.mjs';
 import { describeCli } from '../../dist/manifest/index.js';
 import {
   applyCliPluginCommands,

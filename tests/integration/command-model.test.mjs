@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import * as cliCore from '../../dist/index.js';
+import * as cliCore from '../support/invocation-parser.mjs';
+import { testInvocationParser } from '../support/invocation-parser.mjs';
 import * as testing from '../../dist/testing/index.js';
 
 test('consumer can compile, parse, validate, and record a command scenario through public APIs', async () => {
@@ -23,6 +24,7 @@ test('consumer can compile, parse, validate, and record a command scenario throu
   const validation = await cliCore.validateCli(program, invocation);
   const harness = testing.createCliHarness({
     program,
+    parser: testInvocationParser,
     entrypoints: {
       root: cliCore,
       testing
@@ -35,7 +37,7 @@ test('consumer can compile, parse, validate, and record a command scenario throu
         kind: 'entrypoint-load',
         name: 'root exposes command APIs',
         entrypoint: 'root',
-        expectedExports: ['defineCli', 'parseCli', 'validateCli']
+        expectedExports: ['defineCli', 'createCliInvocationParser', 'validateCli']
       },
       {
         kind: 'entrypoint-load',
@@ -55,7 +57,7 @@ test('consumer can compile, parse, validate, and record a command scenario throu
   assert.equal(harnessResult.status, 'passed');
 });
 
-test('argv-flags issues are surfaced as cli-core diagnostics', () => {
+test('option-binder issues are surfaced as cli-core diagnostics', () => {
   const program = cliCore.defineCli({
     name: 'ship',
     commands: [
@@ -69,6 +71,6 @@ test('argv-flags issues are surfaced as cli-core diagnostics', () => {
   const invocation = cliCore.parseCli(program, { argv: ['deploy'] });
 
   assert.equal(invocation.ok, false);
-  assert.equal(invocation.diagnostics[0].code, 'CLI_ARGV_FLAG_ISSUE');
-  assert.equal(invocation.diagnostics[0].fields.code, 'REQUIRED');
+  assert.equal(invocation.diagnostics[0].code, 'CLI_OPTION_BINDING_FAILED');
+  assert.equal(invocation.diagnostics[0].fields.reason, 'REQUIRED');
 });

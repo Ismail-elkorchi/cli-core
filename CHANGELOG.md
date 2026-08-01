@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Removed the runtime dependency on `argv-flags` and the built-in `parseCli`
+  entrypoint. Integrations now provide a `CliOptionBinder` to
+  `createCliInvocationParser`.
+- Made parsed invocations mandatory for `runCli` and made CLI adapters accept an
+  explicit invocation parser.
+- Replaced parser-specific issue snapshots with binder diagnostics and indexed
+  unknown-option records, with the invocation document advanced to
+  `cli-core.invocation.v2`.
+
 ## 0.1.0 - 2026-06-08
 
 - Initial public release of typed command-core primitives for TypeScript and JavaScript CLIs.

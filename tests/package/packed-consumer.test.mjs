@@ -193,7 +193,7 @@ function assertFullConsumerResult(result) {
 
 function consumerTypesSource() {
   return `
-import { defineCli, parseCli, runCli, type CliProgram, type ParsedInvocation } from '@ismail-elkorchi/cli-core';
+import { createCliInvocationParser, defineCli, runCli, type CliOptionBinder, type CliProgram, type ParsedInvocation } from '@ismail-elkorchi/cli-core';
 import { findCliCommand } from '@ismail-elkorchi/cli-core/command';
 import { runCliMain, type CliMainResult } from '@ismail-elkorchi/cli-core/adapter';
 import { completeCli, type CompletionResponse } from '@ismail-elkorchi/cli-core/completion';
@@ -208,16 +208,25 @@ import { createCliHarness, type CliHarness } from '@ismail-elkorchi/cli-core/tes
 import schemaIndex from '@ismail-elkorchi/cli-core/schemas' with { type: 'json' };
 
 const program: CliProgram = defineCli({ name: 'typed', commands: [{ name: 'run' }] });
-const invocation: ParsedInvocation = parseCli(program, { argv: ['run'] });
+const bindOptions: CliOptionBinder = ({ options }) => ({
+  values: {},
+  present: Object.fromEntries(options.map((option) => [option.name, false])),
+  positionals: [],
+  afterDoubleDash: [],
+  unknownOptions: [],
+  diagnostics: []
+});
+const parser = createCliInvocationParser(bindOptions);
+const invocation: ParsedInvocation = parser.parse(program, { argv: ['run'] });
 const config: ConfigResolution = resolveCliConfig(program);
 const help: HelpDocument = createHelpDocument(program);
 const manifest: CommandManifest = describeCli(program);
 const completion: CompletionResponse = completeCli(program, { words: ['typed', 'r'], cursor: 2 });
 const plugin = defineCliPluginManifest({ name: 'typed-plugin', version: '1.0.0', commands: [{ name: 'audit' }] });
 const application: CliPluginCommandApplication = applyCliPluginCommands(program, [plugin]);
-const repair: RepairSuggestionResult = createRepairSuggestionResult(parseCli(program, { argv: ['rn'] }), program);
+const repair: RepairSuggestionResult = createRepairSuggestionResult(parser.parse(program, { argv: ['rn'] }), program);
 const run = await runCli(program, { mode: 'plan', invocation });
-const main: CliMainResult = await runCliMain({ program, mode: 'plan', argv: ['run'] });
+const main: CliMainResult = await runCliMain({ program, parser, mode: 'plan', argv: ['run'] });
 const effects: EffectApplicationReport = await applyCliEffects({ mode: 'plan', effects: run.effects });
 const envelope: CliSchemaEnvelope = createCliSchemaEnvelope({ payloadSchemaVersion: run.schemaVersion, payload: run });
 const harness: CliHarness = createCliHarness();
@@ -278,7 +287,15 @@ const pluginApplication = plugins.applyCliPluginCommands(baseProgram, [pluginMan
   allowedCapabilities: ['audit']
 });
 const program = pluginApplication.program;
-const invocation = root.parseCli(program, { argv: ['deploy', '--region', 'eu', 'api'] });
+const parser = root.createCliInvocationParser(({ options, argv }) => ({
+  values: argv.includes('--region') ? { region: 'eu' } : {},
+  present: Object.fromEntries(options.map((option) => [option.name, option.name === 'region' && argv.includes('--region')])),
+  positionals: argv.at(-1) === 'api' ? ['api'] : [],
+  afterDoubleDash: [],
+  unknownOptions: [],
+  diagnostics: []
+}));
+const invocation = parser.parse(program, { argv: ['deploy', '--region', 'eu', 'api'] });
 const memoryConfig = config.createMemoryConfigDiscoveryHost({ env: { SHIP_PROFILE: 'ci' } });
 const discovered = await config.discoverCliConfigInput(program, {
   host: memoryConfig.host,
@@ -289,7 +306,7 @@ const resolved = config.resolveCliConfig(program, discovered.input);
 const helpDocument = help.createHelpDocument(program);
 const manifestDocument = manifest.importCommandManifest(manifest.exportCommandManifest(manifest.describeCli(program)));
 const completionResponse = completion.completeCli(program, { words: ['ship', '__complete', 'a'], cursor: 3 });
-const repairs = repair.createRepairSuggestionResult(root.parseCli(program, { argv: ['audt'] }), program).suggestions;
+const repairs = repair.createRepairSuggestionResult(parser.parse(program, { argv: ['audt'] }), program).suggestions;
 const run = await root.runCli(program, {
   mode: 'apply',
   invocation,
@@ -302,6 +319,7 @@ const run = await root.runCli(program, {
 });
 const main = await adapter.runCliMain({
   program,
+  parser,
   mode: 'plan',
   argv: ['deploy', '--region', 'eu', 'api'],
   handlers: {

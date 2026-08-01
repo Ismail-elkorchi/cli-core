@@ -1,7 +1,70 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createCliDiagnostic } from '../../dist/diagnostics.js';
-import { defineCli, parseCli, validateCli } from '../../dist/index.js';
+import {
+  createCliInvocationParser,
+  defineCli,
+  parseCli,
+  validateCli
+} from '../support/invocation-parser.mjs';
+
+test('invocation parser supplies a stable matched command and argv offset to the binder', () => {
+  const program = defineCli({
+    name: 'ship',
+    commands: [{
+      name: 'deploy',
+      options: [{ name: 'region', type: 'string', flags: ['--region'] }],
+      positionals: [{ name: 'service' }]
+    }]
+  });
+  let bindingInput;
+  const parser = createCliInvocationParser((input) => {
+    bindingInput = input;
+    return {
+      values: { region: 'eu' },
+      present: { region: true },
+      positionals: ['api'],
+      afterDoubleDash: [],
+      unknownOptions: [],
+      diagnostics: []
+    };
+  });
+
+  const invocation = parser.parse(program, { argv: ['deploy', '--region', 'eu', 'api'] });
+
+  assert.equal(bindingInput.command, program.commands[1]);
+  assert.equal(Object.isFrozen(bindingInput.options), true);
+  assert.deepEqual(bindingInput.argv, ['--region', 'eu', 'api']);
+  assert.equal(bindingInput.argvOffset, 1);
+  assert.equal(invocation.ok, true);
+});
+
+test('invocation parser preserves indexed clustered unknown options', () => {
+  const program = defineCli({ name: 'ship', commands: [{ name: 'deploy' }] });
+  const parser = createCliInvocationParser(() => ({
+    values: {},
+    present: {},
+    positionals: [],
+    afterDoubleDash: [],
+    unknownOptions: [{ argvElement: '-vx', option: '-x', argvIndex: 1, offset: 2 }],
+    diagnostics: []
+  }));
+
+  const invocation = parser.parse(program, { argv: ['deploy', '-vx'] });
+
+  assert.deepEqual(invocation.options.unknown, [{
+    argvElement: '-vx',
+    option: '-x',
+    argvIndex: 1,
+    offset: 2
+  }]);
+  assert.deepEqual(invocation.diagnostics[0].fields, {
+    option: '-x',
+    argvElement: '-vx',
+    argvIndex: 1,
+    offset: 2
+  });
+});
 
 test('parseCli defaults to the root command with empty argv', () => {
   const program = defineCli({ name: 'ship', commands: [{ name: 'deploy' }] });
@@ -26,9 +89,17 @@ test('parseCli preserves unknown options without diagnostics when explicitly all
   assert.equal(denied.ok, false);
   assert.equal(denied.diagnostics[0].code, 'CLI_UNKNOWN_OPTION');
   assert.equal(denied.diagnostics[0].severity, 'error');
-  assert.deepEqual(denied.diagnostics[0].fields, { option: '--unknown' });
+  assert.deepEqual(denied.diagnostics[0].fields, {
+    option: '--unknown',
+    argvElement: '--unknown',
+    argvIndex: 1
+  });
   assert.equal(allowed.ok, true);
-  assert.deepEqual(allowed.options.unknown, ['--unknown']);
+  assert.deepEqual(allowed.options.unknown, [{
+    argvElement: '--unknown',
+    option: '--unknown',
+    argvIndex: 1
+  }]);
   assert.deepEqual(allowed.diagnostics, []);
 });
 
@@ -93,6 +164,16 @@ test('validateCli treats alias warnings as valid by default and invalid in stric
   assert.equal(invocation.ok, true);
   assert.equal(defaultValidation.ok, true);
   assert.equal(strictValidation.ok, false);
+});
+
+test('validateCli accepts a clean invocation when warnings are rejected', async () => {
+  const program = defineCli({ name: 'ship' });
+  const invocation = parseCli(program);
+
+  const validation = await validateCli(program, invocation, { allowWarnings: false });
+
+  assert.equal(validation.ok, true);
+  assert.deepEqual(validation.diagnostics, []);
 });
 
 test('parseCli treats a leading double dash as a pass-through boundary', () => {
@@ -229,7 +310,7 @@ test('parseCli exposes deprecated alias payloads and keeps active alias payloads
   assert.deepEqual(active.diagnostics, []);
 });
 
-test('parseCli preserves argv-flags issue fields', () => {
+test('invocation parsing preserves option-binder diagnostics', () => {
   const program = defineCli({
     name: 'ship',
     commands: [{ name: 'deploy', options: [{ name: 'count', type: 'number', flags: ['--count'] }] }]
@@ -237,14 +318,14 @@ test('parseCli preserves argv-flags issue fields', () => {
   const invocation = parseCli(program, { argv: ['deploy', '--count', 'many'] });
 
   assert.equal(invocation.ok, false);
-  assert.equal(invocation.diagnostics[0].code, 'CLI_ARGV_FLAG_ISSUE');
+  assert.equal(invocation.diagnostics[0].code, 'CLI_OPTION_BINDING_FAILED');
   assert.equal(invocation.diagnostics[0].severity, 'error');
   assert.deepEqual(invocation.diagnostics[0].fields, {
-    code: 'INVALID_VALUE',
+    reason: 'INVALID_VALUE',
+    option: 'count',
     flag: '--count',
-    key: 'count',
-    value: 'many',
-    index: 1
+    rawValue: 'many',
+    argvIndex: 1
   });
 });
 
