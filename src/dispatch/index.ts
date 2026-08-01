@@ -11,9 +11,27 @@ export type CliHandler<Invocation extends ParsedInvocationSuccess, Context, Resu
   input: CliHandlerContext<Invocation, Context>
 ) => Result | Promise<Result>;
 
-/** Immutable handler collection keyed by canonical command key. */
+type InvocationCommandKey<Invocation extends ParsedInvocationSuccess> =
+  Invocation['commandKey'];
+
+type InvocationForKey<
+  Invocation extends ParsedInvocationSuccess,
+  Key extends string
+> = Invocation extends ParsedInvocationSuccess
+  ? Invocation['commandKey'] extends Key
+    ? Invocation
+    : never
+  : never;
+
+/** Immutable handler collection restricted to canonical command keys. */
 export type CliHandlers<Invocation extends ParsedInvocationSuccess, Context, Result> = Readonly<
-  Record<string, CliHandler<Invocation, Context, Result>>
+  {
+    readonly [Key in InvocationCommandKey<Invocation>]?: CliHandler<
+      InvocationForKey<Invocation, Key>,
+      Context,
+      Result
+    >;
+  }
 >;
 
 /** Error thrown when dispatch is attempted without a matching handler. */
@@ -33,9 +51,9 @@ export function dispatchCli<Invocation extends ParsedInvocationSuccess, Context,
   handlers: CliHandlers<Invocation, Context, Result>,
   context: Context
 ): Promise<Result> {
-  const handler = Object.hasOwn(handlers, invocation.command.key)
-    ? handlers[invocation.command.key]
-    : undefined;
-  if (handler === undefined) return Promise.reject(new CliHandlerNotFoundError(invocation.command.key));
+  const handler: unknown = Object.getOwnPropertyDescriptor(handlers, invocation.commandKey)?.value;
+  if (typeof handler !== 'function') {
+    return Promise.reject(new CliHandlerNotFoundError(invocation.commandKey));
+  }
   return Promise.resolve().then(() => handler({ invocation, context }));
 }

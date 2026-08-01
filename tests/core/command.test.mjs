@@ -8,31 +8,38 @@ import {
   findCliCommandChildren
 } from '../../dist/index.js';
 
-test('defineCli compiles an immutable command tree with private lookup data', () => {
+test('defineCli compiles immutable literal command data with inherited option facts', () => {
   const flags = ['-v', '--verbose'];
-  const commands = [{
-    name: 'deploy',
-    aliases: [{ name: 'd', deprecated: 'Use deploy.' }],
-    positionals: [{ name: 'service' }]
-  }];
   const program = defineCli({
     name: 'ship',
-    options: [{ name: 'verbose', flags, valueMode: 'none' }],
-    commands
+    options: [{ name: 'verbose', kind: 'boolean', flags }],
+    commands: [{
+      name: 'project',
+      aliases: [{ name: 'p', deprecated: 'Use project.' }],
+      options: [{
+        name: 'config',
+        kind: 'value',
+        flags: ['--config'],
+        valueMode: 'required'
+      }],
+      commands: [{
+        name: 'deploy',
+        options: [{ name: 'region', kind: 'value', flags: ['--region'], valueMode: 'required' }]
+      }]
+    }]
   });
-
   flags[0] = '-q';
-  commands[0].name = 'changed';
 
-  const deploy = findCliCommand(program, ['deploy']);
-  assert.equal(deploy?.key, 'ship deploy');
+  const project = findCliCommand(program, ['project']);
+  const deploy = findCliCommand(program, ['project', 'deploy']);
+  assert.equal(deploy?.key, 'ship project deploy');
+  assert.deepEqual(deploy?.options.map((option) => option.name), ['verbose', 'config', 'region']);
+  assert.deepEqual(deploy?.options.map((option) => option.definedAt), [[], ['project'], ['project', 'deploy']]);
   assert.deepEqual(deploy?.options[0].flags, ['-v', '--verbose']);
-  assert.equal(findCliCommandByAlias(program, ['d'])?.command, deploy);
-  assert.deepEqual(findCliCommandChildren(program, program.root), [deploy]);
+  assert.equal(findCliCommandByAlias(program, ['p'])?.command, project);
+  assert.deepEqual(findCliCommandChildren(program, program.root), [project]);
+  assert.deepEqual(program.commandKeys, ['ship', 'ship project', 'ship project deploy']);
   assert.equal(Object.isFrozen(program), true);
-  assert.equal(Object.isFrozen(program.commands), true);
-  assert.equal('pathIndex' in program, false);
-  assert.equal('aliasIndex' in program, false);
 });
 
 test('command keys remain distinct for punctuation in path tokens', () => {
@@ -43,49 +50,71 @@ test('command keys remain distinct for punctuation in path tokens', () => {
       { name: 'a', commands: [{ name: 'b:c' }] }
     ]
   });
-  assert.notEqual(findCliCommand(program, ['a:b', 'c'])?.key, findCliCommand(program, ['a', 'b:c'])?.key);
+  assert.notEqual(
+    findCliCommand(program, ['a:b', 'c'])?.key,
+    findCliCommand(program, ['a', 'b:c'])?.key
+  );
 });
 
-test('definition compilation rejects malformed, ambiguous, and unknown input together', () => {
+test('definition compilation aggregates malformed and ambiguous input', () => {
   assert.throws(
     () => defineCli({
       name: 'ship',
       unsupported: true,
       options: [
-        { name: 'verbose', flags: ['-v'], valueMode: 'none' },
-        { name: 'verbose', flags: ['-v'], valueMode: 'none' }
+        { name: 'verbose', kind: 'boolean', flags: ['-v'] },
+        { name: 'verbose', kind: 'boolean', flags: ['-v'] }
       ],
-      commands: [
-        {
-          name: 'deploy',
-          aliases: ['d'],
-          positionals: [
-            { name: 'environment', required: false },
-            { name: 'service', required: true }
-          ]
-        },
-        { name: 'd' }
-      ]
+      commands: [{
+        name: 'deploy',
+        aliases: ['d'],
+        positionals: [
+          { name: 'environment', required: false },
+          { name: 'service', required: true }
+        ],
+        commands: [{ name: 'nested' }]
+      }, { name: 'd' }]
     }),
     (error) => {
       assert.equal(error instanceof CliDefinitionError, true);
+      assert.equal(error.name, 'CliDefinitionError');
+      assert.equal(error.message, 'Invalid CLI definition (6 issues).');
+      assert.equal(error.issues.length, 6);
       const codes = new Set(error.issues.map((issue) => issue.code));
       assert.equal(codes.has('UNKNOWN_PROPERTY'), true);
       assert.equal(codes.has('INVALID_OPTION'), true);
       assert.equal(codes.has('INVALID_POSITIONAL'), true);
       assert.equal(codes.has('DUPLICATE_COMMAND'), true);
+      assert.equal(codes.has('AMBIGUOUS_COMMAND_INPUT'), true);
       return true;
     }
   );
 });
 
-test('definition compilation rejects parser metadata that cannot be represented truthfully', () => {
+test('option spellings stay binder-neutral and inherited collisions are rejected', () => {
+  assert.equal(defineCli({
+    name: 'ship',
+    options: [{ name: 'global option', kind: 'boolean', flags: ['-ab'] }]
+  }).root.options[0]?.name, 'global option');
   assert.throws(
     () => defineCli({
       name: 'ship',
-      options: [{ name: 'verbose', flags: ['-v'], valueMode: 'none', valueLabel: 'level' }]
+      options: [{ name: 'global', kind: 'boolean', flags: [''] }]
     }),
-    (error) => error instanceof CliDefinitionError
-      && error.issues.some((issue) => issue.code === 'INVALID_OPTION' && issue.reason === 'value-label')
+    (error) => error instanceof CliDefinitionError &&
+      error.message === 'Invalid CLI definition (1 issue).' &&
+      error.issues.some((issue) => issue.code === 'INVALID_OPTION' && issue.reason === 'flags')
+  );
+  assert.throws(
+    () => defineCli({
+      name: 'ship',
+      options: [{ name: 'global', kind: 'boolean', flags: ['--global'] }],
+      commands: [{
+        name: 'deploy',
+        options: [{ name: 'global', kind: 'boolean', flags: ['--local'] }]
+      }]
+    }),
+    (error) => error instanceof CliDefinitionError &&
+      error.issues.some((issue) => issue.code === 'INVALID_OPTION' && issue.reason === 'duplicate-name')
   );
 });

@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.3.0 - 2026-08-01
+
+- Moved all raw option-token classification behind a scanner/binder contract
+  and validate that scanning and final binding agree.
+- Made ancestor options explicit descendants' options, rejected ambiguous
+  child-command/positional definitions, and made pre-command local options fail
+  consistently.
+- Added structured invocations, discriminated runtime diagnostics, canonical
+  command deprecation warnings, exact alias-use history, and prototype-safe
+  positional records.
+- Added a literal `commandKey` discriminant and command-specific handler maps.
+- Retained neutral option defaults, false flags, repetition, multiplicity, and
+  finite values for help and completion. Unknown help and completion paths no
+  longer fall back to the root command.
+- Corrected the integration package name to `clivoke` on npm and
+  `@ismail-elkorchi/clivoke` on JSR.
+
 ## 0.2.0 - 2026-08-01
 
 - Contracted the package to command compilation and lookup, invocation routing,
@@ -19,7 +36,7 @@
   configuration discovery and resolution, plugins, effects, repair suggestions,
   workflow-style run results, process adapters, shell scripts, package metadata,
   and the public testing framework.
-- Moved `argv-flags`, process, and shell integration to `@ismail-elkorchi/cli`.
+- Moved `argv-flags`, process, and shell integration out of this package.
 - Reduced the package to one public entrypoint and added negative public type
   tests plus offline packed consumers for Node, Deno, and Bun.
 

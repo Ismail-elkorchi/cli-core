@@ -2,6 +2,7 @@ import {
   findCliCommand,
   findCliCommandChildren,
   type CliCommand,
+  type CliDefinition,
   type CliOption,
   type CliPositional,
   type CliProgram
@@ -34,16 +35,26 @@ export interface CliHelpPositional {
 export interface CliHelpOption {
   readonly name: string;
   readonly flags: readonly string[];
-  readonly valueMode: CliOption['valueMode'];
-  readonly valueLabel?: string;
-  readonly required: boolean;
-  readonly scope: CliOption['scope'];
-  readonly description?: string;
+	readonly falseFlags: readonly string[];
+	readonly valueMode: CliOption['valueMode'];
+	readonly valueLabel?: string;
+	readonly required: boolean;
+	readonly multiple: boolean;
+	readonly repeat: CliOption['repeat'];
+	readonly hasDefault: boolean;
+	readonly defaultLabel?: string;
+	readonly valueCandidates: readonly string[];
+	readonly definedAt: readonly string[];
+	readonly description?: string;
 }
 
-/** Creates immutable help data for a canonical command path. */
-export function createCliHelp(program: CliProgram, commandPath: readonly string[] = []): CliHelp {
-  const command = findCliCommand(program, commandPath) ?? program.root;
+/** Creates immutable help data, or `undefined` for an unknown canonical path. */
+export function createCliHelp<Definition extends CliDefinition>(
+	program: CliProgram<Definition>,
+	commandPath: readonly string[] = []
+): CliHelp | undefined {
+	const command = findCliCommand(program, commandPath);
+	if (command === undefined) return undefined;
   return Object.freeze({
     command,
     usage: createUsage(program, command),
@@ -53,7 +64,10 @@ export function createCliHelp(program: CliProgram, commandPath: readonly string[
   });
 }
 
-function createUsage(program: CliProgram, command: CliCommand): string {
+function createUsage<Definition extends CliDefinition>(
+  program: CliProgram<Definition>,
+  command: CliCommand
+): string {
   const parts = [program.name, ...command.path];
   if (command.options.some((option) => !option.hidden)) parts.push('[options]');
   parts.push(...command.positionals.map(positionalLabel));
@@ -82,12 +96,18 @@ function toHelpPositional(positional: CliPositional): CliHelpPositional {
 
 function toHelpOption(option: CliOption): CliHelpOption {
   return Object.freeze({
-    name: option.name,
-    flags: option.flags,
-    valueMode: option.valueMode,
+		name: option.name,
+		flags: option.flags,
+		falseFlags: option.falseFlags,
+		valueMode: option.valueMode,
     ...(option.valueLabel === undefined ? {} : { valueLabel: option.valueLabel }),
-    required: option.required,
-    scope: option.scope,
+		required: option.required,
+		multiple: option.multiple,
+		repeat: option.repeat,
+		hasDefault: option.hasDefault,
+		...(option.defaultLabel === undefined ? {} : { defaultLabel: option.defaultLabel }),
+		valueCandidates: option.valueCandidates,
+		definedAt: option.definedAt,
     ...(option.description === undefined ? {} : { description: option.description })
   });
 }
