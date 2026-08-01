@@ -2,8 +2,6 @@ name: CI
 
 on:
   pull_request:
-    branches:
-      - main
   push:
     branches:
       - main
@@ -17,234 +15,80 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  linux-floor-check:
-    name: ci / linux-floor
+  check:
+    name: Check
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - name: Load runtime policy
-        id: runtime-policy
-        shell: bash
-        run: |
-          node -e "const fs=require('node:fs');const p=JSON.parse(fs.readFileSync('tools/runtime-versions.json','utf8'));fs.appendFileSync(process.env.GITHUB_OUTPUT,'node_floor='+p.node.floor+'\\n');fs.appendFileSync(process.env.GITHUB_OUTPUT,'deno_pinned='+p.deno.pinned+'\\n');fs.appendFileSync(process.env.GITHUB_OUTPUT,'bun_pinned='+p.bun.pinned+'\\n');"
       - name: Setup Node
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
-          node-version: ${{ steps.runtime-policy.outputs.node_floor }}
+          node-version: 24.0.0
           cache: npm
       - name: Setup Deno
         uses: denoland/setup-deno@667a34cdef165d8d2b2e98dde39547c9daac7282 # v2.0.4
         with:
-          deno-version: ${{ steps.runtime-policy.outputs.deno_pinned }}
+          deno-version: 2.8.1
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          bun-version: ${{ steps.runtime-policy.outputs.bun_pinned }}
-      - name: Install
+          bun-version: 1.3.14
+      - name: Install shells
+        run: sudo apt-get update && sudo apt-get install -y zsh fish
+      - name: Install dependencies
         run: npm ci
-      - name: One-command truth
+      - name: Check
         run: npm run check
-      - name: Fail on tracked-file churn
+        env:
+          CLI_CORE_EXPECT_SHELLS: bash,zsh,fish,pwsh
+      - name: Verify clean worktree
         shell: bash
-        run: |
-          if [[ -n "$(git status --porcelain=v1)" ]]; then
-            echo "Tracked files changed during CI run:"
-            git status --porcelain=v1
-            exit 1
-          fi
+        run: test -z "$(git status --porcelain=v1)"
 
-  node:
-    name: ci / node
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    steps:
-      - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - name: Load runtime policy
-        id: runtime-policy
-        shell: bash
-        run: |
-          node -e "const fs=require('node:fs');const p=JSON.parse(fs.readFileSync('tools/runtime-versions.json','utf8'));fs.appendFileSync(process.env.GITHUB_OUTPUT,'node_pinned='+p.node.pinned+'\\n');"
-      - name: Setup Node
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
-        with:
-          node-version: ${{ steps.runtime-policy.outputs.node_pinned }}
-          cache: npm
-      - name: Install
-        run: npm ci
-      - name: Lint
-        run: npm run lint
-      - name: Typecheck
-        run: npm run typecheck
-      - name: Build
-        run: npm run build
-      - name: Core tests
-        run: npm run test:core
-      - name: Contract tests
-        run: npm run test:contracts
-      - name: Example tests
-        run: npm run test:examples
-      - name: Integration tests
-        run: npm run build && node --test tests/integration/*.test.mjs
-      - name: Security tests
-        run: npm run test:security
-      - name: Package tests
-        run: npm run test:package
-      - name: Node runtime
-        run: npm run test:runtime:node
-      - name: Export check
-        run: npm run check:exports
-      - name: Public leakage check
-        run: npm run check:leakage
-      - name: Fail on tracked-file churn
-        shell: bash
-        run: |
-          if [[ -n "$(git status --porcelain=v1)" ]]; then
-            echo "Tracked files changed during CI run:"
-            git status --porcelain=v1
-            exit 1
-          fi
-
-  runtime:
-    name: ci / runtime-subset
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    steps:
-      - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - name: Load runtime policy
-        id: runtime-policy
-        shell: bash
-        run: |
-          node -e "const fs=require('node:fs');const p=JSON.parse(fs.readFileSync('tools/runtime-versions.json','utf8'));fs.appendFileSync(process.env.GITHUB_OUTPUT,'node_pinned='+p.node.pinned+'\\n');fs.appendFileSync(process.env.GITHUB_OUTPUT,'deno_pinned='+p.deno.pinned+'\\n');fs.appendFileSync(process.env.GITHUB_OUTPUT,'bun_pinned='+p.bun.pinned+'\\n');"
-      - name: Setup Node
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
-        with:
-          node-version: ${{ steps.runtime-policy.outputs.node_pinned }}
-          cache: npm
-      - name: Setup Deno
-        uses: denoland/setup-deno@667a34cdef165d8d2b2e98dde39547c9daac7282 # v2.0.4
-        with:
-          deno-version: ${{ steps.runtime-policy.outputs.deno_pinned }}
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-        with:
-          bun-version: ${{ steps.runtime-policy.outputs.bun_pinned }}
-      - name: Install
-        run: npm ci
-      - name: Deno source check
-        run: npm run check:deno:source
-      - name: Deno lint
-        run: npm run check:deno:lint
-      - name: Deno docs
-        run: npm run check:deno:docs
-      - name: Deno runtime
-        run: npm run test:runtime:deno
-      - name: Bun runtime
-        run: npm run test:runtime:bun
-      - name: Packed package consumers
-        run: npm run test:package
-      - name: JSR dry run
-        run: npm run check:jsr
-      - name: Fail on tracked-file churn
-        shell: bash
-        run: |
-          if [[ -n "$(git status --porcelain=v1)" ]]; then
-            echo "Tracked files changed during CI run:"
-            git status --porcelain=v1
-            exit 1
-          fi
-
-  os-runtime:
-    name: ci / os-runtime (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 25
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - name: Load runtime policy
-        id: runtime-policy
-        shell: bash
-        run: |
-          node -e "const fs=require('node:fs');const p=JSON.parse(fs.readFileSync('tools/runtime-versions.json','utf8'));fs.appendFileSync(process.env.GITHUB_OUTPUT,'node_pinned='+p.node.pinned+'\\n');"
-      - name: Setup Node
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
-        with:
-          node-version: ${{ steps.runtime-policy.outputs.node_pinned }}
-          cache: npm
-      - name: Install
-        run: npm ci
-      - name: OS runtime smoke
-        run: npm run test:runtime:os
-      - name: Node runtime smoke
-        run: npm run test:runtime:node
-      - name: Packed package consumer
-        run: npm run test:package
-      - name: Fail on tracked-file churn
-        shell: bash
-        run: |
-          if [[ -n "$(git status --porcelain=v1)" ]]; then
-            echo "Tracked files changed during CI run:"
-            git status --porcelain=v1
-            exit 1
-          fi
-
-  shells:
-    name: ci / shells (${{ matrix.name }})
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 25
+  platforms:
+    name: ${{ matrix.name }} behavior
     strategy:
       fail-fast: false
       matrix:
         include:
-          - name: ubuntu
-            os: ubuntu-latest
-            expected: bash,zsh,fish,pwsh
-            install: sudo apt-get update && sudo apt-get install -y zsh fish
-          - name: macos
+          - name: macOS
             os: macos-latest
-            expected: bash,zsh,fish,pwsh
+            shells: bash,zsh,fish,pwsh
             install: |
               if ! command -v pwsh >/dev/null 2>&1; then brew install --cask powershell; fi
               if ! command -v fish >/dev/null 2>&1; then brew install fish; fi
-          - name: windows
+          - name: Windows
             os: windows-latest
-            expected: pwsh,cmd
+            shells: pwsh,cmd
             install: ''
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - name: Load runtime policy
-        id: runtime-policy
-        shell: bash
-        run: |
-          node -e "const fs=require('node:fs');const p=JSON.parse(fs.readFileSync('tools/runtime-versions.json','utf8'));fs.appendFileSync(process.env.GITHUB_OUTPUT,'node_pinned='+p.node.pinned+'\\n');"
       - name: Setup Node
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
-          node-version: ${{ steps.runtime-policy.outputs.node_pinned }}
+          node-version: 24.0.0
           cache: npm
-      - name: Install shell dependencies
+      - name: Install shells
         if: matrix.install != ''
         shell: bash
         run: ${{ matrix.install }}
-      - name: Install
+      - name: Install dependencies
         run: npm ci
-      - name: Shell smoke
-        run: npm run test:shells
+      - name: Build
+        run: npm run build
+      - name: Test operating-system behavior
+        run: node --test tests/runtime-os/*.test.mjs
+      - name: Test shell behavior
+        run: node --test tests/shells/*.test.mjs
         env:
-          CLI_CORE_EXPECT_SHELLS: ${{ matrix.expected }}
-      - name: Fail on tracked-file churn
+          CLI_CORE_EXPECT_SHELLS: ${{ matrix.shells }}
+      - name: Test packed Node consumer
+        run: npm run test:package
+      - name: Verify clean worktree
         shell: bash
-        run: |
-          if [[ -n "$(git status --porcelain=v1)" ]]; then
-            echo "Tracked files changed during CI run:"
-            git status --porcelain=v1
-            exit 1
-          fi
+        run: test -z "$(git status --porcelain=v1)"
