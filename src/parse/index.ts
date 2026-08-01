@@ -1,178 +1,129 @@
 import {
-  findCliCommand,
-  findCliCommandByAlias,
+  findCliCommandChildren,
+  type CliAlias,
   type CliCommand,
-  type CliCommandAliasIndexEntry,
   type CliOption,
   type CliProgram
 } from '../command/index.ts';
-import {
-  createCliDiagnostic,
-  hasErrorDiagnostics,
-  type CliDiagnostic
-} from '../diagnostics.ts';
+import { createCliDiagnostic, hasErrorDiagnostics, type CliDiagnostic } from '../diagnostics.ts';
 
-/**
- * Explicit argv input for parsing.
- */
+/** Settings for one command-aware parse. */
 export interface ParseInput {
-  /** Tokens to parse after the executable and binary name have been removed. */
+  /** Tokens after the executable and program name. */
   readonly argv?: readonly string[];
-  /** Preserves unknown option tokens without turning them into parse diagnostics. */
-  readonly allowUnknownOptions?: boolean;
+  /** Whether indexed unknown flags are accepted. */
+  readonly unknownFlagPolicy?: 'error' | 'collect';
 }
 
-/**
- * Input supplied to an option binder after command routing.
- */
+/** Input supplied to a low-level option binder after command routing. */
 export interface CliOptionBindingInput {
-  /** Matched immutable command, suitable as a compiled-parser cache key. */
   readonly command: CliCommand;
-  /** Compiled global and local options available to the matched command. */
   readonly options: readonly CliOption[];
-  /** Tokens beginning immediately after the matched command path. */
+  /** Tokens left after command tokens were removed. */
   readonly argv: readonly string[];
-  /** Index of the first supplied token in the complete invocation argv. */
-  readonly argvOffset: number;
+  /** Complete-invocation index for each element in `argv`. */
+  readonly argvIndexes: readonly number[];
 }
 
-/**
- * Unknown option retained by an option binder.
- */
-export interface CliUnknownOption {
-  /** Complete argv element containing the unknown option. */
+/** One unknown option preserved at its original argv location. */
+export interface CliUnknownFlag {
   readonly argvElement: string;
-  /** Parsed unknown option spelling. */
-  readonly option: string;
-  /** Index in the complete invocation argv. */
+  readonly flag: string;
   readonly argvIndex: number;
-  /** Offset of a member inside a clustered argv element, when applicable. */
   readonly offset?: number;
+  readonly inlineValue?: string;
 }
 
-/**
- * Parser-independent result returned by an option binder.
- */
-export interface CliOptionBindingResult {
-  /** Decoded values keyed by logical option name. */
-  readonly values: Readonly<Record<string, ParsedCliOptionValue>>;
-  /** Whether each logical option occurred explicitly. */
-  readonly present: Readonly<Record<string, boolean>>;
-  /** Raw positional tokens retained in input order. */
+/** Successful low-level option binding. */
+export interface CliOptionBindingSuccess {
+  readonly status: 'bound';
+  readonly values: Readonly<Record<string, unknown>>;
+  readonly specified: Readonly<Record<string, boolean>>;
   readonly positionals: readonly string[];
-  /** Tokens following the exact `--` boundary. */
   readonly afterDoubleDash: readonly string[];
-  /** Unknown options retained with their original locations. */
-  readonly unknownOptions: readonly CliUnknownOption[];
-  /** Option-binding diagnostics already translated into cli-core diagnostics. */
+  readonly unknownFlags: readonly CliUnknownFlag[];
+}
+
+/** Failed low-level option binding. Partial values are intentionally absent. */
+export interface CliOptionBindingFailure {
+  readonly status: 'invalid';
   readonly diagnostics: readonly CliDiagnostic[];
 }
 
-/**
- * Adapter that binds option tokens without coupling cli-core to a parser implementation.
- */
+/** Parser-independent output from an option binder. */
+export type CliOptionBindingResult = CliOptionBindingSuccess | CliOptionBindingFailure;
+
+/** Adapter boundary between command semantics and token-level option parsing. */
 export type CliOptionBinder = (input: CliOptionBindingInput) => CliOptionBindingResult;
 
-/**
- * Reusable command-aware invocation parser.
- */
-export interface CliInvocationParser {
-  /** Parses an explicit argv vector into a cli-core invocation. */
-  readonly parse: (program: CliProgram, input?: ParseInput) => ParsedInvocation;
-}
-
-/**
- * Structured invocation produced by a command-aware parser.
- */
-export interface ParsedInvocation {
-  /** Schema version for this document. */
-  readonly schemaVersion: 'cli-core.invocation.v2';
-  /** False when command lookup, option binding, or positional binding emitted an error. */
-  readonly ok: boolean;
-  /** Frozen argv tokens that were parsed. */
-  readonly argv: readonly string[];
-  /** Matched command, or the root command when lookup failed. */
-  readonly command: CliCommand | undefined;
-  /** Canonical command path for the invocation. */
-  readonly commandPath: readonly string[];
-  /** Alias that matched the invocation, if any. */
-  readonly usedAlias: ParsedAlias | undefined;
-  /** Bound option values and unknown option locations. */
-  readonly options: ParsedCliOptions;
-  /** Bound positional values keyed by positional name. */
-  readonly positionals: Readonly<Record<string, ParsedPositionalValue>>;
-  /** Raw positional values in argv order. */
-  readonly positionalList: readonly string[];
-  /** Tokens preserved after the exact `--` boundary. */
-  readonly passThrough: readonly string[];
-  /** Parse diagnostics retained as structured data. */
-  readonly diagnostics: readonly CliDiagnostic[];
-}
-
-/**
- * Alias match captured during command lookup.
- */
+/** Alias use retained on a successful invocation. */
 export interface ParsedAlias {
-  /** Original token from user input. */
   readonly token: string;
-  /** Alias path used in argv. */
   readonly path: readonly string[];
-  /** Canonical command path for an alias. */
   readonly canonicalPath: readonly string[];
-  /** Deprecation marker emitted because this alias was used. */
   readonly deprecated?: boolean | string;
 }
 
-/**
- * Option value stored after option binding.
- */
-export type ParsedCliOptionValue = string | number | boolean | readonly string[] | undefined;
-
-/**
- * Positional value stored after invocation binding.
- */
-export type ParsedPositionalValue = string | readonly string[] | undefined;
-
-/**
- * Bound option values and unknown option locations.
- */
-export interface ParsedCliOptions {
-  /** Resolved values keyed by public name. */
-  readonly values: Readonly<Record<string, ParsedCliOptionValue>>;
-  /** Presence map keyed by option name. */
-  readonly present: Readonly<Record<string, boolean>>;
-  /** Unknown options preserved by parsing. */
-  readonly unknown: readonly CliUnknownOption[];
-}
-
-/**
- * Validation envelope that preserves diagnostics as data.
- */
-export interface SemanticValidationResult {
-  /** False when validation policy rejects diagnostics on the invocation. */
-  readonly ok: boolean;
-  /** Diagnostics considered by semantic validation. */
+/** Successful command and argument binding. */
+export interface ParsedInvocationSuccess {
+  readonly status: 'parsed';
+  readonly argv: readonly string[];
+  readonly command: CliCommand;
+  readonly usedAlias?: ParsedAlias;
+  readonly optionValues: Readonly<Record<string, unknown>>;
+  readonly specifiedOptions: Readonly<Record<string, boolean>>;
+  readonly positionalValues: Readonly<Record<string, string | readonly string[] | undefined>>;
+  readonly positionals: readonly string[];
+  readonly afterDoubleDash: readonly string[];
+  readonly unknownFlags: readonly CliUnknownFlag[];
+  /** Non-fatal diagnostics, currently deprecated-alias warnings. */
   readonly diagnostics: readonly CliDiagnostic[];
 }
 
-/**
- * Controls semantic validation policy.
- */
-export interface ValidationContext {
-  /** Whether warning diagnostics still allow a valid result. */
-  readonly allowWarnings?: boolean;
+/** Rejected invocation. Successful-looking values are intentionally absent. */
+export interface ParsedInvocationFailure {
+  readonly status: 'invalid';
+  readonly argv: readonly string[];
+  /** Deepest command reached before rejection, when command routing succeeded. */
+  readonly command?: CliCommand;
+  readonly diagnostics: readonly CliDiagnostic[];
+}
+
+/** Command-aware parse result discriminated by `status`. */
+export type ParsedInvocation = ParsedInvocationSuccess | ParsedInvocationFailure;
+
+/** Reusable command-aware parser. */
+export interface CliInvocationParser {
+  readonly parse: (program: CliProgram, input?: ParseInput) => ParsedInvocation;
 }
 
 interface CommandMatch {
-  readonly command: CliCommand | undefined;
-  readonly alias: CliCommandAliasIndexEntry | undefined;
-  readonly consumed: number;
-  readonly unknownCommand: readonly string[];
+  readonly command: CliCommand;
+  readonly aliases: readonly AliasUse[];
+  readonly commandIndexes: ReadonlySet<number>;
+  readonly unknownCommand?: {
+    readonly token: string;
+    readonly argvIndex: number;
+  };
 }
 
-/**
- * Creates a reusable invocation parser from an explicit option-binding adapter.
- */
+interface AliasUse {
+  readonly alias: CliAlias;
+  readonly command: CliCommand;
+  readonly token: string;
+}
+
+interface PositionalBindingSuccess {
+  readonly status: 'bound';
+  readonly values: Readonly<Record<string, string | readonly string[] | undefined>>;
+}
+
+interface PositionalBindingFailure {
+  readonly status: 'invalid';
+  readonly diagnostics: readonly CliDiagnostic[];
+}
+
+/** Creates an invocation parser around an explicit option binder. */
 export function createCliInvocationParser(bindOptions: CliOptionBinder): CliInvocationParser {
   return Object.freeze({
     parse(program: CliProgram, input: ParseInput = {}): ParsedInvocation {
@@ -181,238 +132,245 @@ export function createCliInvocationParser(bindOptions: CliOptionBinder): CliInvo
   });
 }
 
-/**
- * Validates a parsed invocation against accumulated diagnostics.
- */
-export function validateCli(
-  program: CliProgram,
-  invocation: ParsedInvocation,
-  context: ValidationContext = {}
-): Promise<SemanticValidationResult> {
-  const diagnostics = uniqueDiagnostics([...program.diagnostics, ...invocation.diagnostics]);
-  const warningsAreAllowed = context.allowWarnings ?? true;
-  const hasWarningDiagnostics = diagnostics.some((item) => item.severity === 'warning');
-  return Promise.resolve(Object.freeze({
-    ok: !hasErrorDiagnostics(diagnostics) && (warningsAreAllowed || !hasWarningDiagnostics),
-    diagnostics
-  }));
+/** Finds the deepest command selected by an argv prefix using invocation routing rules. */
+export function findCliCommandForArgv(program: CliProgram, argv: readonly string[]): CliCommand {
+  return matchCommand(program, argv).command;
 }
 
 function parseInvocation(program: CliProgram, bindOptions: CliOptionBinder, input: ParseInput): ParsedInvocation {
   const argv = Object.freeze([...(input.argv ?? [])]);
   const match = matchCommand(program, argv);
-  const command = match.command ?? program.root;
-  const optionTokens = Object.freeze(argv.slice(match.consumed));
-  const optionResult = freezeOptionBindingResult(bindOptions({
-    command,
-    options: Object.freeze([...command.inheritedOptions, ...command.options]),
-    argv: optionTokens,
-    argvOffset: match.consumed
-  }));
-  const positionals = bindPositionals(command, optionResult.positionals);
-  const diagnostics = Object.freeze([
-    ...program.diagnostics,
-    ...unknownCommandDiagnostics(match),
-    ...aliasDiagnostics(match),
-    ...optionResult.diagnostics,
-    ...unknownOptionDiagnostics(optionResult, input.allowUnknownOptions ?? false),
-    ...positionals.diagnostics,
-    ...passThroughDiagnostics(command, optionResult.afterDoubleDash)
-  ]);
-
-  return Object.freeze({
-    schemaVersion: 'cli-core.invocation.v2',
-    ok: !hasErrorDiagnostics(diagnostics),
-    argv,
-    command,
-    commandPath: command.path,
-    usedAlias: buildParsedAlias(match),
-    options: Object.freeze({
-      values: optionResult.values,
-      present: optionResult.present,
-      unknown: optionResult.unknownOptions
-    }),
-    positionals: positionals.values,
-    positionalList: optionResult.positionals,
-    passThrough: optionResult.afterDoubleDash,
-    diagnostics
-  });
-}
-
-function uniqueDiagnostics(diagnostics: readonly CliDiagnostic[]): readonly CliDiagnostic[] {
-  const seen = new Set<CliDiagnostic>();
-  const unique: CliDiagnostic[] = [];
-  for (const diagnostic of diagnostics) {
-    if (seen.has(diagnostic)) continue;
-    seen.add(diagnostic);
-    unique.push(diagnostic);
+  if (match.unknownCommand !== undefined) {
+    return failure(argv, match.command, [createCliDiagnostic(
+      'CLI_UNKNOWN_COMMAND',
+      'error',
+      `Unknown command: ${match.unknownCommand.token}.`,
+      { token: match.unknownCommand.token, argvIndex: match.unknownCommand.argvIndex }
+    )]);
   }
-  return Object.freeze(unique);
+
+  const binderInput = argv.flatMap((element, argvIndex) => match.commandIndexes.has(argvIndex)
+    ? []
+    : [{ element, argvIndex }]);
+  const binding = bindOptions({
+    command: match.command,
+    options: match.command.options,
+    argv: Object.freeze(binderInput.map(({ element }) => element)),
+    argvIndexes: Object.freeze(binderInput.map(({ argvIndex }) => argvIndex))
+  });
+  if (binding.status === 'invalid') return failure(argv, match.command, binding.diagnostics);
+
+  const unknownDiagnostics = input.unknownFlagPolicy === 'collect'
+    ? []
+    : binding.unknownFlags.map((unknown) => createCliDiagnostic(
+      'CLI_UNKNOWN_FLAG',
+      'error',
+      `Unknown option: ${unknown.flag}.`,
+      {
+        flag: unknown.flag,
+        argvElement: unknown.argvElement,
+        argvIndex: unknown.argvIndex,
+        ...(unknown.offset === undefined ? {} : { offset: unknown.offset }),
+        ...(unknown.inlineValue === undefined ? {} : { inlineValue: unknown.inlineValue })
+      }
+    ));
+  const positionalBinding = bindPositionals(match.command, binding.positionals);
+  const afterDoubleDashDiagnostics = binding.afterDoubleDash.length > 0 && !match.command.acceptsAfterDoubleDash
+    ? [createCliDiagnostic(
+        'CLI_AFTER_DOUBLE_DASH_NOT_ACCEPTED',
+        'error',
+        'This command does not accept tokens after `--`.',
+        { commandPath: match.command.path }
+      )]
+    : [];
+  const warnings = deprecatedAliasDiagnostics(match.aliases);
+  if (positionalBinding.status === 'invalid') {
+    return failure(argv, match.command, [
+      ...warnings,
+      ...unknownDiagnostics,
+      ...positionalBinding.diagnostics,
+      ...afterDoubleDashDiagnostics
+    ]);
+  }
+  const otherErrors = [...unknownDiagnostics, ...afterDoubleDashDiagnostics];
+  if (otherErrors.length > 0) return failure(argv, match.command, [...warnings, ...otherErrors]);
+
+  const lastAlias = match.aliases.at(-1);
+  return Object.freeze({
+    status: 'parsed',
+    argv,
+    command: match.command,
+    ...(lastAlias === undefined ? {} : { usedAlias: compileParsedAlias(lastAlias) }),
+    optionValues: freezeRecord(binding.values),
+    specifiedOptions: Object.freeze({ ...binding.specified }),
+    positionalValues: positionalBinding.values,
+    positionals: Object.freeze([...binding.positionals]),
+    afterDoubleDash: Object.freeze([...binding.afterDoubleDash]),
+    unknownFlags: Object.freeze(binding.unknownFlags.map(freezeUnknownFlag)),
+    diagnostics: Object.freeze(warnings)
+  });
 }
 
 function matchCommand(program: CliProgram, argv: readonly string[]): CommandMatch {
-  const pathTokens = collectLeadingPathTokens(argv);
-
-  for (let length = pathTokens.length; length > 0; length -= 1) {
-    const candidate = pathTokens.slice(0, length);
-    const command = findCliCommand(program, candidate);
-    if (command !== undefined) {
-      return { command, alias: undefined, consumed: length, unknownCommand: [] };
+  let command = program.root;
+  const aliases: AliasUse[] = [];
+  const commandIndexes = new Set<number>();
+  let argvIndex = 0;
+  while (argvIndex < argv.length) {
+    const token = argv[argvIndex];
+    if (token === undefined || token === '--') break;
+    if (token.startsWith('-')) {
+      if (token === '-') break;
+      argvIndex += optionSpan(command.options, argv, argvIndex);
+      continue;
     }
-    const aliasMatch = findCliCommandByAlias(program, candidate);
+    const children = findCliCommandChildren(program, command);
+    const canonical = children.find((candidate) => candidate.name === token);
+    if (canonical !== undefined) {
+      command = canonical;
+      commandIndexes.add(argvIndex);
+      argvIndex += 1;
+      continue;
+    }
+    const aliasMatch = children.find((candidate) => candidate.aliases.some((alias) => alias.name === token));
     if (aliasMatch !== undefined) {
+      const alias = aliasMatch.aliases.find((candidate) => candidate.name === token);
+      if (alias !== undefined) aliases.push({ alias, command: aliasMatch, token });
+      command = aliasMatch;
+      commandIndexes.add(argvIndex);
+      argvIndex += 1;
+      continue;
+    }
+    if (command.positionals.length === 0 && children.length > 0) {
       return {
-        command: aliasMatch.command,
-        alias: aliasMatch.alias,
-        consumed: length,
-        unknownCommand: []
+        command,
+        aliases: Object.freeze(aliases),
+        commandIndexes,
+        unknownCommand: { token, argvIndex }
       };
     }
+    break;
   }
-
-  return { command: undefined, alias: undefined, consumed: 0, unknownCommand: pathTokens };
+  return { command, aliases: Object.freeze(aliases), commandIndexes };
 }
 
-function collectLeadingPathTokens(argv: readonly string[]): readonly string[] {
-  const tokens: string[] = [];
-  for (const token of argv) {
-    if (token.startsWith('-')) break;
-    tokens.push(token);
-  }
-  return Object.freeze(tokens);
+function optionSpan(options: readonly CliOption[], argv: readonly string[], argvIndex: number): number {
+  const element = argv[argvIndex];
+  if (element === undefined) return 1;
+  const selection = optionSelectedByElement(options, element);
+  if (selection === undefined || selection.option.valueMode !== 'required' || selection.attached) return 1;
+  return argv[argvIndex + 1] === undefined || argv[argvIndex + 1] === '--' ? 1 : 2;
 }
 
-function freezeOptionBindingResult(result: CliOptionBindingResult): CliOptionBindingResult {
+function optionSelectedByElement(
+  options: readonly CliOption[],
+  element: string
+): { readonly option: CliOption; readonly attached: boolean } | undefined {
+  if (element.startsWith('--')) {
+    const equalsIndex = element.indexOf('=');
+    const flag = equalsIndex < 0 ? element : element.slice(0, equalsIndex);
+    const option = options.find((candidate) => candidate.flags.includes(flag));
+    return option === undefined ? undefined : { option, attached: equalsIndex >= 0 };
+  }
+  const cluster = element.slice(1);
+  for (let offset = 0; offset < cluster.length; offset += 1) {
+    const option = options.find((candidate) => candidate.flags.includes(`-${cluster[offset]}`));
+    if (option !== undefined && option.valueMode !== 'none') {
+      return { option, attached: offset < cluster.length - 1 };
+    }
+  }
+  return undefined;
+}
+
+function bindPositionals(command: CliCommand, positionals: readonly string[]): PositionalBindingSuccess | PositionalBindingFailure {
+  const values: Record<string, string | readonly string[] | undefined> = {};
+  const diagnostics: CliDiagnostic[] = [];
+  let inputIndex = 0;
+  for (const definition of command.positionals) {
+    if (definition.variadic) {
+      const rest = Object.freeze(positionals.slice(inputIndex));
+      if (definition.required && rest.length === 0) {
+        diagnostics.push(createCliDiagnostic(
+          'CLI_MISSING_POSITIONAL',
+          'error',
+          `Missing required positional: ${definition.name}.`,
+          { commandPath: command.path, positional: definition.name }
+        ));
+      }
+      values[definition.name] = rest;
+      inputIndex = positionals.length;
+      continue;
+    }
+    const value = positionals[inputIndex];
+    if (value === undefined) {
+      if (definition.required) {
+        diagnostics.push(createCliDiagnostic(
+          'CLI_MISSING_POSITIONAL',
+          'error',
+          `Missing required positional: ${definition.name}.`,
+          { commandPath: command.path, positional: definition.name }
+        ));
+      }
+      values[definition.name] = undefined;
+    } else {
+      values[definition.name] = value;
+      inputIndex += 1;
+    }
+  }
+  if (inputIndex < positionals.length) {
+    diagnostics.push(createCliDiagnostic(
+      'CLI_UNEXPECTED_POSITIONAL',
+      'error',
+      'Unexpected positional input.',
+      { commandPath: command.path, values: Object.freeze(positionals.slice(inputIndex)) }
+    ));
+  }
+  if (hasErrorDiagnostics(diagnostics)) return { status: 'invalid', diagnostics: Object.freeze(diagnostics) };
+  return { status: 'bound', values: Object.freeze(values) };
+}
+
+function deprecatedAliasDiagnostics(aliases: readonly AliasUse[]): readonly CliDiagnostic[] {
+  return Object.freeze(aliases.flatMap(({ alias, command, token }) => alias.deprecated === undefined
+    ? []
+    : [createCliDiagnostic(
+        'CLI_DEPRECATED_ALIAS',
+        'warning',
+        `Command alias ${token} is deprecated.`,
+        {
+          alias: token,
+          aliasPath: alias.path,
+          commandPath: command.path,
+          ...(typeof alias.deprecated === 'string' ? { reason: alias.deprecated } : {})
+        }
+      )]));
+}
+
+function compileParsedAlias(use: AliasUse): ParsedAlias {
   return Object.freeze({
-    values: freezeOptionValues(result.values),
-    present: Object.freeze({ ...result.present }),
-    positionals: Object.freeze([...result.positionals]),
-    afterDoubleDash: Object.freeze([...result.afterDoubleDash]),
-    unknownOptions: Object.freeze(result.unknownOptions.map((option) => Object.freeze({ ...option }))),
-    diagnostics: Object.freeze([...result.diagnostics])
+    token: use.token,
+    path: use.alias.path,
+    canonicalPath: use.command.path,
+    ...(use.alias.deprecated === undefined ? {} : { deprecated: use.alias.deprecated })
   });
 }
 
-function bindPositionals(command: CliCommand, rest: readonly string[]): {
-  readonly values: Readonly<Record<string, ParsedPositionalValue>>;
-  readonly diagnostics: readonly CliDiagnostic[];
-} {
-  const values: Record<string, ParsedPositionalValue> = {};
-  const diagnostics: CliDiagnostic[] = [];
-  let index = 0;
-
-  for (const positional of command.positionals) {
-    if (positional.variadic) {
-      const remaining = Object.freeze(rest.slice(index));
-      values[positional.name] = remaining;
-      index = rest.length;
-      if (positional.required && remaining.length === 0) {
-        diagnostics.push(
-          createCliDiagnostic('CLI_MISSING_POSITIONAL', 'error', 'Required positional input is missing.', {
-            commandPath: command.path,
-            positional: positional.name
-          })
-        );
-      }
-      continue;
-    }
-
-    const value = rest.at(index);
-    if (value === undefined) {
-      values[positional.name] = undefined;
-      if (positional.required) {
-        diagnostics.push(
-          createCliDiagnostic('CLI_MISSING_POSITIONAL', 'error', 'Required positional input is missing.', {
-            commandPath: command.path,
-            positional: positional.name
-          })
-        );
-      }
-      continue;
-    }
-    values[positional.name] = value;
-    index += 1;
-  }
-
-  if (index < rest.length) {
-    diagnostics.push(
-      createCliDiagnostic('CLI_UNEXPECTED_POSITIONAL', 'error', 'Unexpected positional input was provided.', {
-        commandPath: command.path,
-        values: rest.slice(index)
-      })
-    );
-  }
-
-  return {
-    values: Object.freeze(values),
-    diagnostics: Object.freeze(diagnostics)
-  };
+function failure(
+  argv: readonly string[],
+  command: CliCommand | undefined,
+  diagnostics: readonly CliDiagnostic[]
+): ParsedInvocationFailure {
+  return Object.freeze({
+    status: 'invalid',
+    argv,
+    ...(command === undefined ? {} : { command }),
+    diagnostics: Object.freeze([...diagnostics])
+  });
 }
 
-function unknownCommandDiagnostics(match: CommandMatch): readonly CliDiagnostic[] {
-  if (match.unknownCommand.length === 0) return [];
-  return [
-    createCliDiagnostic('CLI_UNKNOWN_COMMAND', 'error', 'Command path does not match a known command.', {
-      commandPath: match.unknownCommand
-    })
-  ];
+function freezeUnknownFlag(flag: CliUnknownFlag): CliUnknownFlag {
+  return Object.freeze({ ...flag });
 }
 
-function aliasDiagnostics(match: CommandMatch): readonly CliDiagnostic[] {
-  if (match.alias === undefined || match.alias.deprecated === undefined) return [];
-  return [
-    createCliDiagnostic('CLI_DEPRECATED_ALIAS', 'warning', 'Command alias is deprecated.', {
-      alias: match.alias.alias,
-      aliasPath: match.alias.path,
-      commandPath: match.command!.path,
-      reason: typeof match.alias.deprecated === 'string' ? match.alias.deprecated : ''
-    })
-  ];
-}
-
-function unknownOptionDiagnostics(
-  optionResult: CliOptionBindingResult,
-  allowUnknownOptions: boolean
-): readonly CliDiagnostic[] {
-  if (allowUnknownOptions) return [];
-  return Object.freeze(optionResult.unknownOptions.map((unknown) =>
-    createCliDiagnostic('CLI_UNKNOWN_OPTION', 'error', 'Unknown option was provided.', {
-      option: unknown.option,
-      argvElement: unknown.argvElement,
-      argvIndex: unknown.argvIndex,
-      ...(unknown.offset === undefined ? {} : { offset: unknown.offset })
-    })
-  ));
-}
-
-function passThroughDiagnostics(command: CliCommand, passThrough: readonly string[]): readonly CliDiagnostic[] {
-  if (passThrough.length === 0 || command.allowPassThrough) return [];
-  return [
-    createCliDiagnostic('CLI_PASS_THROUGH_UNDECLARED', 'warning', 'Pass-through tokens were preserved for a command that did not declare pass-through behavior.', {
-      commandPath: command.path,
-      passThrough
-    })
-  ];
-}
-
-function buildParsedAlias(match: CommandMatch): ParsedAlias | undefined {
-  if (match.alias === undefined) return undefined;
-  const base = {
-    token: match.alias.alias,
-    path: match.alias.path,
-    canonicalPath: match.command!.path
-  };
-  if (match.alias.deprecated === undefined) return Object.freeze(base);
-  return Object.freeze({ ...base, deprecated: match.alias.deprecated });
-}
-
-function freezeOptionValues(
-  values: Readonly<Record<string, ParsedCliOptionValue>>
-): Readonly<Record<string, ParsedCliOptionValue>> {
-  return Object.freeze(Object.fromEntries(
-    Object.entries(values).map(([key, value]) => [
-      key,
-      Array.isArray(value) ? Object.freeze([...value]) : value
-    ])
-  )) as Readonly<Record<string, ParsedCliOptionValue>>;
+function freezeRecord(record: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> {
+  return Object.freeze({ ...record });
 }

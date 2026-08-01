@@ -35,60 +35,10 @@ jobs:
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: 1.3.14
-      - name: Install shells
-        run: sudo apt-get update && sudo apt-get install -y zsh fish
       - name: Install dependencies
         run: npm ci
       - name: Check
         run: npm run check
-        env:
-          CLI_CORE_EXPECT_SHELLS: bash,zsh,fish,pwsh
-      - name: Verify clean worktree
-        shell: bash
-        run: test -z "$(git status --porcelain=v1)"
-
-  platforms:
-    name: ${{ matrix.name }} behavior
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: macOS
-            os: macos-latest
-            shells: bash,zsh,fish,pwsh
-            install: |
-              if ! command -v pwsh >/dev/null 2>&1; then brew install --cask powershell; fi
-              if ! command -v fish >/dev/null 2>&1; then brew install fish; fi
-          - name: Windows
-            os: windows-latest
-            shells: pwsh,cmd
-            install: ''
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
-    steps:
-      - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - name: Setup Node
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
-        with:
-          node-version: 24.0.0
-          cache: npm
-      - name: Install shells
-        if: matrix.install != ''
-        shell: bash
-        run: ${{ matrix.install }}
-      - name: Install dependencies
-        run: npm ci
-      - name: Build
-        run: npm run build
-      - name: Test operating-system behavior
-        run: node --test tests/runtime-os/*.test.mjs
-      - name: Test shell behavior
-        run: node --test tests/shells/*.test.mjs
-        env:
-          CLI_CORE_EXPECT_SHELLS: ${{ matrix.shells }}
-      - name: Test packed Node consumer
-        run: npm run test:package
       - name: Verify clean worktree
         shell: bash
         run: test -z "$(git status --porcelain=v1)"

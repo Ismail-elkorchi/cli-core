@@ -1,29 +1,28 @@
 # Changelog
 
-## Unreleased
+## 0.2.0 - 2026-08-01
 
-- Removed the runtime dependency on `argv-flags` and the built-in `parseCli`
-  entrypoint. Integrations now provide a `CliOptionBinder` to
-  `createCliInvocationParser`.
-- Made parsed invocations mandatory for `runCli` and made CLI adapters accept an
-  explicit invocation parser.
-- Replaced parser-specific issue snapshots with binder diagnostics and indexed
-  unknown-option records, with the invocation document advanced to
-  `cli-core.invocation.v2`.
+- Contracted the package to command compilation and lookup, invocation routing,
+  positional binding, diagnostics, renderer-neutral help, completion candidates,
+  and small handler dispatch.
+- Replaced diagnostic-bearing partial programs with immutable programs or a
+  structured `CliDefinitionError`.
+- Replaced boolean `ok` results with discriminated `status` results. Failed
+  invocations no longer expose partial option or positional values.
+- Replaced parser-shaped option definitions with parser-independent option
+  presentation metadata and retained `CliOptionBinder` as the parsing boundary.
+- Allowed global flags before command tokens and replaced contiguous argv
+  offsets with an exact per-element index map for binders.
+- Exposed argv-prefix command lookup from the invocation router so completion
+  adapters share command and option-span classification.
+- Removed public lookup indexes, schema versions, manifests, JSON Schemas,
+  configuration discovery and resolution, plugins, effects, repair suggestions,
+  workflow-style run results, process adapters, shell scripts, package metadata,
+  and the public testing framework.
+- Moved `argv-flags`, process, and shell integration to `@ismail-elkorchi/cli`.
+- Reduced the package to one public entrypoint and added negative public type
+  tests plus offline packed consumers for Node, Deno, and Bun.
 
 ## 0.1.0 - 2026-06-08
 
-- Initial public release of typed command-core primitives for TypeScript and JavaScript CLIs.
-- Added command definition APIs for nested command trees, aliases, global and command options, positionals, default commands, deprecation metadata, and deterministic lookup indexes.
-- Added argv parsing and semantic validation that delegates low-level flag binding to `argv-flags` while preserving command paths, positional values, pass-through tokens, warnings, and stable diagnostics.
-- Added machine-readable help, version, and command manifest documents, including manifest export/import helpers for command inventories.
-- Added completion payload, completion protocol, shell script, install-plan, and repair-suggestion APIs for command, option, alias, and positional discovery.
-- Added explicit config discovery and resolution APIs with caller-supplied discovery hosts, memory host helpers, precedence tracking, environment capture, config-file parsing, and versioned migration support.
-- Added plan/apply run APIs with handler lookup, structured run events, run results, exit-status policy, cancellation and timeout mapping, artifacts, diagnostics, and redaction by default.
-- Added effect planning and application APIs with policy-controlled file, spawn, and custom effects, plus an in-memory effect host for tests and dry runs.
-- Added explicit CLI adapter helpers that render structured run results to caller-supplied stdout, stderr, and exit-status hosts without hidden process exits or ambient writes.
-- Added plugin manifest, compatibility, trust, capability, command-application, lazy-loading, hook-planning, and hook-execution APIs.
-- Added schema descriptors, JSON Schema artifacts, schema envelopes, failure envelopes, redaction reports, and public schema exports for machine-readable payloads.
-- Added testing harness APIs with fixture registries, built-in scenario fixtures, scenario replay, and public entrypoint checks.
-- Added npm ESM packaging for Node `>=24` and JSR source entrypoints for TypeScript consumers.
-- Added Node, Deno, Bun, package-consumer, schema, export, leakage, shell, and operating-system smoke coverage for the published surfaces.
+- Initial release.

@@ -6,21 +6,14 @@ if (!tag.startsWith('v')) {
 }
 
 const version = tag.slice(1);
-const [packageJson, jsrJson, packageSource, changelog] = await Promise.all([
+const [packageJson, jsrJson, changelog] = await Promise.all([
   readJson('package.json'),
   readJson('jsr.json'),
-  readFile('src/package.ts', 'utf8'),
   readFile('CHANGELOG.md', 'utf8')
 ]);
 
 assertEqual(packageJson.version, version, 'package.json version');
 assertEqual(jsrJson.version, version, 'jsr.json version');
-
-const publicVersions = [...packageSource.matchAll(/\bversion:\s*'([^']+)'/gu)]
-  .map((match) => match[1]);
-if (publicVersions.length === 0 || publicVersions.some((value) => value !== version)) {
-  throw new Error(`release-gate: src/package.ts version does not match ${version}`);
-}
 
 if (!hasVersionHeading(changelog, version)) {
   throw new Error(`release-gate: missing CHANGELOG section for version ${version}`);

@@ -15,6 +15,12 @@ export default [
   promise.configs['flat/recommended'],
   security.configs.recommended,
   {
+    rules: {
+      'security/detect-object-injection': 'off',
+      'security/detect-possible-timing-attacks': 'off'
+    }
+  },
+  {
     files: ['src/**/*.ts'],
     languageOptions: {
       parser: tsParser,

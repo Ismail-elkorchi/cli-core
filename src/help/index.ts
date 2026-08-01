@@ -2,171 +2,97 @@ import {
   findCliCommand,
   findCliCommandChildren,
   type CliCommand,
-  type CliCommandSource,
   type CliOption,
   type CliPositional,
   type CliProgram
 } from '../command/index.ts';
 
-/**
- * Machine-readable help document for a selected command.
- */
-export interface HelpDocument {
-  /** Schema version for this document. */
-  readonly schemaVersion: 'cli-core.help.v1';
-  /** Name of the CLI program. */
-  readonly programName: string;
-  /** Canonical command path for the invocation. */
-  readonly commandPath: readonly string[];
-  /** Usage line for the selected command. */
+/** Help data for one command. Rendering belongs to an integration package. */
+export interface CliHelp {
+  readonly command: CliCommand;
   readonly usage: string;
-  /** Summary text for the help document. */
-  readonly summary: string | undefined;
-  /** Visible child commands for the selected command. */
-  readonly commands: readonly HelpCommandEntry[];
-  /** Positional entries shown for this command. */
-  readonly positionals: readonly HelpPositionalEntry[];
-  /** Option entries shown for this command. */
-  readonly options: readonly HelpOptionEntry[];
+  readonly commands: readonly CliHelpCommand[];
+  readonly positionals: readonly CliHelpPositional[];
+  readonly options: readonly CliHelpOption[];
 }
 
-/**
- * Command entry included in help output.
- */
-export interface HelpCommandEntry {
-  /** Command token shown in command listings. */
+export interface CliHelpCommand {
   readonly name: string;
-  /** Canonical command path for this help entry. */
-  readonly path: readonly string[];
-  /** Aliases declared for this command. */
   readonly aliases: readonly string[];
-  /** Summary text for the command. */
-  readonly summary: string | undefined;
-  /** Deprecation marker copied from the compiled command. */
-  readonly deprecated: boolean | string | undefined;
-  /** Provenance for this command. */
-  readonly source: CliCommandSource;
+  readonly description?: string;
+  readonly deprecated?: boolean | string;
 }
 
-/**
- * Positional entry included in help output.
- */
-export interface HelpPositionalEntry {
-  /** Positional key shown in usage and help output. */
+export interface CliHelpPositional {
   readonly name: string;
-  /** Controls angle-bracket versus square-bracket usage rendering. */
-  readonly required: boolean;
-  /** Whether this positional captures remaining tokens. */
-  readonly variadic: boolean;
-  /** Rendered usage label for this positional. */
   readonly label: string;
-  /** Summary text for the positional. */
-  readonly summary: string | undefined;
-}
-
-/**
- * Option entry included in help output.
- */
-export interface HelpOptionEntry {
-  /** Option key shown beside accepted flags. */
-  readonly name: string;
-  /** Flag spellings accepted for this option. */
-  readonly flags: readonly string[];
-  /** Value category used to explain expected option input. */
-  readonly type: string;
-  /** Indicates whether parsing requires this option. */
   readonly required: boolean;
-  /** Indicates whether the option is inherited or local. */
-  readonly scope: 'global' | 'local';
-  /** Summary text for the option. */
-  readonly summary: string | undefined;
+  readonly variadic: boolean;
+  readonly description?: string;
 }
 
-/**
- * Machine-readable version document.
- */
-export interface VersionDocument {
-  /** Schema version for this document. */
-  readonly schemaVersion: 'cli-core.version.v1';
-  /** Program name associated with the version. */
+export interface CliHelpOption {
   readonly name: string;
-  /** Program version, or undefined when the definition omitted one. */
-  readonly version: string | undefined;
+  readonly flags: readonly string[];
+  readonly valueMode: CliOption['valueMode'];
+  readonly valueLabel?: string;
+  readonly required: boolean;
+  readonly scope: CliOption['scope'];
+  readonly description?: string;
 }
 
-/**
- * Creates a machine-readable help document.
- */
-export function createHelpDocument(program: CliProgram, commandPath: readonly string[] = []): HelpDocument {
+/** Creates immutable help data for a canonical command path. */
+export function createCliHelp(program: CliProgram, commandPath: readonly string[] = []): CliHelp {
   const command = findCliCommand(program, commandPath) ?? program.root;
-  const childCommands = findCliCommandChildren(program, command.id);
   return Object.freeze({
-    schemaVersion: 'cli-core.help.v1',
-    programName: program.name,
-    commandPath: command.path,
-    usage: buildUsage(program, command),
-    summary: command.description,
-    commands: Object.freeze(childCommands.map(toHelpCommandEntry)),
-    positionals: Object.freeze(command.positionals.map(toHelpPositionalEntry)),
-    options: Object.freeze([...command.inheritedOptions, ...command.options].filter((option) => !option.hidden).map(toHelpOptionEntry))
+    command,
+    usage: createUsage(program, command),
+    commands: Object.freeze(findCliCommandChildren(program, command).map(toHelpCommand)),
+    positionals: Object.freeze(command.positionals.map(toHelpPositional)),
+    options: Object.freeze(command.options.filter((option) => !option.hidden).map(toHelpOption))
   });
 }
 
-/**
- * Creates a machine-readable version document.
- */
-export function createVersionDocument(program: CliProgram): VersionDocument {
-  return Object.freeze({
-    schemaVersion: 'cli-core.version.v1',
-    name: program.name,
-    version: program.version
-  });
-}
-
-function buildUsage(program: CliProgram, command: CliCommand): string {
+function createUsage(program: CliProgram, command: CliCommand): string {
   const parts = [program.name, ...command.path];
-  const options = [...command.inheritedOptions, ...command.options].filter((option) => !option.hidden);
-  if (options.length > 0) parts.push('[options]');
-  for (const positional of command.positionals) {
-    parts.push(formatPositional(positional));
-  }
-  if (command.allowPassThrough) parts.push('[-- ...]');
+  if (command.options.some((option) => !option.hidden)) parts.push('[options]');
+  parts.push(...command.positionals.map(positionalLabel));
+  if (command.acceptsAfterDoubleDash) parts.push('[-- ...]');
   return parts.join(' ');
 }
 
-function toHelpCommandEntry(command: CliCommand): HelpCommandEntry {
+function toHelpCommand(command: CliCommand): CliHelpCommand {
   return Object.freeze({
     name: command.name,
-    path: command.path,
     aliases: Object.freeze(command.aliases.map((alias) => alias.name)),
-    summary: command.description,
-    deprecated: command.deprecated,
-    source: Object.freeze({ ...command.source })
+    ...(command.description === undefined ? {} : { description: command.description }),
+    ...(command.deprecated === undefined ? {} : { deprecated: command.deprecated })
   });
 }
 
-function toHelpPositionalEntry(positional: CliPositional): HelpPositionalEntry {
+function toHelpPositional(positional: CliPositional): CliHelpPositional {
   return Object.freeze({
     name: positional.name,
+    label: positionalLabel(positional),
     required: positional.required,
     variadic: positional.variadic,
-    label: formatPositional(positional),
-    summary: positional.description
+    ...(positional.description === undefined ? {} : { description: positional.description })
   });
 }
 
-function toHelpOptionEntry(option: CliOption): HelpOptionEntry {
+function toHelpOption(option: CliOption): CliHelpOption {
   return Object.freeze({
     name: option.name,
     flags: option.flags,
-    type: option.type,
+    valueMode: option.valueMode,
+    ...(option.valueLabel === undefined ? {} : { valueLabel: option.valueLabel }),
     required: option.required,
     scope: option.scope,
-    summary: option.description
+    ...(option.description === undefined ? {} : { description: option.description })
   });
 }
 
-function formatPositional(positional: CliPositional): string {
-  const body = positional.variadic ? `${positional.name}...` : positional.name;
-  return positional.required ? `<${body}>` : `[${body}]`;
+function positionalLabel(positional: CliPositional): string {
+  const name = positional.variadic ? `${positional.name}...` : positional.name;
+  return positional.required ? `<${name}>` : `[${name}]`;
 }

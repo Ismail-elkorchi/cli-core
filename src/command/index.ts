@@ -1,798 +1,684 @@
-import type { ConfigDefinition } from '../config/types.ts';
-import { createCliDiagnostic, type CliDiagnostic } from '../diagnostics.ts';
+/** How a displayed option accepts a value. */
+export type CliOptionValueMode = 'none' | 'required' | 'optional-inline';
 
-/**
- * Option categories exposed to an option-binding integration.
- */
-export type CliOptionType = 'string' | 'boolean' | 'number' | 'array';
-
-/**
- * Runtime value shape associated with a compiled option category.
- */
-export type CliOptionValue<T extends CliOptionType = CliOptionType> = T extends 'string'
-  ? string
-  : T extends 'boolean'
-    ? boolean
-    : T extends 'number'
-      ? number
-      : T extends 'array'
-        ? string[]
-        : never;
-
-/**
- * Definition object compiled into an immutable command program.
- *
- * @remarks
- * Diagnostics are stored on the returned program instead of thrown, so callers can inspect invalid definitions as data.
- */
-export interface CliDefinition {
-  /** Root command token used in usage, help, and manifest documents. */
+/** A flag that does not accept a value. */
+export interface CliSwitchOptionDefinition {
+  /** Logical option name used in parsed values. */
   readonly name: string;
-  /** Program version surfaced by version and manifest documents. */
-  readonly version?: string;
-  /** Summary copied into root help and manifest output. */
-  readonly description?: string;
-  /** Config contract resolved separately from argv parsing. */
-  readonly config?: ConfigDefinition;
-  /** Global options inherited by each command. */
-  readonly options?: readonly CliOptionDefinition[];
-  /** Top-level commands below the program root. */
-  readonly commands?: readonly CliCommandDefinition[];
-}
-
-/**
- * Command-tree node accepted by defineCli.
- */
-export interface CliCommandDefinition {
-  /** Command path token relative to the parent command. */
-  readonly name: string;
-  /** Alternate path tokens accepted beside the canonical command token. */
-  readonly aliases?: readonly CliAliasInput[];
-  /** Summary copied into help and manifest output for this command. */
-  readonly description?: string;
-  /** Deprecation marker preserved as diagnostics and manifest data. */
-  readonly deprecated?: boolean | string;
-  /** Provenance override for plugin-provided or generated command nodes. */
-  readonly source?: CliCommandSource;
-  /** Positional declarations bound after local option parsing. */
-  readonly positionals?: readonly CliPositionalDefinition[];
-  /** Local options available only in this command scope. */
-  readonly options?: readonly CliOptionDefinition[];
-  /** Nested commands below this command node. */
-  readonly commands?: readonly CliCommandDefinition[];
-  /** Whether tokens after the pass-through boundary are accepted. */
-  readonly allowPassThrough?: boolean;
-}
-
-/**
- * Provenance attached to commands from definitions or plugin manifests.
- */
-export interface CliCommandSource {
-  /** Source category used for provenance-aware help and manifests. */
-  readonly kind: 'definition' | 'plugin';
-  /** Plugin identity when this command came from a plugin manifest. */
-  readonly pluginName?: string;
-  /** Plugin version recorded with command provenance. */
-  readonly pluginVersion?: string;
-}
-
-/**
- * Alias spelling accepted in shorthand or structured form.
- */
-export type CliAliasInput = string | CliAliasDefinition;
-
-/**
- * Structured alias spelling with optional deprecation metadata.
- */
-export interface CliAliasDefinition {
-  /** Alias token relative to the command parent path. */
-  readonly name: string;
-  /** Deprecation marker emitted when this alias is used. */
-  readonly deprecated?: boolean | string;
-}
-
-/**
- * Positional argument declaration used during invocation binding.
- */
-export interface CliPositionalDefinition {
-  /** Key used when this positional is returned from parsing. */
-  readonly name: string;
-  /** Controls missing-input diagnostics for this positional. */
+  /** Accepted flag spellings. */
+  readonly flags: readonly [string, ...string[]];
+  /** This option does not accept a value. */
+  readonly valueMode: 'none';
+  /** A value label is meaningless for a switch. */
+  readonly valueLabel?: never;
+  /** Whether the option must occur. */
   readonly required?: boolean;
-  /** Whether this positional captures remaining tokens. */
-  readonly variadic?: boolean;
-  /** Summary copied into help and manifest output. */
+  /** User-facing explanation. */
   readonly description?: string;
-}
-
-/**
- * Logical option declaration compiled into command metadata.
- */
-export interface CliOptionDefinition<T extends CliOptionType = CliOptionType> {
-  /** Option key used in parsed values and config argv bindings. */
-  readonly name: string;
-  /** Value category supplied to option-binding integrations. */
-  readonly type: T;
-  /** Flag spellings accepted for this option. */
-  readonly flags: readonly string[];
-  /** Summary copied into help, manifests, and completion items. */
-  readonly description?: string;
-  /** Controls missing-option diagnostics after argv binding. */
-  readonly required?: boolean;
-  /** Default value when no explicit value is supplied. */
-  readonly default?: CliOptionValue<T>;
-  /** Whether an empty string value is accepted. */
-  readonly allowEmpty?: boolean;
-  /** Enables boolean negation for long boolean flags. */
-  readonly allowNo?: boolean;
-  /** Omits this option from default help and completion output. */
+  /** Whether default help and completion omit the option. */
   readonly hidden?: boolean;
 }
 
-/**
- * Immutable command program returned by defineCli.
- *
- * @remarks
- * Arrays remain available for serialization, while lookup helpers use internal indexes for command, alias, and child lookup.
- */
-export interface CliProgram {
-  /** Schema version for this document. */
-  readonly schemaVersion: 'cli-core.program.v1';
-  /** Root command token retained from the source definition. */
+/** A flag that accepts a required or optional-inline value. */
+export interface CliValueOptionDefinition {
+  /** Logical option name used in parsed values. */
   readonly name: string;
-  /** Program version retained for version and manifest output. */
-  readonly version?: string;
-  /** Root summary retained for help and manifests. */
+  /** Accepted flag spellings. */
+  readonly flags: readonly [string, ...string[]];
+  /** How the flag obtains its value. */
+  readonly valueMode: 'required' | 'optional-inline';
+  /** Label used for the value in help output. */
+  readonly valueLabel?: string;
+  /** Whether the option must occur. */
+  readonly required?: boolean;
+  /** User-facing explanation. */
   readonly description?: string;
-  /** Config contract retained for explicit config resolution. */
-  readonly config: ConfigDefinition | undefined;
-  /** Root command for the compiled program. */
-  readonly root: CliCommand;
-  /** Frozen command list including the root command. */
-  readonly commands: readonly CliCommand[];
-  /** Serializable index from command path to command id. */
-  readonly pathIndex: readonly CliCommandPathIndexEntry[];
-  /** Serializable index from alias path to command id. */
-  readonly aliasIndex: readonly CliCommandAliasIndexEntry[];
-  /** Definition diagnostics retained even when compilation succeeds. */
-  readonly diagnostics: readonly CliDiagnostic[];
+  /** Whether default help and completion omit the option. */
+  readonly hidden?: boolean;
 }
 
-/**
- * Compiled command node with inherited options and provenance.
- */
-export interface CliCommand {
-  /** Internal command identifier used by handlers and indexes. */
-  readonly id: string;
-  /** Canonical command token at this path segment. */
+/** Parser-independent option metadata used by routing, help, and completion. */
+export type CliOptionDefinition = CliSwitchOptionDefinition | CliValueOptionDefinition;
+
+/** One positional input accepted by a command. */
+export interface CliPositionalDefinition {
+  /** Logical positional name. */
   readonly name: string;
-  /** Canonical command path from the program root. */
-  readonly path: readonly string[];
-  /** Identifier of the parent command when present. */
-  readonly parentId?: string;
-  /** Compiled aliases relative to this command's parent path. */
-  readonly aliases: readonly CliAlias[];
-  /** Summary used by help, manifests, and completion. */
+  /** Whether absence is an error. Defaults to true. */
+  readonly required?: boolean;
+  /** Whether this positional consumes all remaining positional tokens. */
+  readonly variadic?: boolean;
+  /** User-facing explanation. */
   readonly description?: string;
-  /** Deprecation marker retained for diagnostics and manifests. */
+}
+
+/** An alternate command token. */
+export interface CliAliasDefinition {
+  /** Alias token relative to the command parent. */
+  readonly name: string;
+  /** Optional deprecation explanation. */
   readonly deprecated?: boolean | string;
-  /** Provenance for this command. */
-  readonly source: CliCommandSource;
-  /** Positional declarations bound after option parsing. */
-  readonly positionals: readonly CliPositional[];
-  /** Local options available only for this command. */
-  readonly options: readonly CliOption[];
-  /** Global options inherited by this command. */
-  readonly inheritedOptions: readonly CliOption[];
-  /** Whether tokens after the pass-through boundary are accepted. */
-  readonly allowPassThrough: boolean;
 }
 
-/**
- * Compiled alias that points at a canonical command path.
- */
+/** Shorthand or structured alias input. */
+export type CliAliasInput = string | CliAliasDefinition;
+
+/** One command in a command definition tree. */
+export interface CliCommandDefinition {
+  /** Command token relative to its parent. */
+  readonly name: string;
+  /** Alternate tokens relative to its parent. */
+  readonly aliases?: readonly CliAliasInput[];
+  /** User-facing explanation. */
+  readonly description?: string;
+  /** Optional command deprecation explanation. */
+  readonly deprecated?: boolean | string;
+  /** Local positional definitions. */
+  readonly positionals?: readonly CliPositionalDefinition[];
+  /** Local option metadata. */
+  readonly options?: readonly CliOptionDefinition[];
+  /** Nested commands. */
+  readonly commands?: readonly CliCommandDefinition[];
+  /** Whether tokens after `--` are accepted by this command. */
+  readonly acceptsAfterDoubleDash?: boolean;
+}
+
+/** A complete command tree. */
+export interface CliDefinition {
+  /** Program token used in help and command keys. */
+  readonly name: string;
+  /** User-facing program explanation. */
+  readonly description?: string;
+  /** Options available to every command. */
+  readonly options?: readonly CliOptionDefinition[];
+  /** Top-level commands. */
+  readonly commands?: readonly CliCommandDefinition[];
+}
+
+/** Why a CLI definition could not be compiled. */
+export type CliDefinitionIssue =
+  | {
+      readonly code: 'UNKNOWN_PROPERTY';
+      readonly message: string;
+      readonly definitionPath: readonly string[];
+      readonly property: string | symbol;
+    }
+  | {
+      readonly code: 'INVALID_PROPERTY';
+      readonly message: string;
+      readonly definitionPath: readonly string[];
+      readonly property: string;
+      readonly expected: 'string' | 'boolean' | 'boolean-or-string';
+    }
+  | {
+      readonly code: 'INVALID_PROGRAM_NAME';
+      readonly message: string;
+      readonly name: unknown;
+    }
+  | {
+      readonly code: 'INVALID_COMMAND_NAME';
+      readonly message: string;
+      readonly commandPath: readonly string[];
+      readonly name: unknown;
+    }
+  | {
+      readonly code: 'DUPLICATE_COMMAND';
+      readonly message: string;
+      readonly commandPath: readonly string[];
+    }
+  | {
+      readonly code: 'INVALID_ALIAS';
+      readonly message: string;
+      readonly commandPath: readonly string[];
+      readonly alias: unknown;
+    }
+  | {
+      readonly code: 'DUPLICATE_ALIAS';
+      readonly message: string;
+      readonly aliasPath: readonly string[];
+    }
+  | {
+      readonly code: 'INVALID_POSITIONAL';
+      readonly message: string;
+      readonly commandPath: readonly string[];
+      readonly index: number;
+      readonly reason: 'definition' | 'name' | 'duplicate' | 'required-after-optional' | 'after-variadic' | 'variadic-not-last';
+    }
+  | {
+      readonly code: 'INVALID_OPTION';
+      readonly message: string;
+      readonly commandPath: readonly string[];
+      readonly index: number;
+      readonly reason: 'definition' | 'name' | 'duplicate-name' | 'flags' | 'duplicate-flag' | 'value-mode' | 'value-label';
+    };
+
+/** Error thrown when a command definition is malformed or ambiguous. */
+export class CliDefinitionError extends TypeError {
+  /** Every issue found in the rejected definition. */
+  public readonly issues: readonly CliDefinitionIssue[];
+
+  public constructor(issues: readonly CliDefinitionIssue[]) {
+    super(`Invalid CLI definition (${String(issues.length)} ${issues.length === 1 ? 'issue' : 'issues'}).`);
+    this.name = 'CliDefinitionError';
+    this.issues = Object.freeze([...issues]);
+  }
+}
+
+/** An immutable compiled alias. */
 export interface CliAlias {
-  /** Alias token at the final alias path segment. */
+  /** Alias token relative to the command parent. */
   readonly name: string;
-  /** Command path reached by this alias. */
+  /** Complete alias path. */
   readonly path: readonly string[];
-  /** Deprecation marker emitted when this alias is used. */
+  /** Optional deprecation explanation. */
   readonly deprecated?: boolean | string;
 }
 
-/**
- * Compiled positional argument used by parse binding.
- */
+/** An immutable compiled positional. */
 export interface CliPositional {
-  /** Key used in parsed positional output. */
   readonly name: string;
-  /** Controls missing-input diagnostics for this positional. */
   readonly required: boolean;
-  /** Whether this positional captures remaining tokens. */
   readonly variadic: boolean;
-  /** Summary used in help and manifest output. */
   readonly description?: string;
 }
 
-/**
- * Compiled option visible to parsing, help, manifests, and completion.
- */
-export interface CliOption<T extends CliOptionType = CliOptionType> {
-  /** Option key used in parsed option output. */
+/** An immutable compiled option presentation. */
+export interface CliOption {
   readonly name: string;
-  /** Value category supplied to option-binding integrations. */
-  readonly type: T;
-  /** Flag spellings accepted for this option. */
-  readonly flags: readonly string[];
-  /** Summary used in help, manifests, and completion output. */
-  readonly description?: string;
-  /** Controls missing-option diagnostics after argv binding. */
+  readonly flags: readonly [string, ...string[]];
+  readonly valueMode: CliOptionValueMode;
+  readonly valueLabel?: string;
   readonly required: boolean;
-  /** Default value when no explicit value is supplied. */
-  readonly default?: CliOptionValue<T>;
-  /** Whether an empty string value is accepted. */
-  readonly allowEmpty?: boolean;
-  /** Enables boolean negation for long boolean flags. */
-  readonly allowNo?: boolean;
-  /** Omits this option from default help and completion output. */
+  readonly description?: string;
   readonly hidden: boolean;
-  /** Indicates whether this option was inherited or declared locally. */
   readonly scope: 'global' | 'local';
 }
 
-/**
- * Serializable command-path index entry.
- */
-export interface CliCommandPathIndexEntry {
-  /** Command path indexed by this entry. */
+/** One immutable command in a compiled program. */
+export interface CliCommand {
+  /** Unambiguous key containing the program name and canonical command path. */
+  readonly key: string;
+  readonly name: string;
+  /** Canonical path below the program root. */
   readonly path: readonly string[];
-  /** Identifier of the referenced command. */
-  readonly commandId: string;
-}
-
-/**
- * Serializable alias-path index entry.
- */
-export interface CliCommandAliasIndexEntry {
-  /** Alias path indexed by this entry. */
-  readonly path: readonly string[];
-  /** Identifier of the referenced command. */
-  readonly commandId: string;
-  /** Final alias token that matched this index entry. */
-  readonly alias: string;
-  /** Deprecation marker emitted when this alias path is used. */
+  readonly parentPath?: readonly string[];
+  readonly aliases: readonly CliAlias[];
+  readonly description?: string;
   readonly deprecated?: boolean | string;
+  readonly positionals: readonly CliPositional[];
+  /** Global and local options visible at this command. */
+  readonly options: readonly CliOption[];
+  readonly acceptsAfterDoubleDash: boolean;
 }
 
-interface CliCommandLookupIndex {
+/** A valid immutable command program. */
+export interface CliProgram {
+  readonly name: string;
+  readonly description?: string;
+  readonly root: CliCommand;
+  readonly commands: readonly CliCommand[];
+}
+
+/** Details about a command alias lookup. */
+export interface CliAliasMatch {
+  readonly command: CliCommand;
+  readonly alias: CliAlias;
+}
+
+interface CliCommandLookup {
   readonly byPath: ReadonlyMap<string, CliCommand>;
-  readonly byAliasPath: ReadonlyMap<string, CliCommandAliasIndexEntry>;
-  readonly byId: ReadonlyMap<string, CliCommand>;
-  readonly childrenByParentId: ReadonlyMap<string, readonly CliCommand[]>;
+  readonly byAliasPath: ReadonlyMap<string, CliAliasMatch>;
+  readonly childrenByPath: ReadonlyMap<string, readonly CliCommand[]>;
 }
 
-const commandLookupIndexes = new WeakMap<CliProgram, CliCommandLookupIndex>();
+interface OptionIdentity {
+  readonly name: string;
+  readonly flags: readonly string[];
+}
 
-/**
- * Compiles a command definition into an immutable program.
- *
- * @remarks
- * The returned program carries diagnostics for invalid definitions instead of throwing, which keeps definition review machine-readable.
- *
- * @example
- * ```ts
- * import { defineCli } from '@ismail-elkorchi/cli-core';
- *
- * const program = defineCli({
- *   name: 'ship',
- *   commands: [{ name: 'deploy', aliases: ['d'] }]
- * });
- *
- * if (program.diagnostics.length > 0) {
- *   // Invalid definitions are reported as data rather than thrown.
- * }
- * ```
- */
+const commandLookups = new WeakMap<CliProgram, CliCommandLookup>();
+
+const definitionProperties = new Set(['name', 'description', 'options', 'commands']);
+const commandProperties = new Set([
+  'name',
+  'aliases',
+  'description',
+  'deprecated',
+  'positionals',
+  'options',
+  'commands',
+  'acceptsAfterDoubleDash'
+]);
+const aliasProperties = new Set(['name', 'deprecated']);
+const positionalProperties = new Set(['name', 'required', 'variadic', 'description']);
+const optionProperties = new Set(['name', 'flags', 'valueMode', 'valueLabel', 'required', 'description', 'hidden']);
+
+/** Compiles a command tree or throws a structured definition error. */
 export function defineCli(definition: CliDefinition): CliProgram {
-  const diagnostics: CliDiagnostic[] = [];
-  if (!isValidPathToken(definition.name)) {
-    diagnostics.push(createCliDiagnostic('CLI_COMMAND_NAME_INVALID', 'error', 'Program name must be a non-empty path token.', {
-      path: [],
+  const issues = validateDefinition(definition);
+  if (issues.length > 0) throw new CliDefinitionError(issues);
+
+  const globalOptions = compileOptions(definition.options ?? [], 'global');
+  const root = compileCommand(
+    {
       name: definition.name,
-      role: 'root'
-    }));
-  }
-  const globalOptions = compileOptions(definition.options ?? [], 'global', diagnostics, []);
-  const rootOptionalFields: { description?: string } = {};
-  if (definition.description !== undefined) rootOptionalFields.description = definition.description;
-  const root = freezeCommand({
-    id: 'root',
+      ...(definition.description === undefined ? {} : { description: definition.description })
+    },
+    [],
+    undefined,
+    globalOptions,
+    definition.name
+  );
+  const commands: CliCommand[] = [root];
+  compileChildren(definition.commands ?? [], [], globalOptions, definition.name, commands);
+  const program = Object.freeze({
     name: definition.name,
-    path: [],
-    aliases: [],
-    source: definitionSource(),
-    positionals: [],
-    options: [],
-    inheritedOptions: globalOptions,
-    allowPassThrough: false,
-    ...rootOptionalFields
+    ...(definition.description === undefined ? {} : { description: definition.description }),
+    root,
+    commands: Object.freeze(commands)
   });
-  const commands = [root];
-
-  for (const commandDefinition of definition.commands ?? []) {
-    compileCommandTree(commandDefinition, root, globalOptions, commands, diagnostics);
-  }
-
-  const pathIndex = buildPathIndex(commands, diagnostics);
-  const aliasIndex = buildAliasIndex(commands, pathIndex, diagnostics);
-  const program = buildProgram(definition, root, commands, pathIndex, aliasIndex, diagnostics);
-  const frozenProgram = freezeProgram(program);
-  commandLookupIndexes.set(frozenProgram, createCommandLookupIndex(frozenProgram));
-  return frozenProgram;
+  commandLookups.set(program, createLookup(program));
+  return program;
 }
 
-/**
- * Looks up a compiled command by canonical path.
- */
+/** Looks up a command by its canonical path below the program root. */
 export function findCliCommand(program: CliProgram, path: readonly string[]): CliCommand | undefined {
-  return commandLookup(program).byPath.get(pathKey(path));
+  return lookupFor(program).byPath.get(pathKey(path));
 }
 
-/**
- * Looks up a compiled command by alias path.
- */
-export function findCliCommandByAlias(
-  program: CliProgram,
-  path: readonly string[]
-): { readonly command: CliCommand; readonly alias: CliCommandAliasIndexEntry } | undefined {
-  const lookup = commandLookup(program);
-  const alias = lookup.byAliasPath.get(pathKey(path));
-  if (alias === undefined) return undefined;
-  const command = lookup.byId.get(alias.commandId);
-  if (command === undefined) return undefined;
-  return { command, alias };
+/** Looks up a command by a complete alias path below the program root. */
+export function findCliCommandByAlias(program: CliProgram, path: readonly string[]): CliAliasMatch | undefined {
+  return lookupFor(program).byAliasPath.get(pathKey(path));
 }
 
-/**
- * Returns child commands for a compiled parent command.
- */
-export function findCliCommandChildren(program: CliProgram, parentId: string): readonly CliCommand[] {
-  return commandLookup(program).childrenByParentId.get(parentId) ?? Object.freeze([]);
+/** Returns the direct children of a compiled command. */
+export function findCliCommandChildren(program: CliProgram, command: CliCommand): readonly CliCommand[] {
+  return lookupFor(program).childrenByPath.get(pathKey(command.path)) ?? Object.freeze([]);
 }
 
-function compileCommandTree(
-  definition: CliCommandDefinition,
-  parent: CliCommand,
-  globalOptions: readonly CliOption[],
-  commands: CliCommand[],
-  diagnostics: CliDiagnostic[]
+function validateDefinition(definition: CliDefinition): readonly CliDefinitionIssue[] {
+  const issues: CliDefinitionIssue[] = [];
+  if (!isRecord(definition)) {
+    return Object.freeze([{
+      code: 'INVALID_PROGRAM_NAME',
+      message: 'The CLI definition must be an object with a valid program name.',
+      name: undefined
+    }]);
+  }
+  reportUnknownProperties(definition, definitionProperties, [], issues);
+  if (!isCommandToken(definition.name)) {
+    issues.push({ code: 'INVALID_PROGRAM_NAME', message: 'Program name must be one non-option token.', name: definition.name });
+  }
+  validateOptionalString(definition, 'description', [], issues);
+  const globalOptions = validateOptions(definition.options, [], [], issues);
+  validateCommands(definition.commands, [], globalOptions, issues);
+  return Object.freeze(issues.map(freezeIssue));
+}
+
+function validateCommands(
+  value: unknown,
+  parentPath: readonly string[],
+  inheritedOptions: readonly OptionIdentity[],
+  issues: CliDefinitionIssue[]
 ): void {
-  const path = Object.freeze([...parent.path, definition.name]);
-  if (!isValidPathToken(definition.name)) {
-    diagnostics.push(createCliDiagnostic('CLI_COMMAND_NAME_INVALID', 'error', 'Command name must be a non-empty path token.', {
-      path,
-      name: definition.name,
-      parentPath: parent.path
-    }));
+  if (value === undefined) return;
+  if (!Array.isArray(value)) {
+    issues.push({
+      code: 'INVALID_COMMAND_NAME',
+      message: 'Commands must be an array of command definitions.',
+      commandPath: Object.freeze([...parentPath]),
+      name: value
+    });
     return;
   }
-  const optionalFields: { description?: string; deprecated?: boolean | string } = {};
-  if (definition.description !== undefined) optionalFields.description = definition.description;
-  if (definition.deprecated !== undefined) optionalFields.deprecated = definition.deprecated;
-  const command = freezeCommand({
-    id: path.join(':'),
-    name: definition.name,
-    path,
-    parentId: parent.id,
-    aliases: compileAliases(definition.aliases ?? [], parent.path, diagnostics),
-    source: freezeCommandSource(definition.source ?? definitionSource()),
-    positionals: compilePositionals(definition.positionals ?? [], diagnostics, path),
-    options: compileOptions(definition.options ?? [], 'local', diagnostics, path, globalOptions),
-    inheritedOptions: globalOptions,
-    allowPassThrough: definition.allowPassThrough ?? false,
-    ...optionalFields
-  });
-  commands.push(command);
-
-  for (const child of definition.commands ?? []) {
-    compileCommandTree(child, command, globalOptions, commands, diagnostics);
+  const siblingTokens = new Set<string>();
+  for (const entry of value) {
+    if (!isRecord(entry)) {
+      issues.push({
+        code: 'INVALID_COMMAND_NAME',
+        message: 'Each command must be an object.',
+        commandPath: Object.freeze([...parentPath]),
+        name: entry
+      });
+      continue;
+    }
+    const name = entry['name'];
+    const commandPath = Object.freeze([...parentPath, typeof name === 'string' ? name : '']);
+    reportUnknownProperties(entry, commandProperties, commandPath, issues);
+    if (!isCommandToken(name)) {
+      issues.push({ code: 'INVALID_COMMAND_NAME', message: 'Command name must be one non-option token.', commandPath, name });
+      continue;
+    }
+    if (siblingTokens.has(name)) {
+      issues.push({ code: 'DUPLICATE_COMMAND', message: 'Sibling command names and aliases must be unique.', commandPath });
+    }
+    siblingTokens.add(name);
+    validateOptionalString(entry, 'description', commandPath, issues);
+    validateDeprecation(entry['deprecated'], commandPath, issues);
+    validateAliases(entry['aliases'], commandPath, siblingTokens, issues);
+    validatePositionals(entry['positionals'], commandPath, issues);
+    validateBoolean(entry, 'acceptsAfterDoubleDash', commandPath, issues);
+    validateOptions(entry['options'], commandPath, inheritedOptions, issues);
+    validateCommands(entry['commands'], commandPath, inheritedOptions, issues);
   }
 }
 
-function compileAliases(
-  inputs: readonly CliAliasInput[],
-  parentPath: readonly string[],
-  diagnostics: CliDiagnostic[]
-): readonly CliAlias[] {
-  const aliases: CliAlias[] = [];
-  for (const input of inputs) {
-    const alias = compileAlias(input, parentPath, diagnostics);
-    if (alias !== undefined) aliases.push(alias);
+function validateAliases(
+  value: unknown,
+  commandPath: readonly string[],
+  siblingTokens: Set<string>,
+  issues: CliDefinitionIssue[]
+): void {
+  if (value === undefined) return;
+  if (!Array.isArray(value)) {
+    issues.push({ code: 'INVALID_ALIAS', message: 'Aliases must be an array.', commandPath, alias: value });
+    return;
   }
-  return Object.freeze(aliases);
+  for (const entry of value) {
+    const alias = typeof entry === 'string' ? entry : isRecord(entry) ? entry['name'] : undefined;
+    if (isRecord(entry)) {
+      reportUnknownProperties(entry, aliasProperties, [...commandPath, '<alias>'], issues);
+      validateDeprecation(entry['deprecated'], commandPath, issues);
+    }
+    if (!isCommandToken(alias)) {
+      issues.push({ code: 'INVALID_ALIAS', message: 'Alias must be one non-option token.', commandPath, alias: entry });
+      continue;
+    }
+    const aliasPath = Object.freeze([...commandPath.slice(0, -1), alias]);
+    if (siblingTokens.has(alias)) {
+      issues.push({ code: 'DUPLICATE_ALIAS', message: 'Sibling command names and aliases must be unique.', aliasPath });
+    }
+    siblingTokens.add(alias);
+  }
 }
 
-function compileAlias(input: CliAliasInput, parentPath: readonly string[], diagnostics: CliDiagnostic[]): CliAlias | undefined {
-  const alias = typeof input === 'string' ? { name: input } : input;
-  if (!isValidPathToken(alias.name)) {
-    diagnostics.push(createCliDiagnostic('CLI_COMMAND_ALIAS_INVALID', 'error', 'Command alias must be a non-empty path token.', {
-      path: Object.freeze([...parentPath, alias.name]),
-      alias: alias.name,
-      parentPath
-    }));
-    return undefined;
+function validatePositionals(value: unknown, commandPath: readonly string[], issues: CliDefinitionIssue[]): void {
+  if (value === undefined) return;
+  if (!Array.isArray(value)) {
+    issues.push({ code: 'INVALID_POSITIONAL', message: 'Positionals must be an array.', commandPath, index: 0, reason: 'definition' });
+    return;
   }
-  const compiled = alias.deprecated === undefined
-    ? {
-        name: alias.name,
-        path: Object.freeze([...parentPath, alias.name])
-      }
-    : {
-        name: alias.name,
-        path: Object.freeze([...parentPath, alias.name]),
-        deprecated: alias.deprecated
-      };
-  return Object.freeze(compiled);
-}
-
-function compilePositionals(
-  definitions: readonly CliPositionalDefinition[],
-  diagnostics: CliDiagnostic[],
-  commandPath: readonly string[]
-): readonly CliPositional[] {
-  const positionals: CliPositional[] = [];
+  const names = new Set<string>();
   let optionalSeen = false;
   let variadicSeen = false;
-  for (const [index, definition] of definitions.entries()) {
-    const required = definition.required ?? true;
-    const variadic = definition.variadic ?? false;
-    if (!isValidPathToken(definition.name)) {
-      diagnostics.push(positionalDiagnostic(commandPath, definition.name, 'name', index));
+  for (const [index, entry] of value.entries()) {
+    if (!isRecord(entry)) {
+      issues.push({ code: 'INVALID_POSITIONAL', message: 'Each positional must be an object.', commandPath, index, reason: 'definition' });
       continue;
     }
+    reportUnknownProperties(entry, positionalProperties, [...commandPath, `positionals[${String(index)}]`], issues);
+    const name = entry['name'];
+    if (!isIdentifier(name)) {
+      issues.push({ code: 'INVALID_POSITIONAL', message: 'Positional name must be a non-empty identifier.', commandPath, index, reason: 'name' });
+    } else if (names.has(name)) {
+      issues.push({ code: 'INVALID_POSITIONAL', message: 'Positional names must be unique within a command.', commandPath, index, reason: 'duplicate' });
+    } else {
+      names.add(name);
+    }
+    validateOptionalString(entry, 'description', commandPath, issues);
+    validateBoolean(entry, 'required', commandPath, issues);
+    validateBoolean(entry, 'variadic', commandPath, issues);
+    const required = entry['required'] !== false;
+    const variadic = entry['variadic'] === true;
     if (variadicSeen) {
-      diagnostics.push(positionalDiagnostic(commandPath, definition.name, 'after_variadic', index));
-      continue;
+      issues.push({ code: 'INVALID_POSITIONAL', message: 'Nothing may follow a variadic positional.', commandPath, index, reason: 'after-variadic' });
     }
     if (required && optionalSeen) {
-      diagnostics.push(positionalDiagnostic(commandPath, definition.name, 'required_after_optional', index));
+      issues.push({ code: 'INVALID_POSITIONAL', message: 'A required positional may not follow an optional positional.', commandPath, index, reason: 'required-after-optional' });
     }
-    if (variadic && index < definitions.length - 1) {
-      diagnostics.push(positionalDiagnostic(commandPath, definition.name, 'variadic_not_last', index));
+    if (variadic && index !== value.length - 1) {
+      issues.push({ code: 'INVALID_POSITIONAL', message: 'A variadic positional must be last.', commandPath, index, reason: 'variadic-not-last' });
     }
-    if (!required) optionalSeen = true;
-    if (variadic) variadicSeen = true;
-    positionals.push(compilePositional(definition));
+    optionalSeen ||= !required;
+    variadicSeen ||= variadic;
   }
-  return Object.freeze(positionals);
+}
+
+function validateOptions(
+  value: unknown,
+  commandPath: readonly string[],
+  inherited: readonly OptionIdentity[],
+  issues: CliDefinitionIssue[]
+): readonly OptionIdentity[] {
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) {
+    issues.push({ code: 'INVALID_OPTION', message: 'Options must be an array.', commandPath, index: 0, reason: 'definition' });
+    return [];
+  }
+  const names = new Set(inherited.map((option) => option.name));
+  const flags = new Set(inherited.flatMap((option) => [...option.flags]));
+  const valid: OptionIdentity[] = [];
+  for (const [index, entry] of value.entries()) {
+    if (!isRecord(entry)) {
+      issues.push({ code: 'INVALID_OPTION', message: 'Each option must be an object.', commandPath, index, reason: 'definition' });
+      continue;
+    }
+    reportUnknownProperties(entry, optionProperties, [...commandPath, `options[${String(index)}]`], issues);
+    const name = entry['name'];
+    if (!isIdentifier(name)) {
+      issues.push({ code: 'INVALID_OPTION', message: 'Option name must be a non-empty identifier.', commandPath, index, reason: 'name' });
+    } else if (names.has(name)) {
+      issues.push({ code: 'INVALID_OPTION', message: 'Visible option names must be unique.', commandPath, index, reason: 'duplicate-name' });
+    } else {
+      names.add(name);
+    }
+    const optionFlags = entry['flags'];
+    if (!Array.isArray(optionFlags) || optionFlags.length === 0 || optionFlags.some((flag) => !isFlag(flag))) {
+      issues.push({ code: 'INVALID_OPTION', message: 'Option flags must be a non-empty array of flag spellings.', commandPath, index, reason: 'flags' });
+    } else {
+      for (const flag of optionFlags) {
+        if (flags.has(flag as string)) {
+          issues.push({ code: 'INVALID_OPTION', message: 'Visible flag spellings must be unique.', commandPath, index, reason: 'duplicate-flag' });
+        }
+        flags.add(flag as string);
+      }
+    }
+    const valueMode = entry['valueMode'];
+    if (valueMode !== 'none' && valueMode !== 'required' && valueMode !== 'optional-inline') {
+      issues.push({ code: 'INVALID_OPTION', message: 'Option valueMode is invalid.', commandPath, index, reason: 'value-mode' });
+    }
+    if ((valueMode === 'none' && entry['valueLabel'] !== undefined)
+      || (entry['valueLabel'] !== undefined && !isNonEmptyString(entry['valueLabel']))) {
+      issues.push({ code: 'INVALID_OPTION', message: 'Only value-taking options may have a non-empty value label.', commandPath, index, reason: 'value-label' });
+    }
+    validateOptionalString(entry, 'description', commandPath, issues);
+    validateBoolean(entry, 'required', commandPath, issues);
+    validateBoolean(entry, 'hidden', commandPath, issues);
+    if (isIdentifier(name) && Array.isArray(optionFlags) && optionFlags.length > 0 && optionFlags.every(isFlag)) {
+      valid.push({ name, flags: Object.freeze([...optionFlags]) });
+    }
+  }
+  return valid;
+}
+
+function reportUnknownProperties(
+  value: Readonly<Record<PropertyKey, unknown>>,
+  allowed: ReadonlySet<string>,
+  definitionPath: readonly string[],
+  issues: CliDefinitionIssue[]
+): void {
+  for (const property of Reflect.ownKeys(value)) {
+    if (typeof property === 'string' && allowed.has(property)) continue;
+    issues.push({
+      code: 'UNKNOWN_PROPERTY',
+      message: 'Definition object contains an unsupported property.',
+      definitionPath: Object.freeze([...definitionPath]),
+      property
+    });
+  }
+}
+
+function validateOptionalString(
+  value: Readonly<Record<PropertyKey, unknown>>,
+  property: string,
+  path: readonly string[],
+  issues: CliDefinitionIssue[]
+): void {
+  const candidate = value[property];
+  if (candidate !== undefined && typeof candidate !== 'string') {
+    issues.push({
+      code: 'INVALID_PROPERTY',
+      message: `${property} must be a string.`,
+      definitionPath: Object.freeze([...path]),
+      property,
+      expected: 'string'
+    });
+  }
+}
+
+function validateBoolean(
+  value: Readonly<Record<PropertyKey, unknown>>,
+  property: string,
+  path: readonly string[],
+  issues: CliDefinitionIssue[]
+): void {
+  const candidate = value[property];
+  if (candidate !== undefined && typeof candidate !== 'boolean') {
+    issues.push({
+      code: 'INVALID_PROPERTY',
+      message: `${property} must be a boolean.`,
+      definitionPath: Object.freeze([...path]),
+      property,
+      expected: 'boolean'
+    });
+  }
+}
+
+function validateDeprecation(value: unknown, path: readonly string[], issues: CliDefinitionIssue[]): void {
+  if (value !== undefined && typeof value !== 'boolean' && typeof value !== 'string') {
+    issues.push({
+      code: 'INVALID_PROPERTY',
+      message: 'deprecated must be a boolean or string.',
+      definitionPath: Object.freeze([...path]),
+      property: 'deprecated',
+      expected: 'boolean-or-string'
+    });
+  }
+}
+
+function compileChildren(
+  definitions: readonly CliCommandDefinition[],
+  parentPath: readonly string[],
+  globalOptions: readonly CliOption[],
+  programName: string,
+  commands: CliCommand[]
+): void {
+  for (const definition of definitions) {
+    const command = compileCommand(definition, [...parentPath, definition.name], parentPath, globalOptions, programName);
+    commands.push(command);
+    compileChildren(definition.commands ?? [], command.path, globalOptions, programName, commands);
+  }
+}
+
+function compileCommand(
+  definition: CliCommandDefinition,
+  path: readonly string[],
+  parentPath: readonly string[] | undefined,
+  globalOptions: readonly CliOption[],
+  programName: string
+): CliCommand {
+  const localOptions = compileOptions(definition.options ?? [], 'local');
+  return Object.freeze({
+    key: [programName, ...path].join(' '),
+    name: definition.name,
+    path: Object.freeze([...path]),
+    ...(parentPath === undefined ? {} : { parentPath: Object.freeze([...parentPath]) }),
+    aliases: Object.freeze((definition.aliases ?? []).map((alias) => compileAlias(alias, parentPath ?? []))),
+    ...(definition.description === undefined ? {} : { description: definition.description }),
+    ...(definition.deprecated === undefined ? {} : { deprecated: definition.deprecated }),
+    positionals: Object.freeze((definition.positionals ?? []).map(compilePositional)),
+    options: Object.freeze([...globalOptions, ...localOptions]),
+    acceptsAfterDoubleDash: definition.acceptsAfterDoubleDash ?? false
+  });
+}
+
+function compileAlias(input: CliAliasInput, parentPath: readonly string[]): CliAlias {
+  const definition = typeof input === 'string' ? { name: input } : input;
+  return Object.freeze({
+    name: definition.name,
+    path: Object.freeze([...parentPath, definition.name]),
+    ...(definition.deprecated === undefined ? {} : { deprecated: definition.deprecated })
+  });
 }
 
 function compilePositional(definition: CliPositionalDefinition): CliPositional {
-  const positional = definition.description === undefined
-    ? {
-        name: definition.name,
-        required: definition.required ?? true,
-        variadic: definition.variadic ?? false
-      }
-    : {
-        name: definition.name,
-        required: definition.required ?? true,
-        variadic: definition.variadic ?? false,
-        description: definition.description
-      };
-  return Object.freeze(positional);
-}
-
-function positionalDiagnostic(
-  commandPath: readonly string[],
-  name: string,
-  reason: string,
-  index: number
-): CliDiagnostic {
-  return createCliDiagnostic('CLI_POSITIONAL_INVALID', 'error', 'Command positional definition is invalid.', {
-    commandPath,
-    name,
-    reason,
-    index
-  });
-}
-
-function compileOptions<T extends CliOptionType>(
-  definitions: readonly CliOptionDefinition<T>[],
-  scope: 'global' | 'local',
-  diagnostics: CliDiagnostic[],
-  commandPath: readonly string[],
-  inheritedOptions: readonly CliOption[] = []
-): readonly CliOption<T>[] {
-  const options: CliOption<T>[] = [];
-  const names = new Set(inheritedOptions.map((option) => option.name));
-  const flagOwners = new Map<string, string>();
-  for (const option of inheritedOptions) {
-    for (const flag of option.flags) flagOwners.set(flag, option.name);
-  }
-
-  for (const definition of definitions) {
-    if (!isValidOptionName(definition.name)) {
-      diagnostics.push(optionDiagnostic('CLI_OPTION_NAME_INVALID', commandPath, definition.name, scope, { reason: 'name' }));
-      continue;
-    }
-    if (names.has(definition.name)) {
-      diagnostics.push(optionDiagnostic('CLI_OPTION_NAME_DUPLICATE', commandPath, definition.name, scope));
-      continue;
-    }
-    if (definition.allowNo !== undefined && definition.type !== 'boolean') {
-      diagnostics.push(optionDiagnostic('CLI_OPTION_FLAG_INVALID', commandPath, definition.name, scope, {
-        flag: 'allowNo',
-        reason: 'allowNo is only valid for boolean options.'
-      }));
-      continue;
-    }
-    if (definition.allowEmpty !== undefined && definition.type !== 'string' && definition.type !== 'array') {
-      diagnostics.push(optionDiagnostic('CLI_OPTION_FLAG_INVALID', commandPath, definition.name, scope, {
-        flag: 'allowEmpty',
-        reason: 'allowEmpty is only valid for string or array options.'
-      }));
-      continue;
-    }
-    const invalidFlag = definition.flags.find((flag) => !isValidOptionFlag(flag));
-    if (definition.flags.length === 0 || invalidFlag !== undefined) {
-      diagnostics.push(optionDiagnostic('CLI_OPTION_FLAG_INVALID', commandPath, definition.name, scope, {
-        flag: invalidFlag ?? ''
-      }));
-      continue;
-    }
-    const duplicateFlag = definition.flags.find((flag, index) =>
-      definition.flags.indexOf(flag) !== index || flagOwners.has(flag)
-    );
-    if (duplicateFlag !== undefined) {
-      diagnostics.push(optionDiagnostic('CLI_OPTION_FLAG_DUPLICATE', commandPath, definition.name, scope, {
-        flag: duplicateFlag,
-        existingOption: flagOwners.get(duplicateFlag) ?? definition.name
-      }));
-      continue;
-    }
-    const option = compileOption(definition, scope);
-    names.add(option.name);
-    for (const flag of option.flags) flagOwners.set(flag, option.name);
-    options.push(option);
-  }
-
-  return Object.freeze(options);
-}
-
-function optionDiagnostic(
-  code: 'CLI_OPTION_NAME_INVALID' | 'CLI_OPTION_NAME_DUPLICATE' | 'CLI_OPTION_FLAG_INVALID' | 'CLI_OPTION_FLAG_DUPLICATE',
-  commandPath: readonly string[],
-  option: string,
-  scope: 'global' | 'local',
-  fields: Readonly<Record<string, string>> = {}
-): CliDiagnostic {
-  return createCliDiagnostic(code, 'error', 'Command option definition is invalid.', {
-    commandPath,
-    option,
-    scope,
-    ...fields
-  });
-}
-
-function compileOption<T extends CliOptionType>(
-  definition: CliOptionDefinition<T>,
-  scope: 'global' | 'local'
-): CliOption<T> {
-  const optionBase = {
+  return Object.freeze({
     name: definition.name,
-    type: definition.type,
-    flags: Object.freeze([...definition.flags]),
+    required: definition.required ?? true,
+    variadic: definition.variadic ?? false,
+    ...(definition.description === undefined ? {} : { description: definition.description })
+  });
+}
+
+function compileOptions(definitions: readonly CliOptionDefinition[], scope: 'global' | 'local'): readonly CliOption[] {
+  return Object.freeze(definitions.map((definition) => Object.freeze({
+    name: definition.name,
+    flags: freezeFlags(definition.flags),
+    valueMode: definition.valueMode,
+    ...(definition.valueLabel === undefined ? {} : { valueLabel: definition.valueLabel }),
     required: definition.required ?? false,
+    ...(definition.description === undefined ? {} : { description: definition.description }),
     hidden: definition.hidden ?? false,
     scope
-  };
-  const optionalFields: {
-    description?: string;
-    default?: CliOptionValue<T>;
-    allowEmpty?: boolean;
-    allowNo?: boolean;
-  } = {};
-  if (definition.description !== undefined) optionalFields.description = definition.description;
-  if (definition.default !== undefined) optionalFields.default = cloneOptionDefault(definition.default);
-  if (definition.allowEmpty !== undefined) optionalFields.allowEmpty = definition.allowEmpty;
-  if (definition.allowNo !== undefined) optionalFields.allowNo = definition.allowNo;
-
-  return Object.freeze({
-    ...optionBase,
-    ...optionalFields
-  }) as CliOption<T>;
+  })));
 }
 
-function buildPathIndex(commands: readonly CliCommand[], diagnostics: CliDiagnostic[]): readonly CliCommandPathIndexEntry[] {
-  const entries: CliCommandPathIndexEntry[] = [];
-  const seen = new Map<string, CliCommand>();
-
-  for (const command of commands) {
-    const key = pathKey(command.path);
-    const existing = seen.get(key);
-    if (existing !== undefined) {
-      diagnostics.push(
-        createCliDiagnostic('CLI_DUPLICATE_COMMAND_PATH', 'error', 'Command path is already defined.', {
-          path: command.path,
-          commandId: command.id,
-          existingCommandId: existing.id
-        })
-      );
-      continue;
-    }
-    seen.set(key, command);
-    entries.push(Object.freeze({ path: command.path, commandId: command.id }));
-  }
-
-  return Object.freeze(entries);
-}
-
-function buildAliasIndex(
-  commands: readonly CliCommand[],
-  pathIndex: readonly CliCommandPathIndexEntry[],
-  diagnostics: CliDiagnostic[]
-): readonly CliCommandAliasIndexEntry[] {
-  const entries: CliCommandAliasIndexEntry[] = [];
-  const seen = new Map<string, CliCommandAliasIndexEntry>();
-  const commandPaths = new Map(pathIndex.map((entry) => [pathKey(entry.path), entry]));
-
-  for (const command of commands) {
-    for (const alias of command.aliases) {
-      const key = pathKey(alias.path);
-      const commandPath = commandPaths.get(key);
-      if (commandPath !== undefined) {
-        diagnostics.push(
-          createCliDiagnostic('CLI_ALIAS_CONFLICTS_WITH_COMMAND', 'error', 'Command alias conflicts with a command path.', {
-            path: alias.path,
-            commandId: command.id,
-            existingCommandId: commandPath.commandId
-          })
-        );
-        continue;
-      }
-      const existing = seen.get(key);
-      if (existing !== undefined) {
-        diagnostics.push(
-          createCliDiagnostic('CLI_DUPLICATE_COMMAND_ALIAS', 'error', 'Command alias is already defined.', {
-            path: alias.path,
-            commandId: command.id,
-            existingCommandId: existing.commandId
-          })
-        );
-        continue;
-      }
-      const entry = alias.deprecated === undefined
-        ? { path: alias.path, commandId: command.id, alias: alias.name }
-        : { path: alias.path, commandId: command.id, alias: alias.name, deprecated: alias.deprecated };
-      const frozenEntry = Object.freeze(entry);
-      seen.set(key, frozenEntry);
-      entries.push(frozenEntry);
-    }
-  }
-
-  return Object.freeze(entries);
-}
-
-function buildProgram(
-  definition: CliDefinition,
-  root: CliCommand,
-  commands: readonly CliCommand[],
-  pathIndex: readonly CliCommandPathIndexEntry[],
-  aliasIndex: readonly CliCommandAliasIndexEntry[],
-  diagnostics: readonly CliDiagnostic[]
-): CliProgram {
-  const baseProgram = {
-    schemaVersion: 'cli-core.program.v1' as const,
-    name: definition.name,
-    config: definition.config,
-    root,
-    commands: Object.freeze([...commands]),
-    pathIndex,
-    aliasIndex,
-    diagnostics: Object.freeze([...diagnostics])
-  };
-  const optionalFields: { version?: string; description?: string } = {};
-  if (definition.version !== undefined) optionalFields.version = definition.version;
-  if (definition.description !== undefined) optionalFields.description = definition.description;
-  return { ...baseProgram, ...optionalFields };
-}
-
-function freezeCommand(command: CliCommand): CliCommand {
-  return Object.freeze({
-    ...command,
-    path: Object.freeze([...command.path]),
-    aliases: Object.freeze([...command.aliases]),
-    source: freezeCommandSource(command.source),
-    positionals: Object.freeze([...command.positionals]),
-    options: Object.freeze([...command.options]),
-    inheritedOptions: Object.freeze([...command.inheritedOptions])
-  });
-}
-
-function definitionSource(): CliCommandSource {
-  return Object.freeze({ kind: 'definition' });
-}
-
-function freezeCommandSource(source: CliCommandSource): CliCommandSource {
-  const optionalFields: { pluginName?: string; pluginVersion?: string } = {};
-  if (source.pluginName !== undefined) optionalFields.pluginName = source.pluginName;
-  if (source.pluginVersion !== undefined) optionalFields.pluginVersion = source.pluginVersion;
-  return Object.freeze({ kind: source.kind, ...optionalFields });
-}
-
-function freezeProgram(program: CliProgram): CliProgram {
-  return Object.freeze({
-    ...program,
-    commands: Object.freeze([...program.commands]),
-    pathIndex: Object.freeze([...program.pathIndex]),
-    aliasIndex: Object.freeze([...program.aliasIndex]),
-    diagnostics: Object.freeze([...program.diagnostics])
-  });
-}
-
-function commandLookup(program: CliProgram): CliCommandLookupIndex {
-  const existing = commandLookupIndexes.get(program);
-  if (existing !== undefined) return existing;
-  const rebuilt = createCommandLookupIndex(program);
-  commandLookupIndexes.set(program, rebuilt);
-  return rebuilt;
-}
-
-function createCommandLookupIndex(program: CliProgram): CliCommandLookupIndex {
-  const byId = new Map(program.commands.map((command) => [command.id, command]));
+function createLookup(program: CliProgram): CliCommandLookup {
   const byPath = new Map<string, CliCommand>();
-  for (const entry of program.pathIndex) {
-    const command = byId.get(entry.commandId);
-    if (command !== undefined) byPath.set(pathKey(entry.path), command);
-  }
-  const byAliasPath = new Map(program.aliasIndex.map((entry) => [pathKey(entry.path), entry]));
-  const children = new Map<string, CliCommand[]>();
+  const byAliasPath = new Map<string, CliAliasMatch>();
+  const mutableChildren = new Map<string, CliCommand[]>();
   for (const command of program.commands) {
-    if (command.parentId === undefined) continue;
-    const existing = children.get(command.parentId) ?? [];
-    existing.push(command);
-    children.set(command.parentId, existing);
+    byPath.set(pathKey(command.path), command);
+    for (const alias of command.aliases) byAliasPath.set(pathKey(alias.path), Object.freeze({ command, alias }));
+    if (command.parentPath !== undefined) {
+      const key = pathKey(command.parentPath);
+      const children = mutableChildren.get(key) ?? [];
+      children.push(command);
+      mutableChildren.set(key, children);
+    }
   }
-  return Object.freeze({
-    byPath,
-    byAliasPath,
-    byId,
-    childrenByParentId: new Map([...children].map(([parentId, items]) => [parentId, Object.freeze([...items])]))
-  });
+  const childrenByPath = new Map<string, readonly CliCommand[]>();
+  for (const [key, children] of mutableChildren) childrenByPath.set(key, Object.freeze(children));
+  return { byPath, byAliasPath, childrenByPath };
+}
+
+function lookupFor(program: CliProgram): CliCommandLookup {
+  const existing = commandLookups.get(program);
+  if (existing !== undefined) return existing;
+  const lookup = createLookup(program);
+  commandLookups.set(program, lookup);
+  return lookup;
 }
 
 function pathKey(path: readonly string[]): string {
-  return path.join('\u0000');
+  return JSON.stringify(path);
 }
 
-function isValidPathToken(value: string): boolean {
-  return typeof value === 'string' && value.length > 0 && !value.includes('\u0000');
+function isRecord(value: unknown): value is Readonly<Record<PropertyKey, unknown>> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function isValidOptionName(value: string): boolean {
-  return isValidPathToken(value);
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.length > 0;
 }
 
-function isValidOptionFlag(value: string): boolean {
-  if (value.length < 2 || !value.startsWith('-')) {
-    return false;
-  }
-  if (value === '--' || value.includes('=') || value.includes(' ') || value.includes('\u0000')) {
-    return false;
-  }
-  if (value.startsWith('--no-')) {
-    return false;
-  }
-  if (value.startsWith('--')) {
-    return /^--[a-zA-Z][A-Za-z0-9-]*$/u.test(value);
-  }
-  return /^-[a-zA-Z0-9]$/u.test(value) || /^-[a-zA-Z0-9][a-zA-Z0-9-]*$/u.test(value);
+function isCommandToken(value: unknown): value is string {
+  return isNonEmptyString(value) && !value.startsWith('-') && !/\s/u.test(value) && value !== '--';
 }
 
-function cloneOptionDefault<T extends CliOptionType>(value: CliOptionValue<T>): CliOptionValue<T> {
-  if (Array.isArray(value)) {
-    return Object.freeze([...value]) as CliOptionValue<T>;
-  }
-  return value;
+function isIdentifier(value: unknown): value is string {
+  return isNonEmptyString(value) && !/\s/u.test(value);
+}
+
+function isFlag(value: unknown): value is string {
+  return typeof value === 'string' && /^(?:-[^-\s=]|--[^-\s=][^\s=]*)$/u.test(value);
+}
+
+function freezeFlags(flags: readonly [string, ...string[]]): readonly [string, ...string[]] {
+  const [first, ...rest] = flags;
+  return Object.freeze([first, ...rest]);
+}
+
+function freezeIssue(issue: CliDefinitionIssue): CliDefinitionIssue {
+  return Object.freeze(issue);
 }

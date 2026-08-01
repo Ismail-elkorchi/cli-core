@@ -1,7 +1,7 @@
 {
   "name": "@ismail-elkorchi/cli-core",
-  "version": "0.1.0",
-  "description": "Typed, replayable command-core primitives for TypeScript and JavaScript CLIs.",
+  "version": "0.2.0",
+  "description": "Parser-independent command routing, help, completion, and dispatch primitives.",
   "type": "module",
   "sideEffects": false,
   "main": "./dist/index.js",
@@ -10,59 +10,11 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
-    },
-    "./command": {
-      "types": "./dist/command/public.d.ts",
-      "default": "./dist/command/public.js"
-    },
-    "./adapter": {
-      "types": "./dist/adapter/index.d.ts",
-      "default": "./dist/adapter/index.js"
-    },
-    "./help": {
-      "types": "./dist/help/index.d.ts",
-      "default": "./dist/help/index.js"
-    },
-    "./completion": {
-      "types": "./dist/completion/index.d.ts",
-      "default": "./dist/completion/index.js"
-    },
-    "./manifest": {
-      "types": "./dist/manifest/index.d.ts",
-      "default": "./dist/manifest/index.js"
-    },
-    "./config": {
-      "types": "./dist/config/index.d.ts",
-      "default": "./dist/config/index.js"
-    },
-    "./effects": {
-      "types": "./dist/effects/index.d.ts",
-      "default": "./dist/effects/index.js"
-    },
-    "./plugins": {
-      "types": "./dist/plugins/index.d.ts",
-      "default": "./dist/plugins/index.js"
-    },
-    "./repair": {
-      "types": "./dist/repair/index.d.ts",
-      "default": "./dist/repair/index.js"
-    },
-    "./schema": {
-      "types": "./dist/schema/index.d.ts",
-      "default": "./dist/schema/index.js"
-    },
-    "./schemas": "./schemas/index.json",
-    "./schemas/*.json": "./schemas/*.json",
-    "./testing": {
-      "types": "./dist/testing/index.d.ts",
-      "default": "./dist/testing/index.js"
-    },
-    "./package.json": "./package.json"
+    }
   },
   "files": [
     "CHANGELOG.md",
     "dist",
-    "schemas",
     "README.md",
     "LICENSE"
   ],
@@ -70,28 +22,15 @@
     "build": "tsc -p tsconfig.json && node scripts/rewrite-declaration-imports.mjs",
     "prepack": "npm run build",
     "lint": "eslint .",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "npm run build && node --test tests/core/*.test.mjs tests/contracts/*.test.mjs tests/examples/*.test.mjs tests/integration/*.test.mjs tests/security/*.test.mjs && deno test tests/integration/runtime-deno-smoke.mjs && bun tests/integration/runtime-bun-smoke.mjs",
-    "test:core": "npm run build && node --test tests/core/*.test.mjs",
-    "test:contracts": "npm run build && node --test tests/contracts/*.test.mjs",
-    "test:examples": "npm run build && node --test tests/examples/*.test.mjs",
-    "test:integration": "npm run build && node --test tests/integration/*.test.mjs && deno test tests/integration/runtime-deno-smoke.mjs && bun tests/integration/runtime-bun-smoke.mjs",
-    "test:security": "npm run build && node --test tests/security/*.test.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.type-tests.json",
+    "test": "npm run build && node --test tests/core/*.test.mjs",
     "test:package": "node --test tests/package/*.test.mjs",
-    "test:runtime:os": "npm run build && node --test tests/runtime-os/*.test.mjs",
-    "test:runtime:node": "npm run build && node --test tests/integration/runtime-node.test.mjs",
-    "test:runtime:deno": "npm run build && deno test tests/integration/runtime-deno-smoke.mjs",
-    "test:runtime:bun": "npm run build && bun tests/integration/runtime-bun-smoke.mjs",
-    "test:shells": "npm run build && node --test tests/shells/*.test.mjs",
     "test:mutation": "stryker run",
-    "check:deno:source": "deno check src/index.ts src/command/public.ts src/adapter/index.ts src/help/index.ts src/completion/index.ts src/manifest/index.ts src/config/index.ts src/effects/index.ts src/plugins/index.ts src/repair/index.ts src/schema/index.ts src/testing/index.ts",
-    "check:deno:lint": "deno lint src tests/integration/runtime-deno-smoke.mjs",
-    "check:deno:docs": "deno doc --lint src/index.ts src/command/public.ts src/adapter/index.ts src/help/index.ts src/completion/index.ts src/manifest/index.ts src/config/index.ts src/effects/index.ts src/plugins/index.ts src/repair/index.ts src/schema/index.ts src/testing/index.ts",
+    "check:runtime": "deno check src/index.ts && deno lint src tests/runtime-smoke.mjs && deno test tests/runtime-smoke.mjs && bun tests/runtime-smoke.mjs",
     "check:jsr": "deno publish --dry-run --allow-dirty",
     "check:workflow-policy": "node scripts/workflow-policy-check.mjs",
-    "check:exports": "node scripts/check-exports.mjs",
     "release:gate": "node scripts/release-gate.mjs",
-    "check": "npm run check:workflow-policy && npm run lint && npm run typecheck && npm test && npm run test:package && npm run check:exports && npm run check:deno:source && npm run check:deno:lint && npm run check:deno:docs && npm run check:jsr"
+    "check": "npm run check:workflow-policy && npm run lint && npm run typecheck && npm test && npm run test:package && npm run check:runtime && npm run check:jsr"
   },
   "repository": {
     "type": "git",
@@ -99,13 +38,20 @@
   },
   "keywords": [
     "cli",
-    "command",
-    "typescript",
-    "automation",
-    "manifest",
+    "command-line",
+    "command-router",
+    "command-tree",
+    "subcommands",
+    "command-dispatch",
+    "command-model",
+    "help",
+    "autocomplete",
     "completion",
-    "adapter",
-    "testing"
+    "typescript",
+    "esm",
+    "node",
+    "deno",
+    "bun"
   ],
   "publishConfig": {
     "access": "public"
