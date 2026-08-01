@@ -1,108 +1,49 @@
-export { cliCorePackage } from './package.ts';
-export type { CliCorePackage } from './package.ts';
-export { defineCli } from './command/index.ts';
 export {
-  completeCli,
-  createCompletionPayload
-} from './completion/index.ts';
-export { resolveCliConfig } from './config/index.ts';
-export { createHelpDocument } from './help/index.ts';
-export { describeCli } from './manifest/index.ts';
-export { createCliInvocationParser, validateCli } from './parse/index.ts';
-export { runCli } from './run/index.ts';
+  CliDefinitionError,
+  defineCli,
+  findCliCommand,
+  findCliCommandByAlias,
+  findCliCommandChildren
+} from './command/index.ts';
+export { completeCli } from './completion/index.ts';
+export { createCliDiagnostic, hasErrorDiagnostics } from './diagnostics.ts';
+export { CliHandlerNotFoundError, dispatchCli } from './dispatch/index.ts';
+export { createCliHelp } from './help/index.ts';
+export { createCliInvocationParser, findCliCommandForArgv } from './parse/index.ts';
+
 export type {
   CliAlias,
   CliAliasDefinition,
   CliAliasInput,
+  CliAliasMatch,
   CliCommand,
-  CliCommandAliasIndexEntry,
   CliCommandDefinition,
-  CliCommandPathIndexEntry,
-  CliCommandSource,
   CliDefinition,
+  CliDefinitionIssue,
   CliOption,
   CliOptionDefinition,
-  CliOptionType,
-  CliOptionValue,
+  CliOptionValueMode,
   CliPositional,
   CliPositionalDefinition,
-  CliProgram
+  CliProgram,
+  CliSwitchOptionDefinition,
+  CliValueOptionDefinition
 } from './command/index.ts';
+export type { CliCompletion, CliCompletionInput } from './completion/index.ts';
+export type { CliCoreDiagnosticCode, CliDiagnostic, CliDiagnosticSeverity } from './diagnostics.ts';
+export type { CliHandler, CliHandlerContext, CliHandlers } from './dispatch/index.ts';
 export type {
-  CompletionInput,
-  CompletionItem,
-  CompletionPayload,
-  CompletionResponse
-} from './completion/index.ts';
-export type {
-  ParsedAlias,
-  ParsedCliOptionValue,
-  ParsedCliOptions,
-  ParsedInvocation,
   CliInvocationParser,
   CliOptionBinder,
+  CliOptionBindingFailure,
   CliOptionBindingInput,
   CliOptionBindingResult,
-  CliUnknownOption,
-  ParsedPositionalValue,
-  ParseInput,
-  SemanticValidationResult,
-  ValidationContext
+  CliOptionBindingSuccess,
+  CliUnknownFlag,
+  ParsedAlias,
+  ParsedInvocation,
+  ParsedInvocationFailure,
+  ParsedInvocationSuccess,
+  ParseInput
 } from './parse/index.ts';
-export type {
-  ConfigCandidate,
-  ConfigDefinition,
-  ConfigExplanation,
-  ConfigFieldDefinition,
-  ConfigFileInput,
-  ConfigInput,
-  ConfigMigration,
-  ConfigResolution,
-  ConfigResolutionEntry,
-  ConfigSource,
-  ConfigValue,
-  ConfigValueType
-} from './config/index.ts';
-export type {
-  CliDiagnostic,
-  CliDiagnosticCode,
-  CliDiagnosticSeverity,
-  CliDiagnosticValue
-} from './diagnostics.ts';
-export type {
-  HelpCommandEntry,
-  HelpDocument,
-  HelpOptionEntry,
-  HelpPositionalEntry,
-  VersionDocument
-} from './help/index.ts';
-export type {
-  CommandManifest,
-  ManifestAlias,
-  ManifestCommand,
-  ManifestCommandSource,
-  ManifestOption,
-  ManifestPositional,
-  ManifestProgram
-} from './manifest/index.ts';
-export type {
-  CustomRunEffect,
-  ExitKind,
-  ExitStatusPolicy,
-  FileRunEffect,
-  PluginRunEffect,
-  RunArtifact,
-  RunPayload,
-  RunEffect,
-  RunEvent,
-  RunEventName,
-  RunEventSink,
-  RunHandler,
-  RunHandlerContext,
-  RunHandlerOutput,
-  RunIdentifier,
-  RunMode,
-  RunRequest,
-  RunResult,
-  SpawnRunEffect
-} from './run/index.ts';
+export type { CliHelp, CliHelpCommand, CliHelpOption, CliHelpPositional } from './help/index.ts';

@@ -2,12 +2,11 @@
   "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
   "testRunner": "command",
   "commandRunner": {
-    "command": "node --test tests/core/*.test.mjs tests/contracts/*.test.mjs tests/examples/*.test.mjs tests/security/*.test.mjs"
+    "command": "node --test tests/core/*.test.mjs"
   },
   "buildCommand": "npm run build",
   "mutate": [
-    "src/**/*.ts",
-    "!src/package.ts"
+    "src/**/*.ts"
   ],
   "coverageAnalysis": "off",
   "reporters": [
