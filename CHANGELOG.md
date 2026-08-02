@@ -28,6 +28,8 @@
 - Retained neutral option defaults, false flags, repetition, multiplicity, and
   finite values for help and completion. Unknown help and completion paths no
   longer fall back to the root command.
+- Stopped inferring default-value metadata from multiplicity; integrations now
+  state independently whether an option materializes a value when absent.
 - Corrected the integration package name to `clivoke` on npm and
   `@ismail-elkorchi/clivoke` on JSR.
 - Contracted the package to command compilation and lookup, invocation routing,

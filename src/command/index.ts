@@ -1155,7 +1155,7 @@ function compileOptions(
     const multiple = definition.kind === 'value' && definition.multiple === true;
     const hasDefault = definition.kind === 'count'
       ? true
-      : multiple || definition.hasDefault === true;
+      : definition.hasDefault === true;
     const repeat: CliOptionRepeat = definition.kind === 'count'
       ? 'count'
       : multiple

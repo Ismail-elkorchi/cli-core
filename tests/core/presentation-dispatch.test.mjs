@@ -49,6 +49,24 @@ test('help retains neutral option semantics and rejects unknown paths', () => {
   assert.equal(createCliHelp(program, ['typo']), undefined);
 });
 
+test('multiplicity does not invent default-value metadata', () => {
+  const requiredMultiple = defineCli({
+    name: 'tag',
+    options: [{
+      name: 'labels',
+      kind: 'value',
+      flags: ['--label'],
+      valueMode: 'required',
+      multiple: true,
+      required: true,
+      hasDefault: false
+    }]
+  });
+  assert.equal(requiredMultiple.root.options[0]?.multiple, true);
+  assert.equal(requiredMultiple.root.options[0]?.hasDefault, false);
+  assert.equal(createCliHelp(requiredMultiple)?.options[0]?.hasDefault, false);
+});
+
 test('completion returns commands, unused flags, and option values but not positional labels', () => {
   assert.deepEqual(
     completeCli(program, { commandPath: ['deploy'], prefix: '--r' }),
