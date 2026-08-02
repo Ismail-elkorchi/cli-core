@@ -10,6 +10,11 @@ interface DiagnosticBase {
 export type CliCoreDiagnostic =
   | (DiagnosticBase & {
       readonly source: 'command';
+      readonly code: 'CLI_SUBCOMMAND_REQUIRED';
+      readonly commandPath: readonly string[];
+    })
+  | (DiagnosticBase & {
+      readonly source: 'command';
       readonly code: 'CLI_UNKNOWN_COMMAND';
       readonly token: string;
       readonly argvIndex: number;
@@ -58,13 +63,18 @@ export type CliCoreDiagnostic =
     })
   | (DiagnosticBase & {
       readonly source: 'invocation';
-      readonly code: 'CLI_AFTER_DOUBLE_DASH_NOT_ACCEPTED';
+      readonly code: 'CLI_PASSTHROUGH_ARGUMENTS_NOT_ACCEPTED';
       readonly commandPath: readonly string[];
     })
   | (DiagnosticBase & {
       readonly source: 'invocation';
       readonly code: 'CLI_INVALID_BINDER_RESULT';
-      readonly stage: 'scan' | 'bind' | 'structured';
+      readonly stage: 'scan' | 'bind';
+      readonly reason: string;
+    })
+  | (DiagnosticBase & {
+      readonly source: 'invocation';
+      readonly code: 'CLI_INVALID_STRUCTURED_INVOCATION';
       readonly reason: string;
     });
 

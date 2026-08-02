@@ -2,6 +2,9 @@
 
 ## 0.2.0 - 2026-08-01
 
+- Added neutral value-description and implicit-value labels to option and help
+  metadata, rejected labels that contradict the option facts, and narrowed
+  dispatch to the command-key behavior it uses.
 - Moved all raw option-token classification behind a scanner/binder contract
   and validate that scanning and final binding agree.
 - Made ancestor options explicit descendants' options, rejected ambiguous
@@ -10,7 +13,18 @@
 - Added structured invocations, discriminated runtime diagnostics, canonical
   command deprecation warnings, exact alias-use history, and prototype-safe
   positional records.
+- Structured invocation validation rejects unsupported properties and
+  accessors without executing them, using an invocation diagnostic rather than
+  mislabeling the failure as binder output.
 - Added a literal `commandKey` discriminant and command-specific handler maps.
+- Made successful invocations a distributed `CliInvocation` union with explicit
+  argv or structured sources and complete handler maps.
+- Added root positionals and passthrough arguments plus explicit non-invokable
+  command groups that require a child before binding.
+- Strengthened scanner validation to require ordered, exclusive argv ownership
+  and exact agreement with bound option presence.
+- Rejected required options reported as absent and sparse flag or value-candidate
+  arrays.
 - Retained neutral option defaults, false flags, repetition, multiplicity, and
   finite values for help and completion. Unknown help and completion paths no
   longer fall back to the root command.

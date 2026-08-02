@@ -20,6 +20,7 @@ export interface CliHelp {
 export interface CliHelpCommand {
   readonly name: string;
   readonly aliases: readonly string[];
+  readonly invokable: boolean;
   readonly description?: string;
   readonly deprecated?: boolean | string;
 }
@@ -38,6 +39,8 @@ export interface CliHelpOption {
 	readonly falseFlags: readonly string[];
 	readonly valueMode: CliOption['valueMode'];
 	readonly valueLabel?: string;
+	readonly valueDescription?: string;
+	readonly implicitValueLabel?: string;
 	readonly required: boolean;
 	readonly multiple: boolean;
 	readonly repeat: CliOption['repeat'];
@@ -70,8 +73,10 @@ function createUsage<Definition extends CliDefinition>(
 ): string {
   const parts = [program.name, ...command.path];
   if (command.options.some((option) => !option.hidden)) parts.push('[options]');
+  const hasChildren = findCliCommandChildren(program, command).length > 0;
+  if (hasChildren) parts.push(command.invokable ? '[command]' : '<command>');
   parts.push(...command.positionals.map(positionalLabel));
-  if (command.acceptsAfterDoubleDash) parts.push('[-- ...]');
+  if (command.acceptsPassthroughArguments) parts.push('[-- ...]');
   return parts.join(' ');
 }
 
@@ -79,6 +84,7 @@ function toHelpCommand(command: CliCommand): CliHelpCommand {
   return Object.freeze({
     name: command.name,
     aliases: Object.freeze(command.aliases.map((alias) => alias.name)),
+    invokable: command.invokable,
     ...(command.description === undefined ? {} : { description: command.description }),
     ...(command.deprecated === undefined ? {} : { deprecated: command.deprecated })
   });
@@ -101,6 +107,12 @@ function toHelpOption(option: CliOption): CliHelpOption {
 		falseFlags: option.falseFlags,
 		valueMode: option.valueMode,
     ...(option.valueLabel === undefined ? {} : { valueLabel: option.valueLabel }),
+		...(option.valueDescription === undefined
+			? {}
+			: { valueDescription: option.valueDescription }),
+		...(option.implicitValueLabel === undefined
+			? {}
+			: { implicitValueLabel: option.implicitValueLabel }),
 		required: option.required,
 		multiple: option.multiple,
 		repeat: option.repeat,

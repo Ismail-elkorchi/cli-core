@@ -26,8 +26,10 @@ const program = defineCli({
       name: 'region',
       kind: 'value',
       flags: ['-r', '--region'],
-      valueMode: 'required',
+      valueMode: 'optional-inline',
       valueLabel: 'region',
+      valueDescription: 'Deployment region.',
+      implicitValueLabel: 'automatic',
       valueCandidates: ['eu', 'us'],
       hasDefault: true,
       defaultLabel: 'eu'
@@ -42,6 +44,8 @@ test('help retains neutral option semantics and rejects unknown paths', () => {
   assert.deepEqual(help?.options[0].falseFlags, ['--no-verbose']);
   assert.deepEqual(help?.options[1].valueCandidates, ['eu', 'us']);
   assert.equal(help?.options[1].defaultLabel, 'eu');
+  assert.equal(help?.options[1].valueDescription, 'Deployment region.');
+  assert.equal(help?.options[1].implicitValueLabel, 'automatic');
   assert.equal(createCliHelp(program, ['typo']), undefined);
 });
 
@@ -72,8 +76,8 @@ test('dispatch propagates results and reports missing handlers', async () => {
     specifiedOptions: { verbose: false, region: false },
     positionalValues: { service: 'api' }
   });
-  assert.equal(invocation.status, 'parsed');
-  if (invocation.status !== 'parsed') return;
+  assert.equal(invocation.status, 'ready');
+  if (invocation.status !== 'ready') return;
 
   const value = await dispatchCli(invocation, {
     'ship deploy': ({ invocation: parsed, context }) =>

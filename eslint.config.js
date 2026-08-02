@@ -35,8 +35,10 @@ export default [
     },
     rules: {
       ...tseslint.configs.recommended.rules,
+      'no-redeclare': 'off',
       '@typescript-eslint/consistent-type-imports': 'error',
       '@typescript-eslint/no-import-type-side-effects': 'error',
+      '@typescript-eslint/no-redeclare': 'error',
       'n/no-missing-import': 'off'
     }
   },
