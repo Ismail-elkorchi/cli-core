@@ -118,3 +118,77 @@ test('option spellings stay binder-neutral and inherited collisions are rejected
       error.issues.some((issue) => issue.code === 'INVALID_OPTION' && issue.reason === 'duplicate-name')
   );
 });
+
+test('definition arrays are dense and command groups must contain children', () => {
+  const sparseFlags = [];
+  sparseFlags.length = 1;
+  const sparseFalseFlags = [];
+  sparseFalseFlags.length = 1;
+  const sparseCandidates = [];
+  sparseCandidates.length = 1;
+
+  for (const option of [
+    { name: 'sparse', kind: 'boolean', flags: sparseFlags },
+    { name: 'sparse', kind: 'boolean', flags: ['-s'], falseFlags: sparseFalseFlags },
+    {
+      name: 'sparse',
+      kind: 'value',
+      flags: ['-s'],
+      valueMode: 'required',
+      valueCandidates: sparseCandidates
+    }
+  ]) {
+    assert.throws(
+      () => defineCli({ name: 'tool', options: [option] }),
+      (error) => error instanceof CliDefinitionError &&
+        error.issues.some((issue) => issue.code === 'INVALID_OPTION')
+    );
+  }
+
+  assert.throws(
+    () => defineCli({ name: 'tool', commands: [{ name: 'group', invokable: false }] }),
+    (error) => error instanceof CliDefinitionError &&
+      error.issues.some((issue) => issue.code === 'NON_INVOKABLE_LEAF')
+  );
+  assert.throws(
+    () => defineCli({
+      name: 'tool',
+      positionals: [{ name: 'input' }],
+      commands: [{ name: 'run' }]
+    }),
+    (error) => error instanceof CliDefinitionError &&
+      error.issues.some((issue) => issue.code === 'AMBIGUOUS_COMMAND_INPUT')
+  );
+});
+
+test('option presentation cannot claim values that the option does not materialize', () => {
+  assert.throws(
+    () => defineCli({
+      name: 'ship',
+      options: [{
+        name: 'region',
+        kind: 'value',
+        flags: ['--region'],
+        valueMode: 'required',
+        hasDefault: false,
+        defaultLabel: 'eu'
+      }]
+    }),
+    (error) => error instanceof CliDefinitionError && error.issues.some((issue) =>
+      issue.code === 'INVALID_OPTION' && issue.reason === 'presentation')
+  );
+  assert.throws(
+    () => defineCli({
+      name: 'ship',
+      options: [{
+        name: 'region',
+        kind: 'value',
+        flags: ['--region'],
+        valueMode: 'required',
+        implicitValueLabel: 'automatic'
+      }]
+    }),
+    (error) => error instanceof CliDefinitionError && error.issues.some((issue) =>
+      issue.code === 'INVALID_OPTION' && issue.reason === 'presentation')
+  );
+});

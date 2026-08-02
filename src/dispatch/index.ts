@@ -1,32 +1,34 @@
-import type { ParsedInvocationSuccess } from '../parse/index.ts';
+interface CliDispatchTarget {
+  readonly commandKey: string;
+}
 
 /** Context supplied to a command handler. */
-export interface CliHandlerContext<Invocation extends ParsedInvocationSuccess, Context> {
+export interface CliHandlerContext<Invocation extends CliDispatchTarget, Context> {
   readonly invocation: Invocation;
   readonly context: Context;
 }
 
 /** A command handler keyed by `CliCommand.key`. */
-export type CliHandler<Invocation extends ParsedInvocationSuccess, Context, Result> = (
+export type CliHandler<Invocation extends CliDispatchTarget, Context, Result> = (
   input: CliHandlerContext<Invocation, Context>
 ) => Result | Promise<Result>;
 
-type InvocationCommandKey<Invocation extends ParsedInvocationSuccess> =
+type InvocationCommandKey<Invocation extends CliDispatchTarget> =
   Invocation['commandKey'];
 
 type InvocationForKey<
-  Invocation extends ParsedInvocationSuccess,
+  Invocation extends CliDispatchTarget,
   Key extends string
-> = Invocation extends ParsedInvocationSuccess
+> = Invocation extends CliDispatchTarget
   ? Invocation['commandKey'] extends Key
     ? Invocation
     : never
   : never;
 
 /** Immutable handler collection restricted to canonical command keys. */
-export type CliHandlers<Invocation extends ParsedInvocationSuccess, Context, Result> = Readonly<
+export type CliHandlers<Invocation extends CliDispatchTarget, Context, Result> = Readonly<
   {
-    readonly [Key in InvocationCommandKey<Invocation>]?: CliHandler<
+    readonly [Key in InvocationCommandKey<Invocation>]: CliHandler<
       InvocationForKey<Invocation, Key>,
       Context,
       Result
@@ -46,7 +48,7 @@ export class CliHandlerNotFoundError extends Error {
 }
 
 /** Dispatches a successful invocation. Handler failures propagate unchanged. */
-export function dispatchCli<Invocation extends ParsedInvocationSuccess, Context, Result>(
+export function dispatchCli<Invocation extends CliDispatchTarget, Context, Result>(
   invocation: Invocation,
   handlers: CliHandlers<Invocation, Context, Result>,
   context: Context
