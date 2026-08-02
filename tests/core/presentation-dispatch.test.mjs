@@ -20,7 +20,7 @@ const program = defineCli({
   }],
   commands: [{
     name: 'deploy',
-    aliases: ['d'],
+    aliases: [{ name: 'd', deprecated: 'Use deploy.' }],
     description: 'Deploy one service.',
     options: [{
       name: 'region',
@@ -39,6 +39,10 @@ const program = defineCli({
 });
 
 test('help retains neutral option semantics and rejects unknown paths', () => {
+  assert.deepEqual(createCliHelp(program)?.commands[0].aliases, [{
+    name: 'd',
+    deprecated: 'Use deploy.'
+  }]);
   const help = createCliHelp(program, ['deploy']);
   assert.equal(help?.usage, 'ship deploy [options] <service>');
   assert.deepEqual(help?.options[0].falseFlags, ['--no-verbose']);
@@ -47,6 +51,24 @@ test('help retains neutral option semantics and rejects unknown paths', () => {
   assert.equal(help?.options[1].valueDescription, 'Deployment region.');
   assert.equal(help?.options[1].implicitValueLabel, 'automatic');
   assert.equal(createCliHelp(program, ['typo']), undefined);
+});
+
+test('multiplicity does not invent default-value metadata', () => {
+  const requiredMultiple = defineCli({
+    name: 'tag',
+    options: [{
+      name: 'labels',
+      kind: 'value',
+      flags: ['--label'],
+      valueMode: 'required',
+      multiple: true,
+      required: true,
+      hasDefault: false
+    }]
+  });
+  assert.equal(requiredMultiple.root.options[0]?.multiple, true);
+  assert.equal(requiredMultiple.root.options[0]?.hasDefault, false);
+  assert.equal(createCliHelp(requiredMultiple)?.options[0]?.hasDefault, false);
 });
 
 test('completion returns commands, unused flags, and option values but not positional labels', () => {

@@ -20,18 +20,20 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json && node scripts/rewrite-declaration-imports.mjs",
+    "clean": "node --eval \"import('node:fs/promises').then(({ rm }) => rm('dist', { recursive: true, force: true }))\"",
+    "build": "npm run clean && tsc -p tsconfig.json && node scripts/finalize-build.mjs",
     "prepack": "npm run build",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.type-tests.json",
     "test": "npm run build && node --test tests/core/*.test.mjs",
+    "test:docs": "deno test --doc README.md",
     "test:package": "node --test tests/package/*.test.mjs",
     "test:mutation": "stryker run",
     "check:runtime": "deno check src/index.ts && deno lint src tests/runtime-smoke.mjs && deno test tests/runtime-smoke.mjs && bun tests/runtime-smoke.mjs",
     "check:jsr": "deno publish --dry-run --allow-dirty",
     "check:workflow-policy": "node scripts/workflow-policy-check.mjs",
     "release:gate": "node scripts/release-gate.mjs",
-    "check": "npm run check:workflow-policy && npm run lint && npm run typecheck && npm test && npm run test:package && npm run check:runtime && npm run check:jsr"
+    "check": "npm run check:workflow-policy && npm run lint && npm run typecheck && npm test && npm run test:docs && npm run test:package && npm run check:runtime && npm run check:jsr"
   },
   "repository": {
     "type": "git",
@@ -79,7 +81,7 @@
     "eslint-plugin-n": "^18.2.2",
     "eslint-plugin-promise": "^7.3.0",
     "eslint-plugin-security": "^4.0.1",
-    "globals": "^17.8.0",
+    "globals": "^17.9.0",
     "typescript": "^6.0.3"
   }
 }

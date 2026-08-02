@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -46,6 +46,15 @@ for (const runtime of ['node', 'deno', 'bun']) {
         'consumer.ts'
       ], { cwd: workspace });
     }
+    if (runtime === 'deno') {
+      await writeFile(join(workspace, 'consumer.ts'), typeConsumerSource);
+      await run('deno', [
+        'check',
+        '--deny-import',
+        '--node-modules-dir=manual',
+        'consumer.ts'
+      ], workspace);
+    }
     const args = runtime === 'deno' ? ['run', '--allow-read', 'consumer.mjs'] : ['consumer.mjs'];
     const { stdout } = await run(runtime, args, workspace);
     assert.deepEqual(JSON.parse(stdout), { commandKey: 'ship deploy', completion: 'deploy' });
@@ -53,12 +62,18 @@ for (const runtime of ['node', 'deno', 'bun']) {
 }
 
 async function pack(destination) {
+  const obsoleteOutput = join(repository, 'dist', 'obsolete', 'index.js');
+  await mkdir(join(repository, 'dist', 'obsolete'), { recursive: true });
+  await writeFile(obsoleteOutput, 'throw new Error("obsolete output was packaged");\n');
   const { stdout } = await run('npm', ['pack', '--json', '--pack-destination', destination], repository);
   const [archive] = JSON.parse(stdout);
   const paths = new Set(archive.files.map((file) => file.path));
   assert.equal(paths.has('dist/index.js'), true);
+  assert.equal(paths.has('dist/obsolete/index.js'), false);
   assert.equal(paths.has('src/index.ts'), true);
-  assert.equal([...paths].some((path) => path.startsWith('schemas/')), false);
+  assert.equal([...paths].some((path) => path.startsWith('dist/config/')), false);
+  assert.equal([...paths].some((path) => path.startsWith('dist/plugins/')), false);
+  assert.equal([...paths].some((path) => path.startsWith('dist/schema/')), false);
   assert.equal([...paths].some((path) => path.includes('node_modules')), false);
   return archive;
 }

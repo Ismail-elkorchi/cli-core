@@ -58,19 +58,5 @@ export default [
     rules: {
       'n/no-missing-import': 'off'
     }
-  },
-  {
-    files: ['tests/integration/runtime-deno-smoke.mjs'],
-    languageOptions: {
-      globals: {
-        Deno: 'readonly'
-      }
-    }
-  },
-  {
-    files: ['examples/**/*.mjs'],
-    rules: {
-      'n/no-missing-import': 'off'
-    }
   }
 ];

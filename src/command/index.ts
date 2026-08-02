@@ -15,23 +15,32 @@ interface CliOptionDefinitionBase {
   readonly hidden?: boolean;
 }
 
-type CliDefaultMetadata =
+type CliOptionalPresenceMetadata =
   | {
+      readonly required?: false;
       readonly hasDefault?: false;
       readonly defaultLabel?: never;
     }
   | {
+      readonly required?: false;
       readonly hasDefault: true;
       readonly defaultLabel?: string;
     };
+
+type CliPresenceMetadata =
+  | {
+      readonly required: true;
+      readonly hasDefault?: false;
+      readonly defaultLabel?: never;
+    }
+  | CliOptionalPresenceMetadata;
 
 /** Parser-independent facts about a boolean option. */
 export type CliBooleanOptionDefinition = CliOptionDefinitionBase & {
   readonly kind: 'boolean';
   readonly falseFlags?: readonly [string, ...string[]];
-  readonly required?: boolean;
   readonly repeat?: 'error' | 'first' | 'last';
-} & CliDefaultMetadata;
+} & CliPresenceMetadata;
 
 /** Parser-independent facts about an occurrence-counting option. */
 export interface CliCountOptionDefinition extends CliOptionDefinitionBase {
@@ -44,15 +53,23 @@ interface CliValueOptionDefinitionBase extends CliOptionDefinitionBase {
   readonly valueLabel?: string;
   /** Human-readable constraints or meaning for the option value. */
   readonly valueDescription?: string;
-  readonly required?: boolean;
-  readonly multiple?: boolean;
-  readonly repeat?: 'error' | 'first' | 'last';
   /** Finite raw values suitable for help and completion. */
   readonly valueCandidates?: readonly string[];
 }
 
+type CliValueMultiplicity =
+  | {
+      readonly multiple: true;
+      readonly repeat?: never;
+    }
+  | {
+      readonly multiple?: false;
+      readonly repeat?: 'error' | 'first' | 'last';
+    };
+
 /** Parser-independent facts about a value-taking option. */
-export type CliValueOptionDefinition = CliValueOptionDefinitionBase & CliDefaultMetadata & (
+export type CliValueOptionDefinition = CliValueOptionDefinitionBase &
+  CliPresenceMetadata & CliValueMultiplicity & (
   | {
       readonly valueMode: 'required';
       readonly implicitValueLabel?: never;
@@ -200,24 +217,6 @@ type CommandsOf<Definition> = Definition extends { readonly commands?: infer Com
     : never
   : never;
 
-type CommandKeyFor<
-  ProgramName extends string,
-  Command,
-  Prefix extends string = ''
-> = Command extends { readonly name: infer Name extends string }
-  ? `${ProgramName} ${Prefix}${Name}` | CommandKeyFor<
-      ProgramName,
-      CommandsOf<Command>,
-      `${Prefix}${Name} `
-    >
-  : never;
-
-/** Canonical handler keys retained from a literal definition. */
-export type CliCommandKey<Definition extends CliDefinition> =
-  string extends Definition['name']
-    ? string
-    : Definition['name'] | CommandKeyFor<Definition['name'], CommandsOf<Definition>>;
-
 type InvokableCommandKeyFor<
   ProgramName extends string,
   Command,
@@ -235,19 +234,6 @@ export type CliInvokableCommandKey<Definition extends CliDefinition> =
     ? string
     : (Definition extends { readonly invokable: false } ? never : Definition['name']) |
       InvokableCommandKeyFor<Definition['name'], CommandsOf<Definition>>;
-
-type CommandPathFor<
-  Command,
-  Prefix extends readonly string[] = readonly []
-> = Command extends { readonly name: infer Name extends string }
-  ? readonly [...Prefix, Name] | CommandPathFor<CommandsOf<Command>, readonly [...Prefix, Name]>
-  : never;
-
-/** Canonical command paths retained from a literal definition. */
-export type CliCommandPath<Definition extends CliDefinition> =
-  string extends Definition['name']
-    ? readonly string[]
-    : readonly [] | CommandPathFor<CommandsOf<Definition>>;
 
 /** Why a CLI definition could not be compiled. */
 export type CliDefinitionIssue =
@@ -334,7 +320,7 @@ export class CliDefinitionError extends TypeError {
   public constructor(issues: readonly CliDefinitionIssue[]) {
     super(`Invalid CLI definition (${String(issues.length)} ${issues.length === 1 ? 'issue' : 'issues'}).`);
     this.name = 'CliDefinitionError';
-    this.issues = Object.freeze(issues.map((issue) => Object.freeze(issue)));
+    this.issues = Object.freeze(issues.map(freezeDefinitionIssue));
   }
 }
 
@@ -395,30 +381,19 @@ interface CliProgramRuntime {
   readonly description?: string;
   readonly root: CliCommand;
   readonly commands: readonly CliCommand[];
-  readonly commandKeys: readonly string[];
-  readonly commandPaths: readonly (readonly string[])[];
 }
 
-/** A valid immutable command program retaining literal keys and paths. */
+/** A valid immutable command program retaining its literal definition type. */
 export type CliProgram<Definition extends CliDefinition = CliDefinition> =
   CliProgramRuntime & (string extends Definition['name']
     ? object
     : {
         readonly name: Definition['name'];
         readonly root: CliCommand<Definition['name']>;
-        readonly commandKeys: readonly CliCommandKey<Definition>[];
-        readonly commandPaths: readonly CliCommandPath<Definition>[];
       });
-
-/** Details about a command alias lookup. */
-export interface CliAliasMatch {
-  readonly command: CliCommand;
-  readonly alias: CliAlias;
-}
 
 interface CliCommandLookup {
   readonly byPath: ReadonlyMap<string, CliCommand>;
-  readonly byAliasPath: ReadonlyMap<string, CliAliasMatch>;
   readonly childrenByPath: ReadonlyMap<string, readonly CliCommand[]>;
 }
 
@@ -506,15 +481,11 @@ export function defineCli<const Definition extends CliDefinition>(
     definition.name,
     commands
   );
-  const commandKeys = Object.freeze(commands.map((command) => command.key));
-  const commandPaths = Object.freeze(commands.map((command) => command.path));
   const program = Object.freeze({
     name: definition.name,
     ...(definition.description === undefined ? {} : { description: definition.description }),
     root,
-    commands: Object.freeze(commands),
-    commandKeys,
-    commandPaths
+    commands: Object.freeze(commands)
   }) as CliProgram<Definition>;
   commandLookups.set(program, createLookup(program));
   return program;
@@ -526,14 +497,6 @@ export function findCliCommand<Definition extends CliDefinition>(
   path: readonly string[]
 ): CliCommand | undefined {
   return lookupFor(program).byPath.get(pathKey(path));
-}
-
-/** Looks up a command by a complete alias path below the program root. */
-export function findCliCommandByAlias<Definition extends CliDefinition>(
-  program: CliProgram<Definition>,
-  path: readonly string[]
-): CliAliasMatch | undefined {
-  return lookupFor(program).byAliasPath.get(pathKey(path));
 }
 
 /** Returns the direct children of a compiled command. */
@@ -955,6 +918,15 @@ function validateOptions(
         reason: 'repeat'
       });
     }
+    if (kind === 'value' && entry['multiple'] === true && entry['repeat'] !== undefined) {
+      issues.push({
+        code: 'INVALID_OPTION',
+        message: 'Multiple value options always append and cannot declare scalar repetition.',
+        commandPath,
+        index,
+        reason: 'repeat'
+      });
+    }
     if (
       entry['valueCandidates'] !== undefined &&
       !isDenseStringArray(entry['valueCandidates'])
@@ -975,6 +947,15 @@ function validateOptions(
       issues.push({
         code: 'INVALID_OPTION',
         message: 'A default label requires hasDefault to be true.',
+        commandPath,
+        index,
+        reason: 'presentation'
+      });
+    }
+    if (entry['required'] === true && entry['hasDefault'] === true) {
+      issues.push({
+        code: 'INVALID_OPTION',
+        message: 'A required option cannot declare a default.',
         commandPath,
         index,
         reason: 'presentation'
@@ -1155,7 +1136,7 @@ function compileOptions(
     const multiple = definition.kind === 'value' && definition.multiple === true;
     const hasDefault = definition.kind === 'count'
       ? true
-      : multiple || definition.hasDefault === true;
+      : definition.hasDefault === true;
     const repeat: CliOptionRepeat = definition.kind === 'count'
       ? 'count'
       : multiple
@@ -1193,13 +1174,9 @@ function compileOptions(
 
 function createLookup(program: { readonly commands: readonly CliCommand[] }): CliCommandLookup {
   const byPath = new Map<string, CliCommand>();
-  const byAliasPath = new Map<string, CliAliasMatch>();
   const mutableChildren = new Map<string, CliCommand[]>();
   for (const command of program.commands) {
     byPath.set(pathKey(command.path), command);
-    for (const alias of command.aliases) {
-      byAliasPath.set(pathKey(alias.path), Object.freeze({ command, alias }));
-    }
     if (command.parentPath !== undefined) {
       const key = pathKey(command.parentPath);
       const children = mutableChildren.get(key) ?? [];
@@ -1211,7 +1188,22 @@ function createLookup(program: { readonly commands: readonly CliCommand[] }): Cl
   for (const [key, children] of mutableChildren) {
     childrenByPath.set(key, Object.freeze(children));
   }
-  return { byPath, byAliasPath, childrenByPath };
+  return { byPath, childrenByPath };
+}
+
+function freezeDefinitionIssue(issue: CliDefinitionIssue): CliDefinitionIssue {
+  return Object.freeze({
+    ...issue,
+    ...('definitionPath' in issue
+      ? { definitionPath: Object.freeze([...issue.definitionPath]) }
+      : {}),
+    ...('commandPath' in issue
+      ? { commandPath: Object.freeze([...issue.commandPath]) }
+      : {}),
+    ...('aliasPath' in issue
+      ? { aliasPath: Object.freeze([...issue.aliasPath]) }
+      : {})
+  });
 }
 
 function lookupFor(program: object & { readonly commands: readonly CliCommand[] }): CliCommandLookup {

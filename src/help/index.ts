@@ -19,9 +19,15 @@ export interface CliHelp {
 
 export interface CliHelpCommand {
   readonly name: string;
-  readonly aliases: readonly string[];
+  readonly aliases: readonly CliHelpAlias[];
   readonly invokable: boolean;
   readonly description?: string;
+  readonly deprecated?: boolean | string;
+}
+
+/** One command alias and its presentation metadata. */
+export interface CliHelpAlias {
+  readonly name: string;
   readonly deprecated?: boolean | string;
 }
 
@@ -36,28 +42,28 @@ export interface CliHelpPositional {
 export interface CliHelpOption {
   readonly name: string;
   readonly flags: readonly string[];
-	readonly falseFlags: readonly string[];
-	readonly valueMode: CliOption['valueMode'];
-	readonly valueLabel?: string;
-	readonly valueDescription?: string;
-	readonly implicitValueLabel?: string;
-	readonly required: boolean;
-	readonly multiple: boolean;
-	readonly repeat: CliOption['repeat'];
-	readonly hasDefault: boolean;
-	readonly defaultLabel?: string;
-	readonly valueCandidates: readonly string[];
-	readonly definedAt: readonly string[];
-	readonly description?: string;
+  readonly falseFlags: readonly string[];
+  readonly valueMode: CliOption['valueMode'];
+  readonly valueLabel?: string;
+  readonly valueDescription?: string;
+  readonly implicitValueLabel?: string;
+  readonly required: boolean;
+  readonly multiple: boolean;
+  readonly repeat: CliOption['repeat'];
+  readonly hasDefault: boolean;
+  readonly defaultLabel?: string;
+  readonly valueCandidates: readonly string[];
+  readonly definedAt: readonly string[];
+  readonly description?: string;
 }
 
 /** Creates immutable help data, or `undefined` for an unknown canonical path. */
 export function createCliHelp<Definition extends CliDefinition>(
-	program: CliProgram<Definition>,
-	commandPath: readonly string[] = []
+  program: CliProgram<Definition>,
+  commandPath: readonly string[] = []
 ): CliHelp | undefined {
-	const command = findCliCommand(program, commandPath);
-	if (command === undefined) return undefined;
+  const command = findCliCommand(program, commandPath);
+  if (command === undefined) return undefined;
   return Object.freeze({
     command,
     usage: createUsage(program, command),
@@ -83,7 +89,10 @@ function createUsage<Definition extends CliDefinition>(
 function toHelpCommand(command: CliCommand): CliHelpCommand {
   return Object.freeze({
     name: command.name,
-    aliases: Object.freeze(command.aliases.map((alias) => alias.name)),
+    aliases: Object.freeze(command.aliases.map((alias) => Object.freeze({
+      name: alias.name,
+      ...(alias.deprecated === undefined ? {} : { deprecated: alias.deprecated })
+    }))),
     invokable: command.invokable,
     ...(command.description === undefined ? {} : { description: command.description }),
     ...(command.deprecated === undefined ? {} : { deprecated: command.deprecated })
@@ -102,24 +111,24 @@ function toHelpPositional(positional: CliPositional): CliHelpPositional {
 
 function toHelpOption(option: CliOption): CliHelpOption {
   return Object.freeze({
-		name: option.name,
-		flags: option.flags,
-		falseFlags: option.falseFlags,
-		valueMode: option.valueMode,
+    name: option.name,
+    flags: option.flags,
+    falseFlags: option.falseFlags,
+    valueMode: option.valueMode,
     ...(option.valueLabel === undefined ? {} : { valueLabel: option.valueLabel }),
-		...(option.valueDescription === undefined
-			? {}
-			: { valueDescription: option.valueDescription }),
-		...(option.implicitValueLabel === undefined
-			? {}
-			: { implicitValueLabel: option.implicitValueLabel }),
-		required: option.required,
-		multiple: option.multiple,
-		repeat: option.repeat,
-		hasDefault: option.hasDefault,
-		...(option.defaultLabel === undefined ? {} : { defaultLabel: option.defaultLabel }),
-		valueCandidates: option.valueCandidates,
-		definedAt: option.definedAt,
+    ...(option.valueDescription === undefined
+      ? {}
+      : { valueDescription: option.valueDescription }),
+    ...(option.implicitValueLabel === undefined
+      ? {}
+      : { implicitValueLabel: option.implicitValueLabel }),
+    required: option.required,
+    multiple: option.multiple,
+    repeat: option.repeat,
+    hasDefault: option.hasDefault,
+    ...(option.defaultLabel === undefined ? {} : { defaultLabel: option.defaultLabel }),
+    valueCandidates: option.valueCandidates,
+    definedAt: option.definedAt,
     ...(option.description === undefined ? {} : { description: option.description })
   });
 }

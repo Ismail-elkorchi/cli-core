@@ -142,7 +142,7 @@ test('routing consumes only binder-classified arguments and preserves every alia
   ]);
 });
 
-test('unknown options before a child command fail before routing regardless of value form', () => {
+test('unknown flags before a child command fail before routing regardless of value form', () => {
   const parser = parserFor({
     scan({ command, argv }) {
       if (command.key === 'ship') {
@@ -157,7 +157,7 @@ test('unknown options before a child command fail before routing regardless of v
           unknownFlags: [{ argvElement: argv[0], flag: '--region', argvIndex: 0 }]
         };
       }
-      throw new Error('routing must stop at the unknown option');
+      throw new Error('routing must stop at the unknown flag');
     },
     bind() {
       throw new Error('binding must not run');
@@ -171,6 +171,7 @@ test('unknown options before a child command fail before routing regardless of v
     const result = parser.parse(program, { argv });
     assert.equal(result.status, 'invalid');
     assert.deepEqual(result.diagnostics.map((diagnostic) => diagnostic.code), ['CLI_UNKNOWN_FLAG']);
+    assert.match(result.diagnostics[0].message, /^Unknown flag:/u);
   }
 });
 
@@ -219,6 +220,39 @@ test('malformed binder output is rejected before invocation construction', () =>
   const sparseResult = sparseParser.parse(program, { argv: ['value'] });
   assert.equal(sparseResult.status, 'invalid');
   assert.equal(sparseResult.diagnostics[0]?.code, 'CLI_INVALID_BINDER_RESULT');
+});
+
+test('failed binder stages must explain failure with an error diagnostic', () => {
+  const emptyProgram = defineCli({ name: 'tool' });
+  const invalidScan = parserFor({
+    scan: () => ({ status: 'invalid', diagnostics: [], unknownFlags: [] }),
+    bind() {
+      throw new Error('binding must not run after an invalid scan');
+    }
+  }).parse(emptyProgram);
+  assert.equal(invalidScan.status, 'invalid');
+  assert.deepEqual(invalidScan.diagnostics.map((diagnostic) => diagnostic.code), [
+    'CLI_INVALID_BINDER_RESULT'
+  ]);
+
+  const invalidBinding = parserFor({
+    scan: () => ({
+      status: 'scanned',
+      options: [],
+      arguments: [],
+      afterDoubleDash: [],
+      unknownFlags: []
+    }),
+    bind: () => ({
+      status: 'invalid',
+      diagnostics: [createCliOptionDiagnostic('NOTICE', 'warning', 'Not an error.')],
+      unknownFlags: []
+    })
+  }).parse(emptyProgram);
+  assert.equal(invalidBinding.status, 'invalid');
+  assert.deepEqual(invalidBinding.diagnostics.map((diagnostic) => diagnostic.code), [
+    'CLI_INVALID_BINDER_RESULT'
+  ]);
 });
 
 test('scan results form an ordered exclusive argv partition', () => {
@@ -344,7 +378,7 @@ test('scan results form an ordered exclusive argv partition', () => {
   }
 });
 
-test('recognized and unknown short-cluster members share one option token by offset', () => {
+test('recognized and unknown short-cluster members share one argv element by offset', () => {
   const clusterProgram = defineCli({
     name: 'cluster',
     options: [
