@@ -67,19 +67,19 @@
     "node": ">=24"
   },
   "overrides": {
-    "qs": "6.15.2"
+    "qs": "6.15.3"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@stryker-mutator/core": "^9.6.1",
-    "@types/node": "^25.9.1",
-    "@typescript-eslint/eslint-plugin": "^8.59.4",
-    "@typescript-eslint/parser": "^8.59.4",
-    "eslint": "^10.4.0",
-    "eslint-plugin-n": "^18.0.1",
+    "@types/node": "^26.1.2",
+    "@typescript-eslint/eslint-plugin": "^8.65.0",
+    "@typescript-eslint/parser": "^8.65.0",
+    "eslint": "^10.8.0",
+    "eslint-plugin-n": "^18.2.2",
     "eslint-plugin-promise": "^7.3.0",
-    "eslint-plugin-security": "^4.0.0",
-    "globals": "^17.6.0",
+    "eslint-plugin-security": "^4.0.1",
+    "globals": "^17.8.0",
     "typescript": "^6.0.3"
   }
 }
