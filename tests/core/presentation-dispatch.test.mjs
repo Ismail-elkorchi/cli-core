@@ -20,7 +20,7 @@ const program = defineCli({
   }],
   commands: [{
     name: 'deploy',
-    aliases: ['d'],
+    aliases: [{ name: 'd', deprecated: 'Use deploy.' }],
     description: 'Deploy one service.',
     options: [{
       name: 'region',
@@ -39,6 +39,10 @@ const program = defineCli({
 });
 
 test('help retains neutral option semantics and rejects unknown paths', () => {
+  assert.deepEqual(createCliHelp(program)?.commands[0].aliases, [{
+    name: 'd',
+    deprecated: 'Use deploy.'
+  }]);
   const help = createCliHelp(program, ['deploy']);
   assert.equal(help?.usage, 'ship deploy [options] <service>');
   assert.deepEqual(help?.options[0].falseFlags, ['--no-verbose']);

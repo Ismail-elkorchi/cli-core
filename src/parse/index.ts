@@ -61,7 +61,7 @@ export type CliScannedOption = CliScannedOptionBase & (
     }
 );
 
-/** One unknown option preserved at its original argv location. */
+/** One unknown flag preserved at its original argv location. */
 export interface CliUnknownFlag {
   readonly argvElement: string;
   readonly flag: string;
@@ -619,9 +619,13 @@ function validateScanResult(
 ): string | undefined {
   if (!isRecord(result)) return 'Scan result must be an object.';
   if (result.status === 'invalid') {
-    return isDiagnosticArray(result.diagnostics) && isUnknownFlagArray(result.unknownFlags, input)
+    if (!isDiagnosticArray(result.diagnostics) ||
+      !isUnknownFlagArray(result.unknownFlags, input)) {
+      return 'Invalid scan results must contain diagnostics and indexed unknown flags.';
+    }
+    return hasErrorDiagnostics(result.diagnostics)
       ? undefined
-      : 'Invalid scan results must contain diagnostics and indexed unknown flags.';
+      : 'Invalid scan results must contain at least one error diagnostic.';
   }
   if (result.status !== 'scanned') return 'Scan result has an unknown status.';
   if (!isDenseArray(result.options) || !isDenseArray(result.arguments) ||
@@ -693,7 +697,7 @@ function validateScanResult(
     return 'Scan result places an option member inside an inline value span.';
   }
   const ownership = new Map<number, string>();
-  for (const index of optionMembers.keys()) ownership.set(index, 'option token');
+  for (const index of optionMembers.keys()) ownership.set(index, 'flag element');
   for (const option of result.options) {
     if (option.valueArgvIndex !== undefined && option.valueArgvIndex !== option.argvIndex &&
       !claimArgvIndex(ownership, option.valueArgvIndex, 'option value')) {
@@ -876,9 +880,13 @@ function validateBindingResult(
 ): string | undefined {
   if (!isRecord(result)) return 'Binding result must be an object.';
   if (result.status === 'invalid') {
-    return isDiagnosticArray(result.diagnostics) && isUnknownFlagArray(result.unknownFlags, input)
+    if (!isDiagnosticArray(result.diagnostics) ||
+      !isUnknownFlagArray(result.unknownFlags, input)) {
+      return 'Invalid binding results must contain diagnostics and indexed unknown flags.';
+    }
+    return hasErrorDiagnostics(result.diagnostics)
       ? undefined
-      : 'Invalid binding results must contain diagnostics and indexed unknown flags.';
+      : 'Invalid binding results must contain at least one error diagnostic.';
   }
   if (result.status !== 'bound') return 'Binding result has an unknown status.';
   if (!isPlainDataRecord(result.values) || !isPlainDataRecord(result.specified) ||
@@ -1101,13 +1109,15 @@ function unknownFlagDiagnostic(flag: CliUnknownFlag): CliCoreDiagnostic {
     source: 'invocation',
     code: 'CLI_UNKNOWN_FLAG',
     severity: 'error',
-    message: `Unknown option: ${flag.flag}.`,
+    message: `Unknown flag: ${flag.flag}.`,
     flag: flag.flag,
     argvElement: flag.argvElement,
     argvIndex: flag.argvIndex,
     ...(flag.offset === undefined ? {} : { offset: flag.offset }),
     ...(flag.inlineValue === undefined ? {} : { inlineValue: flag.inlineValue }),
-    ...(flag.suggestions === undefined ? {} : { suggestions: flag.suggestions })
+    ...(flag.suggestions === undefined
+      ? {}
+      : { suggestions: Object.freeze([...flag.suggestions]) })
   });
 }
 

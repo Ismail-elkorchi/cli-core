@@ -30,6 +30,16 @@
   longer fall back to the root command.
 - Stopped inferring default-value metadata from multiplicity; integrations now
   state independently whether an option materializes a value when absent.
+- Rejected required defaults and scalar repetition policies on multiple options
+  in both TypeScript and runtime definitions.
+- Required failed scanner and binder results to contain an error diagnostic.
+- Preserved alias deprecation metadata in help and froze definition issue paths.
+- Removed redundant command-key and command-path snapshots plus the incomplete
+  direct alias-path lookup; command routing remains the alias-resolution API.
+- Made builds remove obsolete output before compilation so packed archives
+  contain only the current implementation.
+- Associated emitted JavaScript modules with their declarations and added a
+  packed Deno TypeScript consumer check.
 - Corrected the integration package name to `clivoke` on npm and
   `@ismail-elkorchi/clivoke` on JSR.
 - Contracted the package to command compilation and lookup, invocation routing,

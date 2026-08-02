@@ -18,10 +18,6 @@ const program = defineCli({
     options: [{ name: 'region', kind: 'value', flags: ['--region'], valueMode: 'required' }]
   }]
 });
-const keys: readonly ('ship' | 'ship deploy')[] = program.commandKeys;
-const paths: readonly (readonly [] | readonly ['deploy'])[] = program.commandPaths;
-void keys;
-void paths;
 
 // @ts-expect-error boolean options cannot have value labels
 defineCli({ name: 'ship', options: [{ name: 'verbose', kind: 'boolean', flags: ['-v'], valueLabel: 'level' }] });
@@ -34,6 +30,12 @@ defineCli({ name: 'ship', options: [{ name: 'region', kind: 'value', flags: ['--
 
 // @ts-expect-error implicit labels require optional-inline value mode
 defineCli({ name: 'ship', options: [{ name: 'region', kind: 'value', flags: ['--region'], valueMode: 'required', implicitValueLabel: 'automatic' }] });
+
+// @ts-expect-error required options cannot declare defaults
+defineCli({ name: 'ship', options: [{ name: 'region', kind: 'value', flags: ['--region'], valueMode: 'required', required: true, hasDefault: true }] });
+
+// @ts-expect-error multiple options always use append repetition
+defineCli({ name: 'ship', options: [{ name: 'tag', kind: 'value', flags: ['--tag'], valueMode: 'required', multiple: true, repeat: 'first' }] });
 
 // @ts-expect-error definition objects are closed for object literals
 defineCli({ name: 'ship', unsupported: true });

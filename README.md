@@ -1,14 +1,17 @@
 # @ismail-elkorchi/cli-core
 
-Parser-independent command semantics for TypeScript and JavaScript CLIs.
+Build reusable, typed command systems for argv parsers, graphical interfaces,
+HTTP endpoints, tests, and other invocation sources.
 
-`cli-core` compiles command trees, routes binder-classified command tokens,
-binds positionals, creates renderer-neutral help and completion data, and
-dispatches successful invocations. It does not parse flag syntax, access a
-process, or generate shell scripts.
+`cli-core` compiles immutable command trees, routes scanner-classified command
+tokens, validates decoded invocations, binds positional values, produces help
+and completion data, and dispatches command-specific handlers. Its explicit
+scanner and binder boundary lets each integration choose its own flag grammar.
 
-Use [`clivoke`](https://www.npmjs.com/package/clivoke) on npm or
-`@ismail-elkorchi/clivoke` on JSR for the ready-made `argv-flags` integration.
+[Clivoke](https://github.com/Ismail-elkorchi/clivoke) combines `cli-core` with
+[`argv-flags`](https://www.npmjs.com/package/argv-flags) and adds process and
+shell integration. Its README lists the available installation methods and
+end-to-end adapters.
 
 ## Install
 
@@ -17,10 +20,18 @@ npm install @ismail-elkorchi/cli-core
 deno add jsr:@ismail-elkorchi/cli-core
 ```
 
-## Define commands
+## Quick start
+
+Define the command tree once, then use it from structured adapters, help,
+completion, and dispatch:
 
 ```ts
-import { createCliHelp, defineCli } from "@ismail-elkorchi/cli-core";
+import {
+  createCliHelp,
+  createCliInvocation,
+  defineCli,
+  dispatchCli,
+} from "@ismail-elkorchi/cli-core";
 
 const program = defineCli({
   name: "ship",
@@ -31,6 +42,7 @@ const program = defineCli({
   commands: [{
     name: "deploy",
     aliases: ["d"],
+    description: "Deploy one service.",
     options: [{
       name: "region",
       kind: "value",
@@ -38,85 +50,116 @@ const program = defineCli({
       valueMode: "required",
       required: true,
       valueCandidates: ["eu", "us"],
-      valueDescription: "Deployment region.",
     }],
     positionals: [{ name: "service" }],
   }],
 });
 
-console.log(createCliHelp(program, ["deploy"]));
+const help = createCliHelp(program, ["deploy"]);
+if (help === undefined) throw new Error("deploy help is unavailable");
+
+const invocation = createCliInvocation(program, {
+  sourceId: "deployment-api",
+  commandPath: ["deploy"],
+  optionValues: { region: "eu" },
+  specifiedOptions: { verbose: false, region: true },
+  positionalValues: { service: "billing" },
+});
+
+if (invocation.status === "invalid") {
+  throw new Error(invocation.diagnostics.map(({ message }) => message).join("\n"));
+}
+
+await dispatchCli(invocation, {
+  "ship deploy": ({ invocation: deploy }) => ({
+    service: deploy.positionalValues.service,
+    region: deploy.optionValues.region,
+  }),
+}, undefined);
 ```
 
-Definitions are closed in TypeScript and at runtime. Compilation returns an
-immutable program or throws one `CliDefinitionError` with structured issues.
-Global and ancestor options are inherited by descendants. A command cannot
-declare both child commands and positionals because the same token would be
-ambiguous. Set `invokable: false` on a grouping command that requires a child;
-non-invokable leaves are rejected.
+Definitions are closed in TypeScript and at runtime. `defineCli()` returns an
+immutable `CliProgram` or throws one `CliDefinitionError` containing all
+definition issues found in the tree.
 
-The root accepts the same positional and passthrough metadata as child
-commands. This supports programs such as `formatter <file>` and
-`runner -- node app.js` without an artificial subcommand. Set
-`acceptsPassthroughArguments: true` when tokens after `--` belong to the
-selected command.
+## Command model
+
+Options declared on the root are global. Options declared on a command are
+inherited by its descendants, preserving where each option originated for help
+and completion.
+
+Every command has a stable canonical key such as `ship deploy`. Set
+`invokable: false` on a grouping command that requires a child command. Each
+command chooses child-command routing or positional binding, keeping command
+tokens unambiguous.
+
+The root and child commands share the same positional and passthrough model.
+This supports shapes such as `formatter <file>`, `archive <inputs...>`, and
+`runner -- node app.js` directly. Set `acceptsPassthroughArguments: true` when
+post-`--` tokens belong to the selected command.
+
+Option definitions contain parser-neutral facts used by routing and
+presentation: flag spellings, value mode, requiredness, repetition,
+multiplicity, defaults, false flags, finite value candidates, and descriptive
+labels. Integrations remain responsible for decoding option values.
 
 ## Connect an option grammar
 
-`createCliInvocationParser()` accepts a binder with two operations:
+`createCliInvocationParser()` accepts a `CliOptionBinder` with two operations:
 
 - `scan()` classifies recognized option spans, ordinary arguments, unknown
   flags, and `--` without decoding values.
 - `bind()` performs the final option parse after command tokens are removed.
 
-Both operations receive the visible option metadata and an `argvIndexes` map
-back to the complete argv. Core requires a scan to be an ordered, exclusive
-partition of that argv and requires binding to agree about specified options,
-positionals, post-`--` arguments, and unknown flags. Recognized and unknown
-members of one short cluster share an argv element and are distinguished by
-their offsets. This keeps raw option grammar in one integration while letting
-core route commands without interpreting flag syntax.
+Both operations receive the options visible to the current command, the argv
+elements being classified, and an `argvIndexes` map back to the complete input.
+Core validates that scanning is an ordered, exclusive partition and that final
+binding agrees about specified options, positionals, unknown flags, and
+post-terminator arguments.
 
-Command-local options must follow the command that defines them. Ancestor
-options may appear around descendant command tokens because descendants inherit
-them. An unknown option before a child command stops routing: core cannot safely
-guess whether a following token is its value.
+Place command-local flags after the command that declares them. Ancestor flags
+may appear around descendant command tokens because descendants inherit those
+options. An unknown flag before a child command stops routing so its following
+token is never guessed to be a command or value.
 
-For an HTTP endpoint, TUI, or other non-argv input, use
-`createCliInvocation()` with already decoded option and positional values. Its
-optional `sourceId` can identify the integration that created the invocation.
+Use `createCliInvocation()` when an adapter already has decoded option and
+positional values. The returned invocation records a `structured` source and
+can carry an application-defined `sourceId`.
 
-## Results and dispatch
+## Results and diagnostics
 
-Ready invocations expose a top-level `commandKey` discriminant, the compiled
-`command`, and a `source` discriminated as `argv` or `structured`. Literal
-programs produce a union per invokable command, so handler inputs narrow to
-their exact command key. Handler maps must cover every invokable key. Failed
-invocations contain diagnostics and unknown flags, never partial values.
+A ready invocation exposes:
 
-```ts
-import { dispatchCli, type CliInvocationResult } from "@ismail-elkorchi/cli-core";
+- `commandKey` as the command-specific discriminant;
+- the compiled `command`;
+- decoded option and positional values;
+- explicit option-presence information;
+- used aliases and deprecation warnings;
+- passthrough arguments and collected unknown flags;
+- an `argv` or `structured` source.
 
-async function handle(result: CliInvocationResult) {
-  if (result.status === "ready") {
-    await dispatchCli(result, {
-      "ship deploy": ({ invocation }) => {
-        console.log(invocation.positionalValues.service);
-      },
-    }, undefined);
-  }
-}
-```
+Literal definitions produce a union for every invokable command, so handlers
+receive the exact command key they implement. `CliHandlers` requires every
+invokable key. Invalid results contain structured diagnostics and unknown flags
+without partial values.
 
-`createCliHelp()` and `completeCli()` return `undefined` for an unknown command
-path. Completion returns actual command, alias, flag, and finite option-value
-candidates; positional definitions remain metadata rather than fake values.
-Value descriptions, implicit-value labels, and explicit default labels remain
-opaque presentation strings; the core does not interpret parser-specific
-values.
+Core diagnostics are discriminated by `source` and `code`. Option integrations
+can create immutable option diagnostics with `createCliOptionDiagnostic()`.
+
+## Help, completion, and dispatch
+
+`createCliHelp()` returns renderer-neutral usage, command, alias, positional,
+and option data. `completeCli()` returns command, alias, flag, and finite
+option-value candidates. Both return `undefined` for an unknown canonical
+command path.
+
+`dispatchCli()` sends a ready invocation to its canonical handler and returns
+the handler result. Handler errors propagate to the integration that owns
+application error policy.
 
 ## Runtime support
 
-- ESM only
+- ESM
 - Node.js 24 or later
 - Deno 2.6 or later
 - Bun 1.3 or later

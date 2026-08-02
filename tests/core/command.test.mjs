@@ -4,7 +4,6 @@ import {
   CliDefinitionError,
   defineCli,
   findCliCommand,
-  findCliCommandByAlias,
   findCliCommandChildren
 } from '../../dist/index.js';
 
@@ -36,9 +35,17 @@ test('defineCli compiles immutable literal command data with inherited option fa
   assert.deepEqual(deploy?.options.map((option) => option.name), ['verbose', 'config', 'region']);
   assert.deepEqual(deploy?.options.map((option) => option.definedAt), [[], ['project'], ['project', 'deploy']]);
   assert.deepEqual(deploy?.options[0].flags, ['-v', '--verbose']);
-  assert.equal(findCliCommandByAlias(program, ['p'])?.command, project);
+  assert.deepEqual(project?.aliases[0], {
+    name: 'p',
+    path: ['p'],
+    deprecated: 'Use project.'
+  });
   assert.deepEqual(findCliCommandChildren(program, program.root), [project]);
-  assert.deepEqual(program.commandKeys, ['ship', 'ship project', 'ship project deploy']);
+  assert.deepEqual(program.commands.map((command) => command.key), [
+    'ship',
+    'ship project',
+    'ship project deploy'
+  ]);
   assert.equal(Object.isFrozen(program), true);
 });
 
@@ -80,6 +87,10 @@ test('definition compilation aggregates malformed and ambiguous input', () => {
       assert.equal(error.name, 'CliDefinitionError');
       assert.equal(error.message, 'Invalid CLI definition (6 issues).');
       assert.equal(error.issues.length, 6);
+      const rootOptionIssue = error.issues.find((issue) =>
+        issue.code === 'INVALID_OPTION' && issue.commandPath.length === 0);
+      assert.equal(Object.isFrozen(rootOptionIssue?.commandPath), true);
+      assert.throws(() => rootOptionIssue.commandPath.push('changed'), TypeError);
       const codes = new Set(error.issues.map((issue) => issue.code));
       assert.equal(codes.has('UNKNOWN_PROPERTY'), true);
       assert.equal(codes.has('INVALID_OPTION'), true);
@@ -91,7 +102,7 @@ test('definition compilation aggregates malformed and ambiguous input', () => {
   );
 });
 
-test('option spellings stay binder-neutral and inherited collisions are rejected', () => {
+test('flag spellings stay binder-neutral and inherited collisions are rejected', () => {
   assert.equal(defineCli({
     name: 'ship',
     options: [{ name: 'global option', kind: 'boolean', flags: ['-ab'] }]
@@ -190,5 +201,35 @@ test('option presentation cannot claim values that the option does not materiali
     }),
     (error) => error instanceof CliDefinitionError && error.issues.some((issue) =>
       issue.code === 'INVALID_OPTION' && issue.reason === 'presentation')
+  );
+  assert.throws(
+    () => defineCli({
+      name: 'ship',
+      options: [{
+        name: 'region',
+        kind: 'value',
+        flags: ['--region'],
+        valueMode: 'required',
+        required: true,
+        hasDefault: true
+      }]
+    }),
+    (error) => error instanceof CliDefinitionError && error.issues.some((issue) =>
+      issue.code === 'INVALID_OPTION' && issue.reason === 'presentation')
+  );
+  assert.throws(
+    () => defineCli({
+      name: 'ship',
+      options: [{
+        name: 'tag',
+        kind: 'value',
+        flags: ['--tag'],
+        valueMode: 'required',
+        multiple: true,
+        repeat: 'first'
+      }]
+    }),
+    (error) => error instanceof CliDefinitionError && error.issues.some((issue) =>
+      issue.code === 'INVALID_OPTION' && issue.reason === 'repeat')
   );
 });
