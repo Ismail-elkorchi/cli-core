@@ -20,6 +20,8 @@ export type {
   CliCountOptionDefinition,
   CliDefinition,
   CliDefinitionIssue,
+  CliExample,
+  CliExampleDefinition,
   CliInvokableCommandKey,
   CliOption,
   CliOptionDefinition,
@@ -66,6 +68,7 @@ export type {
   CliHelp,
   CliHelpAlias,
   CliHelpCommand,
+  CliHelpExample,
   CliHelpOption,
   CliHelpPositional
 } from './help/index.ts';

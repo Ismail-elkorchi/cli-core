@@ -172,6 +172,34 @@ test('definition arrays are dense and command groups must contain children', () 
   );
 });
 
+test('examples are closed, dense, non-empty, and immutable', () => {
+  const examples = [{ usage: 'tool run input.txt', description: 'Process one file.' }];
+  const program = defineCli({ name: 'tool', examples });
+  examples[0].usage = 'changed';
+  assert.deepEqual(program.root.examples, [{
+    usage: 'tool run input.txt',
+    description: 'Process one file.'
+  }]);
+  assert.equal(Object.isFrozen(program.root.examples), true);
+  assert.equal(Object.isFrozen(program.root.examples[0]), true);
+
+  const sparse = [];
+  sparse.length = 1;
+  for (const invalid of [
+    sparse,
+    [null],
+    [{ usage: '' }],
+    [{ usage: 'tool', description: '' }],
+    [{ usage: 'tool', unsupported: true }]
+  ]) {
+    assert.throws(
+      () => defineCli({ name: 'tool', examples: invalid }),
+      (error) => error instanceof CliDefinitionError && error.issues.some((issue) =>
+        issue.code === 'INVALID_EXAMPLE' || issue.code === 'UNKNOWN_PROPERTY')
+    );
+  }
+});
+
 test('option presentation cannot claim values that the option does not materialize', () => {
   assert.throws(
     () => defineCli({

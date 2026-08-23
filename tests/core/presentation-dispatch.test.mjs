@@ -11,6 +11,7 @@ import {
 
 const program = defineCli({
   name: 'ship',
+  examples: [{ usage: 'ship deploy api', description: 'Deploy the API.' }],
   options: [{
     name: 'verbose',
     kind: 'boolean',
@@ -22,6 +23,7 @@ const program = defineCli({
     name: 'deploy',
     aliases: [{ name: 'd', deprecated: 'Use deploy.' }],
     description: 'Deploy one service.',
+    examples: [{ usage: 'ship deploy billing --region=eu' }],
     options: [{
       name: 'region',
       kind: 'value',
@@ -39,6 +41,10 @@ const program = defineCli({
 });
 
 test('help retains neutral option semantics and rejects unknown paths', () => {
+  assert.deepEqual(createCliHelp(program)?.examples, [{
+    usage: 'ship deploy api',
+    description: 'Deploy the API.'
+  }]);
   assert.deepEqual(createCliHelp(program)?.commands[0].aliases, [{
     name: 'd',
     deprecated: 'Use deploy.'
@@ -50,6 +56,9 @@ test('help retains neutral option semantics and rejects unknown paths', () => {
   assert.equal(help?.options[1].defaultLabel, 'eu');
   assert.equal(help?.options[1].valueDescription, 'Deployment region.');
   assert.equal(help?.options[1].implicitValueLabel, 'automatic');
+  assert.deepEqual(help?.examples, [{ usage: 'ship deploy billing --region=eu' }]);
+  assert.equal(Object.isFrozen(help?.examples), true);
+  assert.equal(Object.isFrozen(help?.examples[0]), true);
   assert.equal(createCliHelp(program, ['typo']), undefined);
 });
 

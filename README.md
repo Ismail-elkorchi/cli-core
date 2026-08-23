@@ -36,6 +36,10 @@ import {
 const program = defineCli({
   name: "ship",
   invokable: false,
+  examples: [{
+    usage: "ship deploy billing --region eu",
+    description: "Deploy the billing service in Europe.",
+  }],
   options: [
     { name: "verbose", kind: "boolean", flags: ["-v", "--verbose"] },
   ],
@@ -148,8 +152,8 @@ can create immutable option diagnostics with `createCliOptionDiagnostic()`.
 
 ## Help, completion, and dispatch
 
-`createCliHelp()` returns renderer-neutral usage, command, alias, positional,
-and option data. `completeCli()` returns command, alias, flag, and finite
+`createCliHelp()` returns renderer-neutral usage, examples, command, alias,
+positional, and option data. `completeCli()` returns command, alias, flag, and finite
 option-value candidates. Both return `undefined` for an unknown canonical
 command path.
 

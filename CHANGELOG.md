@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0 - 2026-08-23
+
+- Added closed, immutable, renderer-neutral examples to root and command
+  definitions and exposed them through help data.
+- Made high-severity dependency auditing part of the canonical check.
+- Tied npm and JSR publication to a published GitHub Release so generated
+  release notes remain the source of the public changelog for each release.
+
 ## 0.2.0 - 2026-08-01
 
 - Added neutral value-description and implicit-value labels to option and help

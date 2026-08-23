@@ -13,8 +13,14 @@ export interface CliHelp {
   readonly command: CliCommand;
   readonly usage: string;
   readonly commands: readonly CliHelpCommand[];
+  readonly examples: readonly CliHelpExample[];
   readonly positionals: readonly CliHelpPositional[];
   readonly options: readonly CliHelpOption[];
+}
+
+export interface CliHelpExample {
+  readonly usage: string;
+  readonly description?: string;
 }
 
 export interface CliHelpCommand {
@@ -68,6 +74,7 @@ export function createCliHelp<Definition extends CliDefinition>(
     command,
     usage: createUsage(program, command),
     commands: Object.freeze(findCliCommandChildren(program, command).map(toHelpCommand)),
+    examples: command.examples,
     positionals: Object.freeze(command.positionals.map(toHelpPositional)),
     options: Object.freeze(command.options.filter((option) => !option.hidden).map(toHelpOption))
   });
