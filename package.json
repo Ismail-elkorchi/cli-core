@@ -1,6 +1,6 @@
 {
   "name": "@ismail-elkorchi/cli-core",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Parser-independent command routing, help, completion, and dispatch primitives.",
   "type": "module",
   "sideEffects": false,
@@ -32,8 +32,9 @@
     "check:runtime": "deno check src/index.ts && deno lint src tests/runtime-smoke.mjs && deno test tests/runtime-smoke.mjs && bun tests/runtime-smoke.mjs",
     "check:jsr": "deno publish --dry-run --allow-dirty",
     "check:workflow-policy": "node scripts/workflow-policy-check.mjs",
+    "check:audit": "npm audit --audit-level=high",
     "release:gate": "node scripts/release-gate.mjs",
-    "check": "npm run check:workflow-policy && npm run lint && npm run typecheck && npm test && npm run test:docs && npm run test:package && npm run check:runtime && npm run check:jsr"
+    "check": "npm run check:workflow-policy && npm run check:audit && npm run lint && npm run typecheck && npm test && npm run test:docs && npm run test:package && npm run check:runtime && npm run check:jsr"
   },
   "repository": {
     "type": "git",

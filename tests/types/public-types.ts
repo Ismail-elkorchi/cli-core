@@ -12,6 +12,7 @@ import {
 
 const program = defineCli({
   name: 'ship',
+  examples: [{ usage: 'ship deploy --region eu', description: 'Deploy in Europe.' }],
   options: [{ name: 'verbose', kind: 'boolean', flags: ['-v'] }],
   commands: [{
     name: 'deploy',
@@ -39,6 +40,9 @@ defineCli({ name: 'ship', options: [{ name: 'tag', kind: 'value', flags: ['--tag
 
 // @ts-expect-error definition objects are closed for object literals
 defineCli({ name: 'ship', unsupported: true });
+
+// @ts-expect-error example definitions are closed
+defineCli({ name: 'ship', examples: [{ usage: 'ship', unsupported: true }] });
 
 const binder: CliOptionBinder = {
   scan: () => ({

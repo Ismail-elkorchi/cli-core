@@ -96,6 +96,13 @@ export interface CliPositionalDefinition {
   readonly description?: string;
 }
 
+/** One renderer-neutral example shown in command help. */
+export interface CliExampleDefinition {
+  /** Complete invocation or argument sequence to show verbatim. */
+  readonly usage: string;
+  readonly description?: string;
+}
+
 /** An alternate command token. */
 export interface CliAliasDefinition {
   readonly name: string;
@@ -111,6 +118,7 @@ export interface CliCommandDefinition {
   readonly aliases?: readonly CliAliasInput[];
   readonly description?: string;
   readonly deprecated?: boolean | string;
+  readonly examples?: readonly CliExampleDefinition[];
   readonly positionals?: readonly CliPositionalDefinition[];
   readonly options?: readonly CliOptionDefinition[];
   readonly commands?: readonly CliCommandDefinition[];
@@ -123,6 +131,7 @@ export interface CliCommandDefinition {
 export interface CliDefinition {
   readonly name: string;
   readonly description?: string;
+  readonly examples?: readonly CliExampleDefinition[];
   /** Options available to every command. */
   readonly options?: readonly CliOptionDefinition[];
   readonly positionals?: readonly CliPositionalDefinition[];
@@ -167,6 +176,13 @@ type ExactPositionals<Positionals extends readonly CliPositionalDefinition[]> = 
   >;
 };
 
+type ExactExamples<Examples extends readonly CliExampleDefinition[]> = {
+  readonly [Index in keyof Examples]: Examples[Index] & Record<
+    Exclude<keyof Examples[Index], keyof CliExampleDefinition>,
+    never
+  >;
+};
+
 type ExactCommands<Commands extends readonly CliCommandDefinition[]> = {
   readonly [Index in keyof Commands]: Commands[Index] extends CliCommandDefinition
     ? ExactCommand<Commands[Index]>
@@ -179,6 +195,10 @@ type ExactCommand<Command extends CliCommandDefinition> = Command & Record<
 > & (Command extends { readonly options: infer Options }
   ? Options extends readonly CliOptionDefinition[]
     ? { readonly options: ExactOptions<Options> }
+    : never
+  : object) & (Command extends { readonly examples: infer Examples }
+  ? Examples extends readonly CliExampleDefinition[]
+    ? { readonly examples: ExactExamples<Examples> }
     : never
   : object) & (Command extends { readonly aliases: infer Aliases }
   ? Aliases extends readonly CliAliasInput[]
@@ -200,6 +220,10 @@ type ExactDefinition<Definition extends CliDefinition> = Definition & Record<
 > & (Definition extends { readonly options: infer Options }
   ? Options extends readonly CliOptionDefinition[]
     ? { readonly options: ExactOptions<Options> }
+    : never
+  : object) & (Definition extends { readonly examples: infer Examples }
+  ? Examples extends readonly CliExampleDefinition[]
+    ? { readonly examples: ExactExamples<Examples> }
     : never
   : object) & (Definition extends { readonly positionals: infer Positionals }
   ? Positionals extends readonly CliPositionalDefinition[]
@@ -285,6 +309,13 @@ export type CliDefinitionIssue =
       readonly reason: 'definition' | 'name' | 'duplicate' | 'required-after-optional' | 'after-variadic' | 'variadic-not-last';
     }
   | {
+      readonly code: 'INVALID_EXAMPLE';
+      readonly message: string;
+      readonly commandPath: readonly string[];
+      readonly index: number;
+      readonly reason: 'definition' | 'usage' | 'description';
+    }
+  | {
       readonly code: 'INVALID_OPTION';
       readonly message: string;
       readonly commandPath: readonly string[];
@@ -339,6 +370,12 @@ export interface CliPositional {
   readonly description?: string;
 }
 
+/** One immutable renderer-neutral command example. */
+export interface CliExample {
+  readonly usage: string;
+  readonly description?: string;
+}
+
 /** Immutable parser-independent option facts. */
 export interface CliOption {
   readonly name: string;
@@ -369,6 +406,7 @@ export interface CliCommand<out Key extends string = string> {
   readonly aliases: readonly CliAlias[];
   readonly description?: string;
   readonly deprecated?: boolean | string;
+  readonly examples: readonly CliExample[];
   readonly positionals: readonly CliPositional[];
   /** Global, ancestor, and local options visible at this command. */
   readonly options: readonly CliOption[];
@@ -407,6 +445,7 @@ const commandLookups = new WeakMap<object, CliCommandLookup>();
 const definitionProperties = new Set([
   'name',
   'description',
+  'examples',
   'options',
   'positionals',
   'commands',
@@ -418,6 +457,7 @@ const commandProperties = new Set([
   'aliases',
   'description',
   'deprecated',
+  'examples',
   'positionals',
   'options',
   'commands',
@@ -426,6 +466,7 @@ const commandProperties = new Set([
 ]);
 const aliasProperties = new Set(['name', 'deprecated']);
 const positionalProperties = new Set(['name', 'required', 'variadic', 'description']);
+const exampleProperties = new Set(['usage', 'description']);
 const optionBaseProperties = ['name', 'kind', 'flags', 'description', 'hidden'] as const;
 const booleanOptionProperties = new Set([
   ...optionBaseProperties,
@@ -462,6 +503,7 @@ export function defineCli<const Definition extends CliDefinition>(
     {
       name: definition.name,
       ...(definition.description === undefined ? {} : { description: definition.description }),
+      ...(definition.examples === undefined ? {} : { examples: definition.examples }),
       ...(definition.positionals === undefined ? {} : { positionals: definition.positionals }),
       ...(definition.invokable === undefined ? {} : { invokable: definition.invokable }),
       ...(definition.acceptsPassthroughArguments === undefined
@@ -525,6 +567,7 @@ function validateDefinition(definition: CliDefinition): readonly CliDefinitionIs
     });
   }
   validateOptionalString(definition, 'description', [], issues);
+  validateExamples(definition['examples'], [], issues);
   validatePositionals(definition['positionals'], [], issues);
   validateBoolean(definition, 'invokable', [], issues);
   validateBoolean(definition, 'acceptsPassthroughArguments', [], issues);
@@ -585,6 +628,7 @@ function validateCommands(
     }
     siblingTokens.add(name);
     validateOptionalString(entry, 'description', commandPath, issues);
+    validateExamples(entry['examples'], commandPath, issues);
     validateDeprecation(entry['deprecated'], commandPath, issues);
     validateAliases(entry['aliases'], commandPath, siblingTokens, issues);
     validatePositionals(entry['positionals'], commandPath, issues);
@@ -778,6 +822,55 @@ function validatePositionals(
     }
     optionalSeen ||= !required;
     variadicSeen ||= variadic;
+  }
+}
+
+function validateExamples(
+  value: unknown,
+  commandPath: readonly string[],
+  issues: CliDefinitionIssue[]
+): void {
+  if (value === undefined) return;
+  if (!isDenseArray(value)) {
+    issues.push({
+      code: 'INVALID_EXAMPLE',
+      message: 'Examples must be a dense array of example definitions.',
+      commandPath,
+      index: 0,
+      reason: 'definition'
+    });
+    return;
+  }
+  for (const [index, entry] of value.entries()) {
+    if (!isRecord(entry)) {
+      issues.push({
+        code: 'INVALID_EXAMPLE',
+        message: 'Each example must be an object.',
+        commandPath,
+        index,
+        reason: 'definition'
+      });
+      continue;
+    }
+    reportUnknownProperties(entry, exampleProperties, commandPath, issues);
+    if (!isNonEmptyString(entry['usage'])) {
+      issues.push({
+        code: 'INVALID_EXAMPLE',
+        message: 'Example usage must be a non-empty string.',
+        commandPath,
+        index,
+        reason: 'usage'
+      });
+    }
+    if (entry['description'] !== undefined && !isNonEmptyString(entry['description'])) {
+      issues.push({
+        code: 'INVALID_EXAMPLE',
+        message: 'Example description must be a non-empty string when provided.',
+        commandPath,
+        index,
+        reason: 'description'
+      });
+    }
   }
 }
 
@@ -1096,6 +1189,7 @@ function compileCommand(
     ),
     ...(definition.description === undefined ? {} : { description: definition.description }),
     ...(definition.deprecated === undefined ? {} : { deprecated: definition.deprecated }),
+    examples: Object.freeze((definition.examples ?? []).map(compileExample)),
     positionals: Object.freeze((definition.positionals ?? []).map(compilePositional)),
     options: Object.freeze([...inheritedOptions, ...localOptions]),
     invokable: definition.invokable ?? true,
@@ -1117,6 +1211,13 @@ function compilePositional(definition: CliPositionalDefinition): CliPositional {
     name: definition.name,
     required: definition.required ?? true,
     variadic: definition.variadic ?? false,
+    ...(definition.description === undefined ? {} : { description: definition.description })
+  });
+}
+
+function compileExample(definition: CliExampleDefinition): CliExample {
+  return Object.freeze({
+    usage: definition.usage,
     ...(definition.description === undefined ? {} : { description: definition.description })
   });
 }
