@@ -109,26 +109,41 @@ labels. Integrations remain responsible for decoding option values.
 
 ## Connect an option grammar
 
-`createCliInvocationParser()` accepts a `CliOptionBinder` with two operations:
+`createCliInvocationParser()` accepts a `CliOptionBinder` that creates one
+isolated grammar session per invocation:
 
-- `scan()` classifies recognized option spans, ordinary arguments, unknown
-  flags, and `--` without decoding values.
-- `bind()` performs the final option parse after command tokens are removed.
+- `create(argv)` receives the immutable original argument snapshot.
+- The session's `next(scope)` classifies one contiguous span under the current
+  command's option scope. It advances `nextIndex` and reports indexed options,
+  ordinary arguments, integration controls, unknown flags, diagnostics, and
+  explicitly unclassified syntax.
+- The session's `bind(scope)` decodes its retained occurrences once, after the
+  command is selected. It must not reparse raw argv to rediscover ownership.
 
-Both operations receive the options visible to the current command, the argv
-elements being classified, and an `argvIndexes` map back to the complete input.
-Core validates that scanning is an ordered, exclusive partition and that final
-binding agrees about specified options, positionals, unknown flags, and
-post-terminator arguments.
+Core validates span ownership and current-scope option membership, adopts its
+own immutable classification, and resolves child command tokens as traversal
+advances. `route()` returns this classification without decoding;
+`bind(route)` accepts only a route produced by the same parser. `parse()` performs
+both steps. Repeated binding of a route never repeats decoder effects.
+
+Recognized options with malformed values retain command context and diagnostics;
+they cannot produce a ready invocation. Unclassifiable syntax or an unknown flag
+before a child command stops routing. The remaining suffix stays unclassified,
+so an option value cannot be reinterpreted as a help or version control.
 
 Place command-local flags after the command that declares them. Ancestor flags
 may appear around descendant command tokens because descendants inherit those
-options. An unknown flag before a child command stops routing so its following
-token is never guessed to be a command or value.
+options. Integration controls are classified separately from domain options;
+they do not need fake entries in the command definition.
 
 Use `createCliInvocation()` when an adapter already has decoded option and
 positional values. The returned invocation records a `structured` source and
-can carry an application-defined `sourceId`.
+can carry an application-defined `sourceId`. This constructor validates names,
+presence and positional shape; integrations must decode and validate option
+values before calling it. Arbitrary decoded application objects remain owned by
+the decoder. Custom nested diagnostic details likewise remain application-owned.
+Framework-owned arrays, records, and diagnostic containers are snapshots;
+accessors and custom array behavior are rejected rather than executed.
 
 ## Results and diagnostics
 

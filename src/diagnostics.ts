@@ -1,3 +1,4 @@
+import { readDataRecord } from './data.ts';
 /** Severity of a runtime CLI diagnostic. */
 export type CliDiagnosticSeverity = 'error' | 'warning';
 
@@ -95,12 +96,14 @@ export function createCliOptionDiagnostic<Code extends string>(
   message: string,
   details: Readonly<Record<string, unknown>> = {}
 ): CliOptionDiagnostic<Code> {
+  const record = readDataRecord(details);
+  if (record === undefined) throw new TypeError('Diagnostic details must be a plain data record.');
   return Object.freeze({
     source: 'option',
     code,
     severity,
     message,
-    details: Object.freeze({ ...details })
+    details: record
   });
 }
 

@@ -246,7 +246,9 @@ type InvokableCommandKeyFor<
   Command,
   Prefix extends string = ''
 > = Command extends { readonly name: infer Name extends string }
-  ? (Command extends { readonly invokable: false }
+  ? string extends Name
+    ? `${ProgramName} ${Prefix}${string}`
+    : (Command extends { readonly invokable: false }
       ? never
       : `${ProgramName} ${Prefix}${Name}`) |
     InvokableCommandKeyFor<ProgramName, CommandsOf<Command>, `${Prefix}${Name} `>
@@ -261,6 +263,11 @@ export type CliInvokableCommandKey<Definition extends CliDefinition> =
 
 /** Why a CLI definition could not be compiled. */
 export type CliDefinitionIssue =
+  | {
+      readonly code: 'INVALID_DEFINITION_DATA';
+      readonly message: string;
+      readonly definitionPath: readonly string[];
+    }
   | {
       readonly code: 'UNKNOWN_PROPERTY';
       readonly message: string;
@@ -410,6 +417,8 @@ export interface CliCommand<out Key extends string = string> {
   readonly positionals: readonly CliPositional[];
   /** Global, ancestor, and local options visible at this command. */
   readonly options: readonly CliOption[];
+  /** Options declared directly on this command, before inheritance. */
+  readonly declaredOptions: readonly CliOption[];
   readonly invokable: boolean;
   readonly acceptsPassthroughArguments: boolean;
 }
@@ -433,6 +442,7 @@ export type CliProgram<Definition extends CliDefinition = CliDefinition> =
 interface CliCommandLookup {
   readonly byPath: ReadonlyMap<string, CliCommand>;
   readonly childrenByPath: ReadonlyMap<string, readonly CliCommand[]>;
+  readonly childByToken: ReadonlyMap<string, ReadonlyMap<string, CliCommand>>;
 }
 
 interface OptionIdentity {
@@ -493,8 +503,9 @@ const valueOptionProperties = new Set([
 
 /** Compiles a command tree or throws one structured definition error. */
 export function defineCli<const Definition extends CliDefinition>(
-  definition: ExactDefinition<Definition>
+  candidate: ExactDefinition<Definition>
 ): CliProgram<Definition> {
+  const definition = snapshotDefinitionData(candidate, [], new Set<object>()) as ExactDefinition<Definition>;
   const issues = validateDefinition(definition);
   if (issues.length > 0) throw new CliDefinitionError(issues);
 
@@ -547,6 +558,51 @@ export function findCliCommandChildren<Definition extends CliDefinition>(
   command: CliCommand
 ): readonly CliCommand[] {
   return lookupFor(program).childrenByPath.get(pathKey(command.path)) ?? Object.freeze([]);
+}
+
+/** Resolves one direct child token, including its aliases, in constant lookup time. */
+export function findCliCommandChild<Definition extends CliDefinition>(
+  program: CliProgram<Definition>, command: CliCommand, token: string
+): CliCommand | undefined {
+  return lookupFor(program).childByToken.get(pathKey(command.path))?.get(token);
+}
+
+function snapshotDefinitionData(value: unknown, path: readonly string[], ancestors: Set<object>): unknown {
+  if (typeof value !== 'object' || value === null) return value;
+  const reject = (message: string): never => { throw new CliDefinitionError([{
+    code: 'INVALID_DEFINITION_DATA', message, definitionPath: path
+  }]); };
+  if (ancestors.has(value)) return reject('Definitions must not contain cycles.');
+  const array = Array.isArray(value);
+  const prototype: unknown = Object.getPrototypeOf(value);
+  if (!array && prototype !== Object.prototype && prototype !== null) return reject('Definitions must use plain data objects.');
+  ancestors.add(value);
+  if (array) {
+    const lengthDescriptor = Object.getOwnPropertyDescriptor(value, 'length');
+    const length: unknown = lengthDescriptor !== undefined && 'value' in lengthDescriptor ? lengthDescriptor.value : undefined;
+    if (typeof length !== 'number' || !Number.isSafeInteger(length) || length < 0) return reject('Invalid definition array length.');
+    const output: unknown[] = new Array<unknown>(length);
+    for (let index = 0; index < length; index += 1) {
+      const descriptor = Object.getOwnPropertyDescriptor(value, index);
+      if (descriptor === undefined) continue;
+      if (!('value' in descriptor)) return reject('Definition arrays must contain data properties.');
+      output[index] = snapshotDefinitionData(descriptor.value, [...path, String(index)], ancestors);
+    }
+    if (Reflect.ownKeys(value).some((key) => key !== 'length' &&
+      !(typeof key === 'string' && /^(?:0|[1-9]\d*)$/u.test(key) && Number(key) < length))) {
+      return reject('Definition arrays cannot contain additional properties.');
+    }
+    ancestors.delete(value);
+    return Object.freeze(output);
+  }
+  const output = Object.create(null) as Record<PropertyKey, unknown>;
+  for (const key of Reflect.ownKeys(value)) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (descriptor === undefined || !('value' in descriptor)) return reject('Definitions must contain data properties, not accessors.');
+    output[key] = snapshotDefinitionData(descriptor.value, [...path, String(key)], ancestors);
+  }
+  ancestors.delete(value);
+  return Object.freeze(output);
 }
 
 function validateDefinition(definition: CliDefinition): readonly CliDefinitionIssue[] {
@@ -1188,10 +1244,11 @@ function compileCommand(
       (definition.aliases ?? []).map((alias) => compileAlias(alias, parentPath ?? []))
     ),
     ...(definition.description === undefined ? {} : { description: definition.description }),
-    ...(definition.deprecated === undefined ? {} : { deprecated: definition.deprecated }),
+    ...(definition.deprecated === undefined || definition.deprecated === false ? {} : { deprecated: definition.deprecated }),
     examples: Object.freeze((definition.examples ?? []).map(compileExample)),
     positionals: Object.freeze((definition.positionals ?? []).map(compilePositional)),
     options: Object.freeze([...inheritedOptions, ...localOptions]),
+    declaredOptions: parentPath === undefined ? inheritedOptions : localOptions,
     invokable: definition.invokable ?? true,
     acceptsPassthroughArguments: definition.acceptsPassthroughArguments ?? false
   });
@@ -1202,7 +1259,7 @@ function compileAlias(input: CliAliasInput, parentPath: readonly string[]): CliA
   return Object.freeze({
     name: definition.name,
     path: Object.freeze([...parentPath, definition.name]),
-    ...(definition.deprecated === undefined ? {} : { deprecated: definition.deprecated })
+    ...(definition.deprecated === undefined || definition.deprecated === false ? {} : { deprecated: definition.deprecated })
   });
 }
 
@@ -1286,10 +1343,17 @@ function createLookup(program: { readonly commands: readonly CliCommand[] }): Cl
     }
   }
   const childrenByPath = new Map<string, readonly CliCommand[]>();
+  const childByToken = new Map<string, ReadonlyMap<string, CliCommand>>();
   for (const [key, children] of mutableChildren) {
     childrenByPath.set(key, Object.freeze(children));
+    const tokens = new Map<string, CliCommand>();
+    for (const child of children) {
+      tokens.set(child.name, child);
+      for (const alias of child.aliases) tokens.set(alias.name, child);
+    }
+    childByToken.set(key, tokens);
   }
-  return { byPath, childrenByPath };
+  return { byPath, childrenByPath, childByToken };
 }
 
 function freezeDefinitionIssue(issue: CliDefinitionIssue): CliDefinitionIssue {

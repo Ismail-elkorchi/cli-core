@@ -45,20 +45,11 @@ defineCli({ name: 'ship', unsupported: true });
 defineCli({ name: 'ship', examples: [{ usage: 'ship', unsupported: true }] });
 
 const binder: CliOptionBinder = {
-  scan: () => ({
-    status: 'scanned',
-    options: [],
-    arguments: [],
-    afterDoubleDash: [],
-    unknownFlags: []
-  }),
-  bind: ({ options }) => ({
-    status: 'bound',
-    values: {},
-    specified: Object.fromEntries(options.map((option) => [option.name, false])),
-    positionals: [],
-    afterDoubleDash: [],
-    unknownFlags: []
+  create: () => ({
+    next: () => ({ nextIndex: 1, options: [], controlOptions: [], arguments: [], controls: [], afterDoubleDash: [],
+      unknownFlags: [], diagnostics: [], unclassified: [] }),
+    bind: ({ options }) => ({ status: 'bound', values: {},
+      specified: Object.fromEntries(options.map((option) => [option.name, false])) })
   })
 };
 const parser = createCliInvocationParser(binder);
@@ -156,3 +147,24 @@ const incompleteScannedValue: CliScannedOption = {
   valueArgvIndex: 1
 };
 void incompleteScannedValue;
+
+// Widened children terminate key recursion at every subtree.
+const dynamicChildren: readonly import('../../src/index.ts').CliCommandDefinition[] = [{ name: 'deploy' }];
+const mixedProgram = defineCli({ name: 'ship', commands: [{ name: 'group', commands: dynamicChildren }] });
+const mixedResult = parser.parse(mixedProgram);
+if (mixedResult.status === 'ready') {
+  const mixedKey: 'ship' | 'ship group' | `ship group ${string}` = mixedResult.commandKey;
+  void mixedKey;
+}
+const broadDefinition: import('../../src/index.ts').CliDefinition = { name: 'dynamic', commands: dynamicChildren };
+const broadResult = parser.parse(defineCli(broadDefinition));
+void broadResult;
+const partialProgram = defineCli({ name: 'ship', commands: dynamicChildren });
+void createCliInvocation(partialProgram, { optionValues: {}, specifiedOptions: {}, positionalValues: {} });
+
+const ownedRoute = parser.route(program);
+const boundRoute = parser.bind(ownedRoute);
+if (boundRoute.status === 'ready') {
+  const key: 'ship' | 'ship deploy' = boundRoute.commandKey;
+  void key;
+}
