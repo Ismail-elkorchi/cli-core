@@ -432,3 +432,136 @@ test('large owned option and control clusters retain offsets and prior spans', (
     assert.equal(parser.bind(route, { unknownFlagPolicy: 'collect' }).status, 'ready');
   }
 });
+
+test('terminator spans exclusively own the complete ordered passthrough suffix', () => {
+  const p = defineCli({ name: 'tool', options: [{ name: 'on', kind: 'boolean', flags: ['--on'] }] });
+  const entries = {
+    options: occurrence('on', '--on', 1),
+    controlOptions: occurrence('help', '--on', 1),
+    unknownFlags: { flag: '--on', argvElement: '--on', argvIndex: 1 },
+    arguments: arg('--on', 1), controls: arg('--on', 1), unclassified: arg('--on', 1)
+  };
+  for (const [field, entry] of Object.entries(entries)) {
+    const parser = scripted([step(2, { doubleDashArgvIndex: 0, [field]: [entry], diagnostics: [error()] })],
+      () => { throw new Error('must not decode malformed terminator'); });
+    const route = parser.route(p, { argv: ['--', '--on'] });
+    assert.equal(route.status, 'invalid', field);
+    assert.equal(route.classification.complete, false, field);
+    assert.equal(route.diagnostics[0].code, 'CLI_INVALID_BINDER_RESULT', field);
+    assert.deepEqual(route.classification[field], field === 'unclassified' ? [arg('--', 0), arg('--on', 1)] : [], field);
+    assert.equal(parser.bind(route).status, 'invalid', field);
+  }
+  for (const malformed of [
+    step(2, { doubleDashArgvIndex: 0, afterDoubleDash: [arg('a', 1)] }),
+    step(3, { doubleDashArgvIndex: 0, afterDoubleDash: [arg('b', 2), arg('a', 1)] }),
+    step(3, { doubleDashArgvIndex: 0, afterDoubleDash: [arg('a', 1)] })
+  ]) {
+    const route = scripted([malformed]).route(p, { argv: ['--', 'a', 'b'] });
+    assert.equal(route.status, 'invalid');
+    assert.equal(route.classification.complete, false);
+    assert.equal(route.diagnostics[0].code, 'CLI_INVALID_BINDER_RESULT');
+  }
+  for (const acceptsPassthroughArguments of [false, true]) {
+    const program = defineCli({ name: 'tool', acceptsPassthroughArguments });
+    const result = scripted([step(3, { doubleDashArgvIndex: 0, afterDoubleDash: [arg('--on', 1), arg('--', 2)] })])
+      .parse(program, { argv: ['--', '--on', '--'] });
+    assert.equal(result.status, acceptsPassthroughArguments ? 'ready' : 'invalid');
+    if (result.status === 'ready') assert.deepEqual(result.passthroughArguments, ['--on', '--']);
+    else assert.equal(result.diagnostics[0].code, 'CLI_PASSTHROUGH_ARGUMENTS_NOT_ACCEPTED');
+    assert.equal(scripted([step(1, { doubleDashArgvIndex: 0 })]).parse(program, { argv: ['--'] }).status, 'ready');
+  }
+});
+
+test('batched scans cannot classify beyond an unknown parent or unclassified ownership boundary', () => {
+  const p = defineCli({ name: 'tool', options: [{ name: 'on', kind: 'boolean', flags: ['--on'] }], commands: [{ name: 'run' }] });
+  const suffixes = {
+    options: occurrence('on', '--on', 2), controlOptions: occurrence('help', '--on', 2),
+    unknownFlags: { flag: '--on', argvElement: '--on', argvIndex: 2 },
+    arguments: arg('--on', 2), controls: arg('--on', 2), unclassified: arg('--on', 2)
+  };
+  for (const uncertainField of ['unknownFlags', 'unclassified']) {
+    for (const [field, entry] of Object.entries(suffixes)) {
+      if (uncertainField === 'unclassified' && field === 'unclassified') continue;
+      const uncertain = uncertainField === 'unknownFlags'
+        ? { flag: '--local', argvElement: '--local', argvIndex: 1 } : arg('--local', 1);
+      const fields = { [uncertainField]: [uncertain], diagnostics: [error()] };
+      fields[field] = [...(fields[field] ?? []), entry];
+      const parser = scripted([
+        step(1, { controlOptions: [occurrence('prior', '--prior', 0)] }), step(3, fields)
+      ], () => { throw new Error('must not decode uncertain ownership'); });
+      const route = parser.route(p, { argv: ['--prior', '--local', '--on'] });
+      assert.equal(route.status, 'invalid', `${uncertainField}/${field}`);
+      assert.equal(route.classification.complete, false);
+      assert.equal(route.diagnostics[0].code, 'CLI_INVALID_BINDER_RESULT');
+      assert.deepEqual(route.classification.controlOptions, [occurrence('prior', '--prior', 0)]);
+      assert.deepEqual(route.classification.options, []);
+      assert.deepEqual(route.classification.arguments, []);
+      assert.deepEqual(route.classification.controls, []);
+      assert.deepEqual(route.classification.unknownFlags, []);
+      assert.deepEqual(route.classification.unclassified, [arg('--local', 1), arg('--on', 2)]);
+      assert.equal(parser.bind(route, { unknownFlagPolicy: 'collect' }).status, 'invalid');
+    }
+  }
+});
+
+test('safe batched prefixes, separate values, clusters and unclassified suffixes retain ownership', () => {
+  const p = defineCli({ name: 'tool', options: [{ name: 'value', kind: 'value', flags: ['-v'], valueMode: 'required' }], commands: [{ name: 'run' }] });
+  const known = occurrence('value', '-v', 0, { rawValue: '--help', valueArgvIndex: 1, inline: false });
+  const unknown = { flag: '-x', argvElement: '-xh', argvIndex: 2, offset: 1 };
+  const control = occurrence('help', '-h', 2, { argvElement: '-xh', offset: 2 });
+  const parser = scripted([step(3, { options: [known], unknownFlags: [unknown], controlOptions: [control] })],
+    () => bound({ value: '--help' }, { value: true }));
+  const route = parser.route(p, { argv: ['-v', '--help', '-xh'] });
+  assert.equal(route.status, 'routed');
+  assert.equal(route.classification.complete, true);
+  assert.deepEqual(route.classification.options, [known]);
+  assert.deepEqual(route.classification.controlOptions, [control]);
+  assert.equal(parser.bind(route, { unknownFlagPolicy: 'collect' }).status, 'ready');
+  const incomplete = scripted([step(3, {
+    options: [known], unknownFlags: [unknown], controlOptions: [control]
+  })]).route(p, { argv: ['-v', '--help', '-xh', 'run'] });
+  assert.equal(incomplete.status, 'invalid');
+  assert.equal(incomplete.classification.complete, false);
+  assert.deepEqual(incomplete.classification.controlOptions, [control]);
+  assert.deepEqual(incomplete.classification.unclassified, [arg('run', 3)]);
+  const unclassified = scripted([step(3, {
+    controlOptions: [occurrence('help', '--help', 0)],
+    unclassified: [arg('bad', 1), arg('rest', 2)], diagnostics: [error()]
+  })]).route(p, { argv: ['--help', 'bad', 'rest'] });
+  assert.equal(unclassified.status, 'invalid');
+  assert.equal(unclassified.classification.complete, false);
+  assert.deepEqual(unclassified.classification.controlOptions, [occurrence('help', '--help', 0)]);
+  assert.deepEqual(unclassified.classification.unclassified, [arg('bad', 1), arg('rest', 2)]);
+  assert.equal(unclassified.diagnostics[0].code, 'VALUE_ERROR');
+});
+
+test('leaf unknown batches and binder-owned terminator-like values stay classified', () => {
+  const leaf = defineCli({ name: 'tool', options: [{ name: 'value', kind: 'value', flags: ['-v'], valueMode: 'required' }] });
+  const unknown = { flag: '--local', argvElement: '--local', argvIndex: 0 };
+  const control = occurrence('help', '--help', 1);
+  const parser = scripted([step(4, {
+    unknownFlags: [unknown], controlOptions: [control],
+    options: [occurrence('value', '-v', 2, { rawValue: '--', valueArgvIndex: 3, inline: false })]
+  })], () => bound({ value: '--' }, { value: true }));
+  const route = parser.route(leaf, { argv: ['--local', '--help', '-v', '--'] });
+  assert.equal(route.status, 'routed');
+  assert.equal(route.classification.complete, true);
+  assert.deepEqual(route.classification.unknownFlags, [unknown]);
+  assert.deepEqual(route.classification.controlOptions, [control]);
+  assert.equal(parser.bind(route, { unknownFlagPolicy: 'collect' }).status, 'ready');
+});
+
+test('separate values cannot cross an unknown cluster routing boundary', () => {
+  const p = defineCli({ name: 'tool', options: [{ name: 'value', kind: 'value', flags: ['-v'], valueMode: 'required' }], commands: [{ name: 'run' }] });
+  for (const field of ['options', 'controlOptions']) {
+    const route = scripted([step(2, {
+      [field]: [occurrence('value', '-v', 0, { argvElement: '-xv', offset: 2, rawValue: '--help', valueArgvIndex: 1, inline: false })],
+      unknownFlags: [{ flag: '-x', argvElement: '-xv', argvIndex: 0, offset: 1 }]
+    })]).route(p, { argv: ['-xv', '--help'] });
+    assert.equal(route.status, 'invalid');
+    assert.equal(route.classification.complete, false);
+    assert.deepEqual(route.classification[field], []);
+    assert.deepEqual(route.classification.unclassified, [arg('-xv', 0), arg('--help', 1)]);
+    assert.equal(route.diagnostics[0].code, 'CLI_INVALID_BINDER_RESULT');
+  }
+});

@@ -453,7 +453,8 @@ function routeCommand(
   let index = 0;
   while (index < argv.length && !uncertain) {
     const raw = adoptStep(session.next(Object.freeze({ command, options: command.options })));
-    const issue = validateScanStep(raw, argv, index, command);
+    const children = findCliCommandChildren(program, command);
+    const issue = validateScanStep(raw, argv, index, command, children.length > 0);
     if (issue !== undefined) {
       diagnostics.push(invalidBinderDiagnostic('scan', issue));
       blocked = true;
@@ -475,7 +476,6 @@ function routeCommand(
       uncertain = true;
       continue;
     }
-    const children = findCliCommandChildren(program, command);
     // A final-token unknown cannot hide a later command or consume a suffix value.
     // All other unknown ownership remains uncertain while children are in scope.
     if (children.length > 0 && step.unknownFlags.some((flag) => flag.argvIndex < argv.length - 1)) {
@@ -620,7 +620,7 @@ function flagsFor(command: CliCommand): ReadonlyMap<string, string> {
   return flags;
 }
 
-function validateScanStep(step: CliOptionScanStep, argv: readonly string[], start: number, command: CliCommand): string | undefined {
+function validateScanStep(step: CliOptionScanStep, argv: readonly string[], start: number, command: CliCommand, hasChildren: boolean): string | undefined {
   if (!isRecord(step) || !Number.isInteger(step.nextIndex) ||
     step.nextIndex <= start || step.nextIndex > argv.length) return 'Invalid cursor progress.';
   if (![step.options, step.controlOptions, step.arguments, step.controls, step.afterDoubleDash, step.unknownFlags, step.unclassified].every(Array.isArray) ||
@@ -656,7 +656,7 @@ function validateScanStep(step: CliOptionScanStep, argv: readonly string[], star
     if ((flag.inlineValue !== undefined && typeof flag.inlineValue !== 'string') ||
       (flag.suggestions !== undefined && !isStringArray(flag.suggestions))) return 'Invalid unknown flag.';
   }
-  for (const argument of [...step.arguments, ...step.controls, ...step.afterDoubleDash, ...step.unclassified]) {
+  for (const argument of [...step.arguments, ...step.controls, ...step.afterDoubleDash]) {
     if (!isRecord(argument) || !validIndex(argument.argvIndex) || argv[argument.argvIndex] !== argument.value ||
       !claim(argument.argvIndex)) return 'Invalid or overlapping argument ownership.';
   }
@@ -665,7 +665,15 @@ function validateScanStep(step: CliOptionScanStep, argv: readonly string[], star
   if (step.afterDoubleDash.some((arg, index) => arg.argvIndex !== start + index + 1)) return 'Passthrough arguments must retain source order.';
   if (step.afterDoubleDash.length > 0 && step.doubleDashArgvIndex === undefined) return 'Passthrough requires its terminator.';
   if (step.doubleDashArgvIndex !== undefined && (end !== argv.length ||
-    step.afterDoubleDash.some((arg) => arg.argvIndex <= step.doubleDashArgvIndex!))) return 'Invalid terminator partition.';
+    step.afterDoubleDash.length !== end - start - 1)) return 'Invalid terminator partition.';
+  // A malformed span must not publish records beyond an ownership boundary.
+  if (hasChildren && step.unknownFlags.some((flag) => flag.argvIndex < end - 1)) return 'A scan step cannot cross an unknown flag routing boundary.';
+  let lastClassified = start - 1;
+  for (const owned of owners) lastClassified = Math.max(lastClassified, owned);
+  for (const argument of step.unclassified) {
+    if (!isRecord(argument) || !validIndex(argument.argvIndex) || argv[argument.argvIndex] !== argument.value ||
+      argument.argvIndex <= lastClassified || !claim(argument.argvIndex)) return 'Invalid or overlapping unclassified suffix ownership.';
+  }
   if (step.unclassified.length > 0 && !hasErrorDiagnostics(step.diagnostics)) return 'Unclassified input requires an error diagnostic.';
   for (let index = start; index < end; index += 1) if (!owners.has(index)) return 'Unclassified argv element without ownership.';
   return undefined;
