@@ -6,13 +6,16 @@ if (!tag.startsWith('v')) {
 }
 
 const version = tag.slice(1);
-const [packageJson, jsrJson, changelog] = await Promise.all([
+const [packageJson, packageLock, jsrJson, changelog] = await Promise.all([
   readJson('package.json'),
+  readJson('package-lock.json'),
   readJson('jsr.json'),
   readFile('CHANGELOG.md', 'utf8')
 ]);
 
 assertEqual(packageJson.version, version, 'package.json version');
+assertEqual(packageLock.version, version, 'package-lock.json version');
+assertEqual(packageLock.packages?.['']?.version, version, 'package-lock.json packages[""] version');
 assertEqual(jsrJson.version, version, 'jsr.json version');
 
 if (!hasVersionHeading(changelog, version)) {
@@ -40,11 +43,7 @@ function hasVersionHeading(changelog, version) {
     const trimmed = line.trim();
     if (!(trimmed.startsWith('## ') || trimmed.startsWith('### '))) return false;
 
-    const heading = trimmed.replace(/^#{2,3}\s+/u, '');
-    const normalized = heading.startsWith('v') ? heading.slice(1) : heading;
-    return normalized === version
-      || normalized.startsWith(`${version} `)
-      || normalized.startsWith(`${version}(`)
-      || normalized.startsWith(`${version}-`);
+    const heading = /^#{2,3}\s+v?([^\s(]+)/u.exec(trimmed);
+    return heading?.[1] === version;
   });
 }

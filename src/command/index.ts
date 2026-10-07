@@ -241,25 +241,58 @@ type CommandsOf<Definition> = Definition extends { readonly commands?: infer Com
     : never
   : never;
 
-type InvokableCommandKeyFor<
-  ProgramName extends string,
-  Command,
-  Prefix extends string = ''
-> = Command extends { readonly name: infer Name extends string }
-  ? string extends Name
-    ? `${ProgramName} ${Prefix}${string}`
-    : (Command extends { readonly invokable: false }
-      ? never
-      : `${ProgramName} ${Prefix}${Name}`) |
-    InvokableCommandKeyFor<ProgramName, CommandsOf<Command>, `${Prefix}${Name} `>
+type InvokableDynamicCommandKeyFor<ProgramName extends string, Command, Prefix extends string> =
+  Command extends { readonly name: infer Name extends string }
+    ? (Command extends { readonly invokable: false } ? never : `${ProgramName} ${Prefix}${Name}`) |
+      ([CommandsOf<Command>] extends [never] ? never : `${ProgramName} ${Prefix}${Name} ${string}`)
+    : never;
+
+type IsUnion<Value, Whole = Value> = Value extends unknown
+  ? [Whole] extends [Value] ? false : true
   : never;
 
-/** Canonical keys that can produce successful invocations. */
+type InvokableTupleKeyFor<
+  ProgramName extends string,
+  Commands extends readonly CliCommandDefinition[],
+  Prefix extends string
+> = {
+  [Index in keyof Commands]: IsUnion<Commands[Index]> extends false
+    ? InvokableCommandKeyFor<ProgramName, Commands[Index], Prefix>
+    : InvokableDynamicCommandKeyFor<ProgramName, Commands[Index], Prefix>;
+}[number];
+
+// Optional, union-valued, or non-tuple child collections describe dynamic trees, including
+// recursive generic subtypes whose shape changes at every level. Keep their known
+// leading names and widen descendants instead of traversing unbounded types.
+type InvokableChildrenKeyFor<ProgramName extends string, Definition, Prefix extends string = ''> =
+  Definition extends { readonly commands?: infer Commands }
+    ? [Commands] extends [readonly CliCommandDefinition[]]
+      ? Definition extends { readonly commands: unknown }
+        ? number extends Commands['length']
+          ? InvokableDynamicCommandKeyFor<ProgramName, Commands[number], Prefix>
+          : IsUnion<Commands> extends false
+            ? InvokableTupleKeyFor<ProgramName, Commands, Prefix>
+            : InvokableDynamicCommandKeyFor<ProgramName, Commands[number], Prefix>
+        : InvokableDynamicCommandKeyFor<ProgramName, Commands[number], Prefix>
+      : never
+    : never;
+
+type InvokableCommandKeyFor<ProgramName extends string, Command, Prefix extends string> =
+  Command extends { readonly name: infer Name extends string }
+    ? string extends Name
+      ? `${ProgramName} ${Prefix}${string}`
+      : (Command extends { readonly invokable: false } ? never : `${ProgramName} ${Prefix}${Name}`) |
+        InvokableChildrenKeyFor<ProgramName, Command, `${Prefix}${Name} `>
+    : never;
+
+/** Canonical keys that can produce successful invocations. Recursive subtrees widen safely. */
 export type CliInvokableCommandKey<Definition extends CliDefinition> =
-  string extends Definition['name']
-    ? string
-    : (Definition extends { readonly invokable: false } ? never : Definition['name']) |
-      InvokableCommandKeyFor<Definition['name'], CommandsOf<Definition>>;
+  Definition extends CliDefinition
+    ? string extends Definition['name']
+      ? string
+      : (Definition extends { readonly invokable: false } ? never : Definition['name']) |
+        InvokableChildrenKeyFor<Definition['name'], Definition>
+    : never;
 
 /** Why a CLI definition could not be compiled. */
 export type CliDefinitionIssue =
@@ -430,14 +463,18 @@ interface CliProgramRuntime {
   readonly commands: readonly CliCommand[];
 }
 
+declare const programDefinition: unique symbol;
+declare const programCommandKeys: unique symbol;
+
 /** A valid immutable command program retaining its literal definition type. */
-export type CliProgram<Definition extends CliDefinition = CliDefinition> =
-  CliProgramRuntime & (string extends Definition['name']
-    ? object
-    : {
-        readonly name: Definition['name'];
-        readonly root: CliCommand<Definition['name']>;
-      });
+export type CliProgram<Definition extends CliDefinition = CliDefinition> = CliProgramRuntime & {
+  readonly name: Definition['name'];
+  readonly root: CliCommand<Definition['name']>;
+  // Type-only identity: callers cannot access internal mutable lookup managers.
+  readonly [programDefinition]?: Definition;
+  // Extra definition properties can add commands: retain the possible keys too.
+  readonly [programCommandKeys]?: CliInvokableCommandKey<Definition>;
+};
 
 interface CliCommandLookup {
   readonly byPath: ReadonlyMap<string, CliCommand>;

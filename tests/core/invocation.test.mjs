@@ -29,7 +29,7 @@ test('cursor routing changes scope once per command and retains exact ownership'
     step(5, { arguments: [arg('d', 4)] }), step(7, { options: [occurrence('region', '--region', 5, { rawValue: 'eu', valueArgvIndex: 6, inline: false })] }),
     step(8, { arguments: [arg('api', 7)] }), step(9, { arguments: [arg('one', 8)] }),
     step(11, { doubleDashArgvIndex: 9, afterDoubleDash: [arg('--watch', 10)] })
-  ].map((entry) => (scope) => { scopes.push(scope.command.key); return entry; });
+  ].map((entry) => (scope) => { scopes.push(scope.key); return entry; });
   let decodes = 0;
   const parser = scripted(steps, () => { decodes++; return bound({ verbose: true, config: 'file', region: 'eu' }, { verbose: true, config: true, region: true }); });
   const route = parser.route(program, { argv: ['-v', 'project', '--config', 'file', 'd', '--region', 'eu', 'api', 'one', '--', '--watch'] });
@@ -563,5 +563,149 @@ test('separate values cannot cross an unknown cluster routing boundary', () => {
     assert.deepEqual(route.classification[field], []);
     assert.deepEqual(route.classification.unclassified, [arg('-xv', 0), arg('--help', 1)]);
     assert.equal(route.diagnostics[0].code, 'CLI_INVALID_BINDER_RESULT');
+  }
+});
+
+test('scan and decode diagnostics retain stage ownership without lossy equality', () => {
+  const p = defineCli({ name: 'tool' });
+  const scan = createCliOptionDiagnostic('SAME', 'warning', 'same', { payload: { stage: 'scan' } });
+  const decode = createCliOptionDiagnostic('SAME', 'error', 'same', { payload: { stage: 'decode' } });
+  const parser = scripted([step(1, { controls: [arg('x', 0)], diagnostics: [scan] })],
+    () => ({ status: 'invalid', diagnostics: [decode, createCliOptionDiagnostic('SAME', 'error', 'same', { other: true })] }));
+  const result = parser.parse(p, { argv: ['x'] });
+  assert.equal(result.status, 'invalid');
+  assert.deepEqual(result.diagnostics.map(({ severity }) => severity), ['warning', 'error', 'error']);
+  assert.equal(result.diagnostics[0].details.payload, scan.details.payload);
+  assert.equal(result.diagnostics[1].details.payload, decode.details.payload);
+  for (const retained of [[], [createCliOptionDiagnostic('SCAN', 'warning', 'warning')], [error('SCAN')]]) {
+    const parser = scripted([step(1, { controls: [arg('x', 0)], diagnostics: retained })], () => ({ status: 'invalid', diagnostics: [] }));
+    const result = parser.parse(p, { argv: ['x'] });
+    assert.equal(result.status, 'invalid');
+    assert.equal(result.diagnostics.some(({ severity }) => severity === 'error'), true);
+    assert.equal(result.diagnostics.some(({ code }) => code === 'CLI_INVALID_BINDER_RESULT'), !retained.some(({ severity }) => severity === 'error'));
+    assert.equal(result.diagnostics.filter(({ code }) => code === 'SCAN').length, retained.length);
+  }
+});
+
+test('unknown policy applies to routing failures and malformed decoding while uncertainty survives collect', () => {
+  const unknown = { flag: '--wat', argvElement: '--wat', argvIndex: 0 };
+  const leaf = defineCli({ name: 'tool' });
+  const scenarios = [
+    [leaf, [step(1, { unknownFlags: [unknown] }), step(1)], ['--wat', 'bad'], () => bound()],
+    [leaf, [step(1, { unknownFlags: [unknown] })], ['--wat'], () => null],
+    [defineCli({ name: 'tool', invokable: false, commands: [{ name: 'run' }] }), [step(1, { unknownFlags: [unknown] })], ['--wat'], () => bound()],
+    [defineCli({ name: 'tool', commands: [{ name: 'run' }] }), [step(1, { unknownFlags: [unknown] })], ['--wat', 'run'], () => bound()]
+  ];
+  for (const [program, steps, argv, decode] of scenarios) {
+    const parser = scripted(steps, decode);
+    const route = parser.route(program, { argv });
+    for (const policy of ['error', 'collect']) {
+      const result = parser.bind(route, { unknownFlagPolicy: policy });
+      assert.equal(result.status, 'invalid');
+      assert.equal(result.diagnostics.filter(({ code }) => code === 'CLI_UNKNOWN_FLAG').length, policy === 'error' ? 1 : 0);
+      assert.equal(result.diagnostics.some(({ severity }) => severity === 'error'), true);
+    }
+  }
+  const parser = scripted([step(1, { unknownFlags: [unknown] })]);
+  const uncertain = parser.parse(defineCli({ name: 'tool', commands: [{ name: 'run' }] }), { argv: ['--wat', 'run'], unknownFlagPolicy: 'collect' });
+  const diagnostic = uncertain.diagnostics.find(({ code }) => code === 'CLI_ROUTING_UNCERTAIN');
+  assert.deepEqual(diagnostic.flags, [unknown]);
+  assert.equal(Object.isFrozen(diagnostic.flags), true);
+});
+
+test('structured positional validation covers missing, undefined, shape, required variadic and undeclared names', () => {
+  const scalar = defineCli({ name: 'tool', positionals: [{ name: 'value' }] });
+  const optional = defineCli({ name: 'tool', positionals: [{ name: 'value', required: false }] });
+  const variadic = defineCli({ name: 'tool', positionals: [{ name: 'value', variadic: true }] });
+  const optionalVariadic = defineCli({ name: 'tool', positionals: [{ name: 'value', variadic: true, required: false }] });
+  const invoke = (program, positionalValues) => createCliInvocation(program, { optionValues: {}, specifiedOptions: {}, positionalValues });
+  for (const [program, positionals] of [[scalar, {}], [optional, {}], [scalar, { value: undefined }], [scalar, { value: [] }], [scalar, { value: 1 }], [variadic, { value: 'x' }], [variadic, { value: undefined }], [variadic, { value: [] }], [variadic, { value: [1] }], [scalar, { value: 'x', extra: 'y' }]]) {
+    const result = invoke(program, positionals);
+    assert.equal(result.status, 'invalid');
+    assert.equal(result.diagnostics[0].code, 'CLI_INVALID_STRUCTURED_INVOCATION');
+    assert.equal(Object.isFrozen(result.diagnostics[0]), true);
+  }
+  for (const [program, positionals] of [[scalar, { value: 'x' }], [optional, { value: undefined }], [variadic, { value: ['x'] }], [optionalVariadic, { value: [] }]]) {
+    const result = invoke(program, positionals);
+    assert.equal(result.status, 'ready');
+    assert.deepEqual(Object.entries(result.positionalValues), Object.entries(positionals));
+    assert.equal(Object.isFrozen(result.positionalValues), true);
+    if (Array.isArray(result.positionalValues.value)) assert.equal(Object.isFrozen(result.positionalValues.value), true);
+  }
+});
+
+test('decoded presence must match the authoritative scan in both directions', () => {
+  const p = defineCli({ name: 'tool', options: [{ name: 'on', kind: 'boolean', flags: ['--on'] }] });
+  for (const scanned of [true, false]) {
+    const parser = scripted(scanned ? [step(1, { options: [occurrence('on', '--on', 0)] })] : [],
+      () => bound(scanned ? {} : { on: true }, { on: !scanned }));
+    const result = parser.parse(p, { argv: scanned ? ['--on'] : [] });
+    assert.equal(result.status, 'invalid');
+    assert.match(result.diagnostics[0].reason, /presence disagrees/u);
+  }
+});
+
+test('malformed diagnostic fields reject independently at scan and decode boundaries', () => {
+  const p = defineCli({ name: 'tool' });
+  const valid = { source: 'option', code: 'ISSUE', severity: 'error', message: 'issue', details: {} };
+  const malformed = [null, { ...valid, source: 'command' }, { ...valid, code: 1 }, { ...valid, severity: 'fatal' }, { ...valid, message: 1 }, { ...valid, details: [] }, { ...valid, details: undefined }];
+  for (const diagnostic of malformed) {
+    const scan = scripted([step(1, { controls: [arg('x', 0)], diagnostics: [diagnostic] })]).parse(p, { argv: ['x'] });
+    const decode = scripted([], () => ({ status: 'invalid', diagnostics: [diagnostic] })).parse(p);
+    for (const [result, stage] of [[scan, 'scan'], [decode, 'bind']]) {
+      assert.equal(result.status, 'invalid');
+      assert.equal(result.diagnostics[0].code, 'CLI_INVALID_BINDER_RESULT');
+      assert.equal(result.diagnostics[0].stage, stage);
+    }
+  }
+});
+
+test('framework diagnostics cannot poison cached results while nested application payloads remain opaque', () => {
+  const deprecated = defineCli({ name: 'tool', commands: [{ name: 'old', deprecated: true }] });
+  const missing = defineCli({ name: 'tool', positionals: [{ name: 'required' }] });
+  const variadic = defineCli({ name: 'tool', positionals: [{ name: 'required', variadic: true }] });
+  for (const program of [deprecated, missing, variadic]) {
+    const parser = scripted(program === deprecated ? [step(1, { arguments: [arg('old', 0)] })] : []);
+    const route = parser.route(program, { argv: program === deprecated ? ['old'] : [] });
+    const result = parser.bind(route);
+    assert.equal(Object.isFrozen(result.diagnostics[0]), true);
+    assert.throws(() => { result.diagnostics[0].severity = 'error'; }, TypeError);
+    assert.equal(parser.bind(route), result);
+    assert.equal(parser.bind(route, { unknownFlagPolicy: 'collect' }).diagnostics[0].severity, result.diagnostics[0].severity);
+  }
+  const structured = createCliInvocation(deprecated, { commandPath: ['missing'], optionValues: {}, specifiedOptions: {}, positionalValues: {} });
+  assert.equal(Object.isFrozen(structured.diagnostics[0]), true);
+  const extra = scripted([step(1, { arguments: [arg('x', 0)] })]).parse(defineCli({ name: 'tool' }), { argv: ['x'] });
+  assert.equal(Object.isFrozen(extra.diagnostics[0]), true);
+  assert.equal(Object.isFrozen(extra.diagnostics[0].values), true);
+  const payload = { nested: ['application-owned'] };
+  const p = defineCli({ name: 'tool', options: [{ name: 'value', kind: 'boolean', flags: ['--value'], hasDefault: true }] });
+  const result = scripted([], () => bound({ value: payload }, { value: false })).parse(p);
+  assert.equal(result.status, 'ready');
+  assert.equal(result.optionValues.value, payload);
+  assert.equal(Object.isFrozen(payload), false);
+  const diagnostic = createCliOptionDiagnostic('PAYLOAD', 'warning', 'payload', { payload });
+  const scanned = scripted([step(1, { controls: [arg('x', 0)], diagnostics: [diagnostic] })]).parse(defineCli({ name: 'tool' }), { argv: ['x'] });
+  assert.equal(scanned.diagnostics[0].details.payload, payload);
+  assert.equal(Object.isFrozen(scanned.diagnostics[0].details), true);
+  assert.equal(Object.isFrozen(payload.nested), false);
+});
+
+
+test('core unknown policy cannot explain an otherwise unexplained decoder failure', () => {
+  const p = defineCli({ name: 'tool' });
+  for (const scanDiagnostics of [[], [error('LEXICAL_ERROR')]]) {
+    const parser = scripted([step(1, {
+      unknownFlags: [{ flag: '--wat', argvElement: '--wat', argvIndex: 0 }],
+      diagnostics: scanDiagnostics
+    })], () => ({ status: 'invalid', diagnostics: [] }));
+    const route = parser.route(p, { argv: ['--wat'] });
+    for (const unknownFlagPolicy of ['error', 'collect']) {
+      const result = parser.bind(route, { unknownFlagPolicy });
+      assert.equal(result.status, 'invalid');
+      assert.equal(result.diagnostics.filter(({ code }) => code === 'CLI_INVALID_BINDER_RESULT').length, scanDiagnostics.length === 0 ? 1 : 0);
+      assert.equal(result.diagnostics.filter(({ code }) => code === 'CLI_UNKNOWN_FLAG').length, unknownFlagPolicy === 'error' ? 1 : 0);
+      assert.equal(result.diagnostics.filter(({ code }) => code === 'LEXICAL_ERROR').length, scanDiagnostics.length);
+    }
   }
 });
