@@ -261,3 +261,22 @@ test('option presentation cannot claim values that the option does not materiali
       issue.code === 'INVALID_OPTION' && issue.reason === 'repeat')
   );
 });
+
+test('definition adoption preserves non-enumerable data and rejects accessors without reading', () => {
+  let reads = 0;
+  const definition = Object.defineProperty({}, 'name', { value: 'tool' });
+  assert.equal(defineCli(definition).name, 'tool');
+  const accessor = Object.defineProperty({}, 'name', { get() { reads++; return 'tool'; } });
+  assert.throws(() => defineCli(accessor), (error) => error instanceof CliDefinitionError && error.issues[0].code === 'INVALID_DEFINITION_DATA');
+  assert.equal(reads, 0);
+  const cyclic = { name: 'child' }; cyclic.commands = [cyclic];
+  assert.throws(() => defineCli({ name: 'tool', commands: [cyclic] }), CliDefinitionError);
+});
+
+test('declared and effective option metadata retain one inheritance model', () => {
+  const p = defineCli({ name: 'tool', options: [{ name: 'global', kind: 'boolean', flags: ['-g'] }], commands: [{ name: 'run', options: [{ name: 'local', kind: 'boolean', flags: ['-l'] }] }] });
+  assert.deepEqual(p.root.declaredOptions.map(({ name }) => name), ['global']);
+  assert.deepEqual(p.commands[1].declaredOptions.map(({ name }) => name), ['local']);
+  assert.deepEqual(p.commands[1].options.map(({ name }) => name), ['global', 'local']);
+  assert.equal(p.commands[1].options[0], p.root.declaredOptions[0]);
+});

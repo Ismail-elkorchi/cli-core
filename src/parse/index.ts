@@ -1,6 +1,8 @@
+import { readDataArray as adoptArray, readDataRecord as adoptRecord } from '../data.ts';
 import {
   findCliCommand,
   findCliCommandChildren,
+  findCliCommandChild,
   type CliAlias,
   type CliCommand,
   type CliDefinition,
@@ -23,13 +25,10 @@ export interface CliArgvParseInput {
   readonly unknownFlagPolicy?: 'error' | 'collect';
 }
 
-/** Input supplied to an option binder. */
-export interface CliOptionBindingInput {
+/** Command scope selected by the router for the next lexical span. */
+export interface CliOptionScope {
   readonly command: CliCommand;
   readonly options: readonly CliOption[];
-  readonly argv: readonly string[];
-  /** Complete-invocation index for each element in `argv`. */
-  readonly argvIndexes: readonly number[];
 }
 
 /** One non-option argument classified by a binder. */
@@ -43,25 +42,15 @@ interface CliScannedOptionBase {
   readonly flag: string;
   readonly argvElement: string;
   readonly argvIndex: number;
-  /** UTF-16 offset for a member of a short-option cluster. */
   readonly offset?: number;
 }
 
-/** One recognized option occurrence and its complete argv ownership. */
+/** An option occurrence whose source ownership is fixed by the grammar owner. */
 export type CliScannedOption = CliScannedOptionBase & (
-  | {
-      readonly rawValue?: never;
-      readonly valueArgvIndex?: never;
-      readonly inline?: never;
-    }
-  | {
-      readonly rawValue: string;
-      readonly valueArgvIndex: number;
-      readonly inline: boolean;
-    }
+  | { readonly rawValue?: never; readonly valueArgvIndex?: never; readonly inline?: never }
+  | { readonly rawValue: string; readonly valueArgvIndex: number; readonly inline: boolean }
 );
 
-/** One unknown flag preserved at its original argv location. */
 export interface CliUnknownFlag {
   readonly argvElement: string;
   readonly flag: string;
@@ -71,50 +60,64 @@ export interface CliUnknownFlag {
   readonly suggestions?: readonly string[];
 }
 
-/** Successful token classification by the option grammar owner. */
-export interface CliOptionScanSuccess {
-  readonly status: 'scanned';
+/** One contiguous classified span. Unknown syntax owns its token but blocks routing. */
+export interface CliOptionScanStep {
+  /** Exclusive original argv index reached by this step. */
+  readonly nextIndex: number;
   readonly options: readonly CliScannedOption[];
+  /** Integration-owned flag controls, excluded from the domain option namespace. */
+  readonly controlOptions: readonly CliScannedOption[];
   readonly arguments: readonly CliScannedArgument[];
+  /** Integration-owned control arguments; never command or positional tokens. */
+  readonly controls: readonly CliScannedArgument[];
   readonly afterDoubleDash: readonly CliScannedArgument[];
-  readonly doubleDashArgvIndex?: number;
   readonly unknownFlags: readonly CliUnknownFlag[];
-}
-
-/** Failed token classification. */
-export interface CliOptionScanFailure {
-  readonly status: 'invalid';
   readonly diagnostics: readonly CliOptionDiagnostic[];
-  readonly unknownFlags: readonly CliUnknownFlag[];
+  /** Tokens that cannot be classified safely, never positional arguments. */
+  readonly unclassified: readonly CliScannedArgument[];
+  readonly doubleDashArgvIndex?: number;
 }
 
-/** Result of classifying argv without decoding values. */
-export type CliOptionScanResult = CliOptionScanSuccess | CliOptionScanFailure;
+/** Immutable authoritative classification retained for presentation and binding. */
+export interface CliArgvClassification {
+  /** Whether traversal reached the end without losing routing certainty. */
+  readonly complete: boolean;
+  readonly argv: readonly string[];
+  readonly options: readonly CliScannedOption[];
+  /** Integration-owned flag controls, excluded from the domain option namespace. */
+  readonly controlOptions: readonly CliScannedOption[];
+  readonly arguments: readonly CliScannedArgument[];
+  /** Integration-owned control arguments; never command or positional tokens. */
+  readonly controls: readonly CliScannedArgument[];
+  readonly afterDoubleDash: readonly CliScannedArgument[];
+  readonly unknownFlags: readonly CliUnknownFlag[];
+  readonly diagnostics: readonly CliOptionDiagnostic[];
+  readonly unclassified: readonly CliScannedArgument[];
+  readonly doubleDashArgvIndex?: number;
+}
 
-/** Successful low-level option binding. */
 export interface CliOptionBindingSuccess {
   readonly status: 'bound';
   readonly values: Readonly<Record<string, unknown>>;
   readonly specified: Readonly<Record<string, boolean>>;
-  readonly positionals: readonly string[];
-  readonly afterDoubleDash: readonly string[];
-  readonly unknownFlags: readonly CliUnknownFlag[];
 }
 
-/** Failed low-level option binding. Partial values are intentionally absent. */
 export interface CliOptionBindingFailure {
   readonly status: 'invalid';
   readonly diagnostics: readonly CliOptionDiagnostic[];
-  readonly unknownFlags: readonly CliUnknownFlag[];
 }
 
-/** Parser-independent output from an option binder. */
 export type CliOptionBindingResult = CliOptionBindingSuccess | CliOptionBindingFailure;
 
-/** Adapter boundary implemented by the owner of token-level option grammar. */
+/** One invocation's grammar state. bind decodes the spans already returned by next. */
+export interface CliOptionBindingSession {
+  readonly next: (scope: CliOptionScope) => CliOptionScanStep;
+  readonly bind: (scope: CliOptionScope) => CliOptionBindingResult;
+}
+
+/** Grammar owner creates an isolated cursor for each invocation. */
 export interface CliOptionBinder {
-  readonly scan: (input: CliOptionBindingInput) => CliOptionScanResult;
-  readonly bind: (input: CliOptionBindingInput) => CliOptionBindingResult;
+  readonly create: (argv: readonly string[]) => CliOptionBindingSession;
 }
 
 /** Alias use retained on a successful invocation. */
@@ -179,47 +182,42 @@ export type CliInvocationResult<Definition extends CliDefinition = CliDefinition
   | CliInvocationFor<Definition>
   | CliInvocationFailure;
 
-/** Successful command route over binder-classified arguments. */
+/** A resolved route can still contain lexical errors; it is never an invocation. */
 export interface CliCommandRouteSuccess {
   readonly status: 'routed';
   readonly command: CliCommand;
   readonly commandIndexes: readonly number[];
   readonly usedAliases: readonly CliAliasUse[];
+  readonly classification: CliArgvClassification;
+  readonly diagnostics: readonly CliDiagnostic[];
 }
 
-/** Rejected command route. */
 export interface CliCommandRouteFailure {
   readonly status: 'invalid';
   readonly command: CliCommand;
+  readonly commandIndexes: readonly number[];
+  readonly usedAliases: readonly CliAliasUse[];
+  readonly classification: CliArgvClassification;
   readonly diagnostics: readonly CliDiagnostic[];
-  readonly unknownFlags: readonly CliUnknownFlag[];
 }
 
-type CliCommandRouteSuccessFor<Definition extends CliDefinition> =
-  string extends Definition['name']
-    ? CliCommandRouteSuccess
-    : CliInvokableCommandKey<Definition> extends infer Key extends string
-      ? Key extends string
-        ? Omit<CliCommandRouteSuccess, 'command'> & {
-            readonly command: CliCommand<Key>;
-          }
-        : never
-      : never;
-
-/** Result of routing command tokens, retaining literal keys from its program. */
+/** Result of resolving command identity without decoding option values. */
 export type CliCommandRoute<Definition extends CliDefinition = CliDefinition> =
-  | CliCommandRouteSuccessFor<Definition>
+  | (Omit<CliCommandRouteSuccess, 'command'> & {
+      readonly command: CliCommand<CliInvokableCommandKey<Definition>>;
+    })
   | CliCommandRouteFailure;
 
-/** Reusable command-aware parser. */
 export interface CliInvocationParser {
   readonly route: <Definition extends CliDefinition>(
-    program: CliProgram<Definition>,
-    input?: CliArgvParseInput
+    program: CliProgram<Definition>, input?: CliArgvParseInput
   ) => CliCommandRoute<Definition>;
+  /** Decodes only a route owned by this parser, at most once. */
+  readonly bind: <Definition extends CliDefinition>(
+    route: CliCommandRoute<Definition>, input?: Pick<CliArgvParseInput, 'unknownFlagPolicy'>
+  ) => CliInvocationResult<Definition>;
   readonly parse: <Definition extends CliDefinition>(
-    program: CliProgram<Definition>,
-    input?: CliArgvParseInput
+    program: CliProgram<Definition>, input?: CliArgvParseInput
   ) => CliInvocationResult<Definition>;
 }
 
@@ -248,23 +246,6 @@ interface RoutedAliasUse {
   readonly token: string;
 }
 
-interface InternalRouteSuccess {
-  readonly status: 'routed';
-  readonly command: CliCommand;
-  readonly commandIndexes: readonly number[];
-  readonly aliases: readonly RoutedAliasUse[];
-  readonly scan: CliOptionScanSuccess;
-}
-
-interface InternalRouteFailure {
-  readonly status: 'invalid';
-  readonly command: CliCommand;
-  readonly diagnostics: readonly CliDiagnostic[];
-  readonly unknownFlags: readonly CliUnknownFlag[];
-}
-
-type InternalRoute = InternalRouteSuccess | InternalRouteFailure;
-
 interface PositionalBindingSuccess {
   readonly status: 'bound';
   readonly values: Readonly<Record<string, string | readonly string[] | undefined>>;
@@ -275,29 +256,62 @@ interface PositionalBindingFailure {
   readonly diagnostics: readonly CliCoreDiagnostic[];
 }
 
-/** Creates an invocation parser around an explicit option grammar adapter. */
-export function createCliInvocationParser(bindOptions: CliOptionBinder): CliInvocationParser {
+/** Creates a command router and decoder around an isolated grammar cursor. */
+export function createCliInvocationParser(binder: CliOptionBinder): CliInvocationParser {
+  const owned = new WeakMap<object, CliOptionBindingSession>();
+  const results = new WeakMap<object, Map<string, CliInvocationResult>>();
+  function route<Definition extends CliDefinition>(
+    program: CliProgram<Definition>, input: CliArgvParseInput = {}
+  ): CliCommandRoute<Definition> {
+    const argv = freezeArgv(input.argv ?? []);
+    const created = binder.create(argv);
+    let decoded: CliOptionBindingResult | undefined;
+    let decodedOnce = false;
+    let decodingFailed = false;
+    let decodingError: unknown;
+    const session: CliOptionBindingSession = Object.freeze({
+      next: (scope: CliOptionScope) => created.next(scope),
+      bind: (scope: CliOptionScope) => {
+        if (!decodedOnce) {
+          decodedOnce = true;
+          try {
+            decoded = adoptBinding(created.bind(scope));
+          } catch (error) {
+            decodingFailed = true;
+            decodingError = error;
+          }
+        }
+        if (decodingFailed) throw decodingError;
+        return decoded as CliOptionBindingResult;
+      }
+    });
+    const result = routeCommand(program, session, argv);
+    owned.set(result, session);
+    return result as CliCommandRoute<Definition>;
+  }
+  function bind<Definition extends CliDefinition>(
+    routed: CliCommandRoute<Definition>, input: Pick<CliArgvParseInput, 'unknownFlagPolicy'> = {}
+  ): CliInvocationResult<Definition> {
+    const session = owned.get(routed);
+    if (session === undefined) throw new TypeError('Route is not owned by this invocation parser.');
+    const policy = input.unknownFlagPolicy ?? 'error';
+    const cached = results.get(routed);
+    const previous = cached?.get(policy);
+    if (previous !== undefined) return previous as CliInvocationResult<Definition>;
+    // Decode once. A second policy cannot invoke a stateful decoder again.
+    const result = bindRoute(routed, session, policy);
+    const cache = cached ?? new Map<string, CliInvocationResult>();
+    cache.set(policy, result);
+    results.set(routed, cache);
+    return result as CliInvocationResult<Definition>;
+  }
   return Object.freeze({
-    route<Definition extends CliDefinition>(
-      program: CliProgram<Definition>,
-      input: CliArgvParseInput = {}
-    ): CliCommandRoute<Definition> {
-      const argv = freezeArgv(input.argv ?? []);
-      const route = routeCommand(program, bindOptions, argv);
-      return (route.status === 'invalid'
-        ? route
-        : Object.freeze({
-            status: 'routed',
-            command: route.command,
-            commandIndexes: route.commandIndexes,
-            usedAliases: Object.freeze(route.aliases.map(compileAliasUse))
-          })) as CliCommandRoute<Definition>;
-    },
+    route,
+    bind,
     parse<Definition extends CliDefinition>(
-      program: CliProgram<Definition>,
-      input: CliArgvParseInput = {}
+      program: CliProgram<Definition>, input: CliArgvParseInput = {}
     ): CliInvocationResult<Definition> {
-      return parseInvocation(program, bindOptions, input);
+      return bind(route(program, input), input);
     }
   });
 }
@@ -366,193 +380,143 @@ export function createCliInvocation(
   });
 }
 
-function parseInvocation<Definition extends CliDefinition>(
-  program: CliProgram<Definition>,
-  binder: CliOptionBinder,
-  input: CliArgvParseInput
-): CliInvocationResult<Definition>;
-function parseInvocation(
-  program: CliProgram,
-  binder: CliOptionBinder,
-  input: CliArgvParseInput
+function bindRoute(
+  route: CliCommandRoute,
+  session: CliOptionBindingSession,
+  policy: 'error' | 'collect'
 ): CliInvocationResult {
-  const argv = freezeArgv(input.argv ?? []);
-  const source = argvSource(argv);
-  const route = routeCommand(program, binder, argv);
+  const scan = route.classification;
+  const source = argvSource(scan.argv);
   if (route.status === 'invalid') {
-    return failure(source, route.command, route.diagnostics, route.unknownFlags);
+    return failure(source, route.command, route.diagnostics, scan.unknownFlags);
   }
-
-  const commandIndexes = new Set(route.commandIndexes);
-  const binderElements = argv.flatMap((element, argvIndex) => commandIndexes.has(argvIndex)
-    ? []
-    : [{ element, argvIndex }]);
-  const bindingInput: CliOptionBindingInput = Object.freeze({
-    command: route.command,
-    options: route.command.options,
-    argv: Object.freeze(binderElements.map(({ element }) => element)),
-    argvIndexes: Object.freeze(binderElements.map(({ argvIndex }) => argvIndex))
-  });
-  const binding = binder.bind(bindingInput);
-  const bindingIssue = validateBindingResult(binding, bindingInput);
-  if (bindingIssue !== undefined) {
-    return failure(
-      source,
-      route.command,
-      [invalidBinderDiagnostic('bind', bindingIssue)],
-      []
-    );
+  const binding = session.bind(Object.freeze({ command: route.command, options: route.command.options }));
+  const issue = validateBindingResult(binding, route.command.options, new Set(scan.options.map((option) => option.option)));
+  if (issue !== undefined) {
+    return failure(source, route.command, [invalidBinderDiagnostic('bind', issue)], scan.unknownFlags);
   }
-  const correspondenceIssue = validateBindingCorrespondence(
-    binding,
-    route.scan,
-    route.commandIndexes
-  );
-  if (correspondenceIssue !== undefined) {
-    return failure(
-      source,
-      route.command,
-      [invalidBinderDiagnostic('bind', correspondenceIssue)],
-      []
-    );
-  }
-  if (binding.status === 'invalid') {
-    return failure(source, route.command, binding.diagnostics, binding.unknownFlags);
-  }
-
-  const unknownDiagnostics = input.unknownFlagPolicy === 'collect'
-    ? []
-    : binding.unknownFlags.map(unknownFlagDiagnostic);
-  const positionalBinding = bindPositionals(route.command, binding.positionals);
-  const passthroughDiagnostics = binding.afterDoubleDash.length > 0 &&
-    !route.command.acceptsPassthroughArguments
-    ? [passthroughArgumentsDiagnostic(route.command)]
-    : [];
   const warnings = [
-    ...deprecatedAliasDiagnostics(route.aliases),
+    ...route.usedAliases.flatMap((use) => use.deprecated === undefined || use.deprecated === false
+      ? [] : [Object.freeze({ source: 'command' as const, code: 'CLI_DEPRECATED_ALIAS' as const,
+          severity: 'warning' as const, message: `Command alias ${use.token} is deprecated.`,
+          alias: use.token, aliasPath: use.path, commandPath: use.canonicalPath,
+          ...(typeof use.deprecated === 'string' ? { reason: use.deprecated } : {}) })]),
     ...deprecatedCommandDiagnostics(route.command)
   ];
-  if (positionalBinding.status === 'invalid') {
-    return failure(source, route.command, [
-      ...warnings,
-      ...unknownDiagnostics,
-      ...positionalBinding.diagnostics,
-      ...passthroughDiagnostics
-    ], binding.unknownFlags);
+  const unknownDiagnostics = policy === 'collect' ? [] : scan.unknownFlags.map(unknownFlagDiagnostic);
+  if (binding.status === 'invalid') {
+    return failure(source, route.command, deduplicateDiagnostics([...warnings, ...route.diagnostics, ...binding.diagnostics, ...unknownDiagnostics]), scan.unknownFlags);
   }
-  const errors = [
-    ...unknownDiagnostics,
-    ...passthroughDiagnostics
-  ];
-  if (errors.length > 0) {
-    return failure(source, route.command, [...warnings, ...errors], binding.unknownFlags);
+  const commandIndexes = new Set(route.commandIndexes);
+  const positionals = Object.freeze(scan.arguments.filter((argument) =>
+    !commandIndexes.has(argument.argvIndex)).map((argument) => argument.value));
+  const positionalBinding = bindPositionals(route.command, positionals);
+  const diagnostics: CliDiagnostic[] = [...warnings, ...route.diagnostics, ...unknownDiagnostics];
+  if (positionalBinding.status === 'invalid') append(diagnostics, positionalBinding.diagnostics);
+  if (scan.afterDoubleDash.length > 0 && !route.command.acceptsPassthroughArguments) {
+    diagnostics.push(passthroughArgumentsDiagnostic(route.command));
   }
-
+  if (hasErrorDiagnostics(diagnostics) || positionalBinding.status === 'invalid') {
+    return failure(source, route.command, diagnostics, scan.unknownFlags);
+  }
   return Object.freeze({
-    status: 'ready',
-    source,
-    commandKey: route.command.key,
-    command: route.command,
-    usedAliases: Object.freeze(route.aliases.map(compileAliasUse)),
-    optionValues: freezeRecord(binding.values),
-    specifiedOptions: freezeBooleanRecord(binding.specified),
-    positionalValues: positionalBinding.values,
-    positionals: Object.freeze([...binding.positionals]),
-    passthroughArguments: Object.freeze([...binding.afterDoubleDash]),
-    unknownFlags: Object.freeze(binding.unknownFlags.map(freezeUnknownFlag)),
-    diagnostics: Object.freeze(warnings)
+    status: 'ready', source, commandKey: route.command.key, command: route.command,
+    usedAliases: route.usedAliases, optionValues: freezeRecord(binding.values),
+    specifiedOptions: freezeBooleanRecord(binding.specified), positionalValues: positionalBinding.values,
+    positionals, passthroughArguments: Object.freeze(scan.afterDoubleDash.map((argument) => argument.value)),
+    unknownFlags: scan.unknownFlags, diagnostics: Object.freeze(diagnostics)
   });
 }
 
-function routeCommand<Definition extends CliDefinition>(
-  program: CliProgram<Definition>,
-  binder: CliOptionBinder,
-  argv: readonly string[]
-): InternalRoute {
+function append<Value>(target: Value[], values: readonly Value[]): void {
+  for (const value of values) target.push(value);
+}
+
+function routeCommand(
+  program: CliProgram, session: CliOptionBindingSession, argv: readonly string[]
+): CliCommandRoute {
   let command = program.root;
-  const aliases: RoutedAliasUse[] = [];
+  const aliases: CliAliasUse[] = [];
   const commandIndexes: number[] = [];
-  let scan: CliOptionScanSuccess;
-  while (true) {
-    const scanInput: CliOptionBindingInput = Object.freeze({
-      command,
-      options: command.options,
-      argv,
-      argvIndexes: Object.freeze(argv.map((_element, index) => index))
-    });
-    const result = binder.scan(scanInput);
-    const issue = validateScanResult(result, scanInput);
-    if (issue !== undefined) {
-      return {
-        status: 'invalid',
-        command,
-        diagnostics: Object.freeze([invalidBinderDiagnostic('scan', issue)]),
-        unknownFlags: Object.freeze([])
-      };
-    }
-    if (result.status === 'invalid') {
-      return {
-        status: 'invalid',
-        command,
-        diagnostics: result.diagnostics,
-        unknownFlags: result.unknownFlags
-      };
-    }
-    scan = result;
-    const usedIndexes = new Set(commandIndexes);
-    const next = result.arguments.find((argument) => !usedIndexes.has(argument.argvIndex));
+  const options: CliScannedOption[] = [];
+  const controlOptions: CliScannedOption[] = [];
+  const args: CliScannedArgument[] = [];
+  const controls: CliScannedArgument[] = [];
+  const after: CliScannedArgument[] = [];
+  const unknown: CliUnknownFlag[] = [];
+  const unclassified: CliScannedArgument[] = [];
+  const scanDiagnostics: CliOptionDiagnostic[] = [];
+  const diagnostics: CliDiagnostic[] = [];
+  let doubleDash: number | undefined;
+  let blocked = false;
+  let uncertain = false;
+  let index = 0;
+  while (index < argv.length && !uncertain) {
+    const raw = adoptStep(session.next(Object.freeze({ command, options: command.options })));
     const children = findCliCommandChildren(program, command);
-    if (next === undefined) {
-      if (!command.invokable) {
-        return {
-          status: 'invalid',
-          command,
-          diagnostics: Object.freeze([subcommandRequiredDiagnostic(command)]),
-          unknownFlags: result.unknownFlags
-        };
-      }
+    const issue = validateScanStep(raw, argv, index, command, children.length > 0);
+    if (issue !== undefined) {
+      diagnostics.push(invalidBinderDiagnostic('scan', issue));
+      blocked = true;
       break;
     }
-    if (children.length === 0) break;
-    const precedingUnknownFlags = result.unknownFlags.filter((flag) =>
-      flag.argvIndex < next.argvIndex);
-    if (precedingUnknownFlags.length > 0) {
-      return {
-        status: 'invalid',
-        command,
-        diagnostics: Object.freeze(precedingUnknownFlags.map(unknownFlagDiagnostic)),
-        unknownFlags: Object.freeze(precedingUnknownFlags.map(freezeUnknownFlag))
-      };
-    }
-    const canonical = children.find((candidate) => candidate.name === next.value);
-    if (canonical !== undefined) {
-      command = canonical;
-      commandIndexes.push(next.argvIndex);
+    const step = snapshotStep(raw);
+    append(options, step.options);
+    append(controlOptions, step.controlOptions);
+    append(args, step.arguments);
+    append(controls, step.controls);
+    append(after, step.afterDoubleDash);
+    append(unknown, step.unknownFlags);
+    append(unclassified, step.unclassified);
+    append(scanDiagnostics, step.diagnostics);
+    if (step.doubleDashArgvIndex !== undefined) doubleDash = step.doubleDashArgvIndex;
+    index = step.nextIndex;
+    if (step.unclassified.length > 0) {
+      blocked = true;
+      uncertain = true;
       continue;
     }
-    const aliasCommand = children.find((candidate) =>
-      candidate.aliases.some((alias) => alias.name === next.value));
-    if (aliasCommand !== undefined) {
-      const alias = aliasCommand.aliases.find((candidate) => candidate.name === next.value);
-      if (alias !== undefined) aliases.push({ alias, command: aliasCommand, token: next.value });
-      command = aliasCommand;
-      commandIndexes.push(next.argvIndex);
+    // A final-token unknown cannot hide a later command or consume a suffix value.
+    // All other unknown ownership remains uncertain while children are in scope.
+    if (children.length > 0 && step.unknownFlags.some((flag) => flag.argvIndex < argv.length - 1)) {
+      for (const flag of step.unknownFlags) diagnostics.push(unknownFlagDiagnostic(flag));
+      blocked = true;
+      uncertain = true;
       continue;
     }
-    return {
-      status: 'invalid',
-      command,
-      diagnostics: Object.freeze([unknownCommandDiagnostic(command, next)]),
-      unknownFlags: result.unknownFlags
-    };
+    if (blocked) continue;
+    for (const argument of step.arguments) {
+      if (children.length === 0) break;
+      const selected = findCliCommandChild(program, command, argument.value);
+      if (selected === undefined) {
+        diagnostics.push(unknownCommandDiagnostic(command, argument));
+        blocked = true;
+        break;
+      }
+      const alias = selected.aliases.find((candidate) => candidate.name === argument.value);
+      if (alias !== undefined) aliases.push(compileAliasUse({ alias, command: selected, token: argument.value }));
+      command = selected;
+      commandIndexes.push(argument.argvIndex);
+    }
   }
-  return {
-    status: 'routed',
-    command,
-    commandIndexes: Object.freeze(commandIndexes),
-    aliases: Object.freeze(aliases),
-    scan
-  };
+  if (!blocked && !command.invokable) {
+    diagnostics.push(subcommandRequiredDiagnostic(command));
+    blocked = true;
+  }
+  for (let remaining = index; remaining < argv.length; remaining += 1) {
+    unclassified.push(Object.freeze({ value: argv[remaining]!, argvIndex: remaining }));
+  }
+  const classification: CliArgvClassification = Object.freeze({
+    complete: index === argv.length && unclassified.length === 0, argv, options: Object.freeze(options), controlOptions: Object.freeze(controlOptions), arguments: Object.freeze(args), controls: Object.freeze(controls),
+    afterDoubleDash: Object.freeze(after), unknownFlags: Object.freeze(unknown),
+    unclassified: Object.freeze(unclassified), diagnostics: Object.freeze(scanDiagnostics),
+    ...(doubleDash === undefined ? {} : { doubleDashArgvIndex: doubleDash })
+  });
+  return Object.freeze({
+    status: blocked ? 'invalid' : 'routed', command,
+    commandIndexes: Object.freeze(commandIndexes), usedAliases: Object.freeze(aliases),
+    classification, diagnostics: Object.freeze([...diagnostics, ...scanDiagnostics])
+  });
 }
 
 function bindPositionals(
@@ -613,308 +577,149 @@ function bindPositionals(
   return { status: 'bound', values: Object.freeze(values) };
 }
 
-function validateScanResult(
-  result: CliOptionScanResult,
-  input: CliOptionBindingInput
-): string | undefined {
-  if (!isRecord(result)) return 'Scan result must be an object.';
-  if (result.status === 'invalid') {
-    if (!isDiagnosticArray(result.diagnostics) ||
-      !isUnknownFlagArray(result.unknownFlags, input)) {
-      return 'Invalid scan results must contain diagnostics and indexed unknown flags.';
-    }
-    return hasErrorDiagnostics(result.diagnostics)
-      ? undefined
-      : 'Invalid scan results must contain at least one error diagnostic.';
-  }
-  if (result.status !== 'scanned') return 'Scan result has an unknown status.';
-  if (!isDenseArray(result.options) || !isDenseArray(result.arguments) ||
-    !isDenseArray(result.afterDoubleDash) || !isUnknownFlagArray(result.unknownFlags, input)) {
-    return 'Successful scan result arrays are malformed.';
-  }
-  const optionNames = new Set(input.options.map((option) => option.name));
-  for (const occurrence of result.options) {
-    if (!isRecord(occurrence) || typeof occurrence['option'] !== 'string' ||
-      typeof occurrence['flag'] !== 'string' || typeof occurrence['argvElement'] !== 'string' ||
-      !optionNames.has(occurrence['option']) || !isCompleteArgvIndex(occurrence['argvIndex'], input) ||
-      valueAtCompleteIndex(input, occurrence['argvIndex']) !== occurrence['argvElement'] ||
-      !isOptionalOffset(occurrence['offset']) ||
-      !hasValidOptionMemberLocation(
-        occurrence['argvElement'],
-        occurrence['flag'],
-        occurrence['offset']
-      ) || !hasValidScannedValue(occurrence, input)) {
-      return 'Scan result contains an invalid option occurrence.';
-    }
-    const definition = input.options.find((option) => option.name === occurrence['option']);
-    if (definition === undefined ||
-      ![...definition.flags, ...definition.falseFlags].includes(occurrence['flag'])) {
-      return 'Scan result contains a flag not owned by its reported option.';
-    }
-  }
-  if (!isOrderedByArgvLocation(result.options) ||
-    !isOrderedByArgvLocation(result.unknownFlags)) {
-    return 'Scanned option occurrences and unknown flags must be in argv order.';
-  }
-  for (const argument of [...result.arguments, ...result.afterDoubleDash]) {
-    if (!isRecord(argument) || typeof argument['value'] !== 'string' ||
-      !isCompleteArgvIndex(argument['argvIndex'], input) ||
-      valueAtCompleteIndex(input, argument['argvIndex']) !== argument['value']) {
-      return 'Scan result contains an invalid indexed argument.';
-    }
-  }
-  if (!isOrderedByArgvLocation(result.arguments) ||
-    !isOrderedByArgvLocation(result.afterDoubleDash)) {
-    return 'Scanned arguments must be in argv order.';
-  }
-  if (result.doubleDashArgvIndex !== undefined &&
-    (!isCompleteArgvIndex(result.doubleDashArgvIndex, input) ||
-      valueAtCompleteIndex(input, result.doubleDashArgvIndex) !== '--')) {
-    return 'Scan result contains an invalid double-dash index.';
-  }
-  const terminatorLocalIndex = input.argv.indexOf('--');
-  const expectedDoubleDashIndex = terminatorLocalIndex < 0
-    ? undefined
-    : input.argvIndexes[terminatorLocalIndex];
-  if (result.doubleDashArgvIndex !== expectedDoubleDashIndex) {
-    return 'Scan result disagrees with argv about the double-dash terminator.';
-  }
-  if (result.doubleDashArgvIndex === undefined && result.afterDoubleDash.length > 0) {
-    return 'Post-terminator arguments require a double-dash index.';
-  }
-  const optionMembers = new Map<number, Set<number | undefined>>();
-  for (const option of result.options) {
-    if (!addOptionMember(optionMembers, option.argvIndex, option.offset)) {
-      return 'Scan result contains overlapping option members.';
-    }
-  }
-  for (const flag of result.unknownFlags) {
-    if (!addOptionMember(optionMembers, flag.argvIndex, flag.offset)) {
-      return 'Scan result contains overlapping option members.';
-    }
-  }
-  if (hasMemberAfterInlineValue(result.options, result.unknownFlags)) {
-    return 'Scan result places an option member inside an inline value span.';
-  }
-  const ownership = new Map<number, string>();
-  for (const index of optionMembers.keys()) ownership.set(index, 'flag element');
-  for (const option of result.options) {
-    if (option.valueArgvIndex !== undefined && option.valueArgvIndex !== option.argvIndex &&
-      !claimArgvIndex(ownership, option.valueArgvIndex, 'option value')) {
-      return 'Scan result assigns one argv element to multiple owners.';
-    }
-  }
-  for (const argument of result.arguments) {
-    if (!claimArgvIndex(ownership, argument.argvIndex, 'argument')) {
-      return 'Scan result assigns one argv element to multiple owners.';
-    }
-  }
-  for (const argument of result.afterDoubleDash) {
-    if (!claimArgvIndex(ownership, argument.argvIndex, 'passthrough argument')) {
-      return 'Scan result assigns one argv element to multiple owners.';
-    }
-  }
-  if (result.doubleDashArgvIndex !== undefined &&
-    !claimArgvIndex(ownership, result.doubleDashArgvIndex, 'double dash')) {
-    return 'Scan result assigns one argv element to multiple owners.';
-  }
-  if (input.argvIndexes.some((index) => !ownership.has(index))) {
-    return 'Scan result leaves an argv element unclassified.';
-  }
-  if (result.doubleDashArgvIndex !== undefined &&
-    !hasValidTerminatorPartition(result, result.doubleDashArgvIndex)) {
-    return 'Scan result classifies argv elements on the wrong side of double dash.';
-  }
-  return undefined;
-}
-
-function hasValidScannedValue(
-  occurrence: Readonly<Record<string, unknown>>,
-  input: CliOptionBindingInput
-): boolean {
-  const hasRawValue = Object.hasOwn(occurrence, 'rawValue');
-  const hasValueIndex = Object.hasOwn(occurrence, 'valueArgvIndex');
-  const hasInline = Object.hasOwn(occurrence, 'inline');
-  if (!hasRawValue && !hasValueIndex && !hasInline) return true;
-  if (!hasRawValue || !hasValueIndex || !hasInline ||
-    typeof occurrence['rawValue'] !== 'string' ||
-    !isCompleteArgvIndex(occurrence['valueArgvIndex'], input) ||
-    typeof occurrence['inline'] !== 'boolean') {
-    return false;
-  }
-  const valueIndex = occurrence['valueArgvIndex'];
-  const optionIndex = occurrence['argvIndex'];
-  return occurrence['inline']
-    ? valueIndex === optionIndex
-    : valueIndex !== optionIndex &&
-      valueAtCompleteIndex(input, valueIndex) === occurrence['rawValue'];
-}
-
-function hasValidOptionMemberLocation(
-  argvElement: string,
-  flag: string,
-  offset: number | undefined
-): boolean {
-  return offset === undefined || (
-    offset > 0 &&
-    flag.length === 2 &&
-    flag[0] === '-' &&
-    argvElement[offset] === flag[1]
-  );
-}
-
-function hasMemberAfterInlineValue(
-  options: readonly CliScannedOption[],
-  unknownFlags: readonly CliUnknownFlag[]
-): boolean {
-  const members = [...options, ...unknownFlags];
-  return options.some((option) => {
-    const inlineOffset = option.inline === true ? option.offset : undefined;
-    return inlineOffset !== undefined &&
-      members.some((member) => member.argvIndex === option.argvIndex &&
-        member.offset !== undefined && member.offset > inlineOffset);
+function adoptDiagnostics(value: unknown): unknown {
+  return adoptArray(value)?.map((entry) => {
+    const record = adoptRecord(entry);
+    return record === undefined ? entry : Object.freeze({ ...record, details: adoptRecord(record['details']) });
   });
 }
 
-function isOrderedByArgvLocation(
-  entries: readonly { readonly argvIndex: number; readonly offset?: number }[]
-): boolean {
-  for (let index = 1; index < entries.length; index += 1) {
-    const previous = entries[index - 1];
-    const current = entries[index];
-    if (previous === undefined || current === undefined ||
-      current.argvIndex < previous.argvIndex ||
-      (current.argvIndex === previous.argvIndex &&
-        (current.offset ?? -1) < (previous.offset ?? -1))) {
-      return false;
+function adoptStep(value: unknown): CliOptionScanStep {
+  const record = adoptRecord(value);
+  if (record === undefined) return undefined as unknown as CliOptionScanStep;
+  const output = { ...record };
+  for (const field of ['options', 'controlOptions', 'arguments', 'controls', 'afterDoubleDash', 'unclassified']) {
+    output[field] = adoptArray(record[field])?.map(adoptRecord);
+  }
+  output['unknownFlags'] = adoptArray(record['unknownFlags'])?.map((entry) => {
+    const flag = adoptRecord(entry);
+    return flag === undefined ? undefined : Object.freeze({ ...flag,
+      ...(flag['suggestions'] === undefined ? {} : { suggestions: adoptArray(flag['suggestions']) ?? null }) });
+  });
+  output['diagnostics'] = adoptDiagnostics(record['diagnostics']);
+  return output as unknown as CliOptionScanStep;
+}
+
+function adoptBinding(value: unknown): CliOptionBindingResult {
+  const record = adoptRecord(value);
+  if (record === undefined) return undefined as unknown as CliOptionBindingResult;
+  return Object.freeze(record['status'] === 'invalid'
+    ? { status: 'invalid', diagnostics: adoptDiagnostics(record['diagnostics']) }
+    : { status: record['status'], values: adoptRecord(record['values']), specified: adoptRecord(record['specified']) }) as CliOptionBindingResult;
+}
+
+const optionScopes = new WeakMap<CliCommand, ReadonlyMap<string, string>>();
+function flagsFor(command: CliCommand): ReadonlyMap<string, string> {
+  const cached = optionScopes.get(command);
+  if (cached !== undefined) return cached;
+  const flags = new Map<string, string>();
+  for (const option of command.options) {
+    for (const flag of [...option.flags, ...option.falseFlags]) flags.set(flag, option.name);
+  }
+  optionScopes.set(command, flags);
+  return flags;
+}
+
+function validateScanStep(step: CliOptionScanStep, argv: readonly string[], start: number, command: CliCommand, hasChildren: boolean): string | undefined {
+  if (!isRecord(step) || !Number.isInteger(step.nextIndex) ||
+    step.nextIndex <= start || step.nextIndex > argv.length) return 'Invalid cursor progress.';
+  if (![step.options, step.controlOptions, step.arguments, step.controls, step.afterDoubleDash, step.unknownFlags, step.unclassified].every(Array.isArray) ||
+    !isDiagnosticArray(step.diagnostics)) return 'Malformed classification fields.';
+  const end = step.nextIndex;
+  if (step.arguments.length + step.controls.length > 0 && (end !== start + 1 || step.arguments.length + step.controls.length !== 1)) return 'An argument step must own exactly one argv element.';
+  if (step.doubleDashArgvIndex !== undefined && step.doubleDashArgvIndex !== start) return 'A terminator step must begin at its terminator.';
+  const validIndex = (value: unknown): value is number => typeof value === 'number' && Number.isInteger(value) && value >= start && value < end;
+  const owners = new Set<number>();
+  const members = new Map<number, Set<number | undefined>>();
+  const claim = (index: number): boolean => { if (owners.has(index)) return false; owners.add(index); return true; };
+  for (const item of [...step.options, ...step.controlOptions, ...step.unknownFlags]) {
+    if (!isRecord(item) || !validIndex(item.argvIndex) || argv[item.argvIndex] !== item.argvElement ||
+      typeof item.flag !== 'string' || !isOptionalOffset(item.offset)) return 'Invalid option location.';
+    const existing = members.get(item.argvIndex) ?? new Set<number | undefined>();
+    if (existing.has(item.offset) || (existing.size > 0 && (item.offset === undefined || existing.has(undefined)))) return 'Overlapping option members.';
+    existing.add(item.offset); members.set(item.argvIndex, existing);
+  }
+  for (const index of members.keys()) claim(index);
+  const flags = flagsFor(command);
+  if (step.options.some((option) => flags.get(option.flag) !== option.option)) return 'Option is not declared in the active command scope.';
+  for (const option of [...step.options, ...step.controlOptions]) {
+    if (typeof option.option !== 'string') return 'Invalid option name.';
+    const hasValue = Object.hasOwn(option, 'rawValue');
+    if (hasValue !== Object.hasOwn(option, 'valueArgvIndex') || hasValue !== Object.hasOwn(option, 'inline')) return 'Incomplete option value ownership.';
+    if (hasValue) {
+      if (typeof option.rawValue !== 'string' || !validIndex(option.valueArgvIndex) || typeof option.inline !== 'boolean') return 'Invalid option value.';
+      if (option.inline ? option.valueArgvIndex !== option.argvIndex :
+        option.valueArgvIndex !== option.argvIndex + 1 || argv[option.valueArgvIndex] !== option.rawValue || !claim(option.valueArgvIndex)) return 'Invalid option value ownership.';
     }
   }
-  return true;
-}
-
-function addOptionMember(
-  members: Map<number, Set<number | undefined>>,
-  argvIndex: number,
-  offset: number | undefined
-): boolean {
-  const existing = members.get(argvIndex) ?? new Set<number | undefined>();
-  if (existing.has(offset) || (existing.size > 0 &&
-    (offset === undefined || existing.has(undefined)))) {
-    return false;
+  for (const flag of step.unknownFlags) {
+    if ((flag.inlineValue !== undefined && typeof flag.inlineValue !== 'string') ||
+      (flag.suggestions !== undefined && !isStringArray(flag.suggestions))) return 'Invalid unknown flag.';
   }
-  existing.add(offset);
-  members.set(argvIndex, existing);
-  return true;
-}
-
-function claimArgvIndex(
-  ownership: Map<number, string>,
-  argvIndex: number,
-  owner: string
-): boolean {
-  if (ownership.has(argvIndex)) return false;
-  ownership.set(argvIndex, owner);
-  return true;
-}
-
-function hasValidTerminatorPartition(
-  scan: CliOptionScanSuccess,
-  doubleDashIndex: number
-): boolean {
-  return scan.options.every((option) => option.argvIndex < doubleDashIndex &&
-    (option.valueArgvIndex === undefined || option.valueArgvIndex < doubleDashIndex)) &&
-    scan.arguments.every((argument) => argument.argvIndex < doubleDashIndex) &&
-    scan.unknownFlags.every((flag) => flag.argvIndex < doubleDashIndex) &&
-    scan.afterDoubleDash.every((argument) => argument.argvIndex > doubleDashIndex);
-}
-
-function validateBindingCorrespondence(
-  binding: CliOptionBindingResult,
-  scan: CliOptionScanSuccess,
-  commandIndexes: readonly number[]
-): string | undefined {
-  if (!sameUnknownFlags(binding.unknownFlags, scan.unknownFlags)) {
-    return 'Binding and scanning disagree about unknown flags.';
+  for (const argument of [...step.arguments, ...step.controls, ...step.afterDoubleDash]) {
+    if (!isRecord(argument) || !validIndex(argument.argvIndex) || argv[argument.argvIndex] !== argument.value ||
+      !claim(argument.argvIndex)) return 'Invalid or overlapping argument ownership.';
   }
-  if (binding.status === 'invalid') return undefined;
-  const scannedOptions = new Set(scan.options.map((option) => option.option));
-  for (const [name, specified] of Object.entries(binding.specified)) {
-    if (specified !== scannedOptions.has(name)) {
-      return 'Binding and scanning disagree about specified options.';
-    }
+  if (step.doubleDashArgvIndex !== undefined && (!validIndex(step.doubleDashArgvIndex) ||
+    argv[step.doubleDashArgvIndex] !== '--' || !claim(step.doubleDashArgvIndex))) return 'Invalid terminator ownership.';
+  if (step.afterDoubleDash.some((arg, index) => arg.argvIndex !== start + index + 1)) return 'Passthrough arguments must retain source order.';
+  if (step.afterDoubleDash.length > 0 && step.doubleDashArgvIndex === undefined) return 'Passthrough requires its terminator.';
+  if (step.doubleDashArgvIndex !== undefined && (end !== argv.length ||
+    step.afterDoubleDash.length !== end - start - 1)) return 'Invalid terminator partition.';
+  // A malformed span must not publish records beyond an ownership boundary.
+  if (hasChildren && step.unknownFlags.some((flag) => flag.argvIndex < end - 1)) return 'A scan step cannot cross an unknown flag routing boundary.';
+  let lastClassified = start - 1;
+  for (const owned of owners) lastClassified = Math.max(lastClassified, owned);
+  for (const argument of step.unclassified) {
+    if (!isRecord(argument) || !validIndex(argument.argvIndex) || argv[argument.argvIndex] !== argument.value ||
+      argument.argvIndex <= lastClassified || !claim(argument.argvIndex)) return 'Invalid or overlapping unclassified suffix ownership.';
   }
-  const commands = new Set(commandIndexes);
-  const expectedPositionals = scan.arguments
-    .filter((argument) => !commands.has(argument.argvIndex))
-    .map((argument) => argument.value);
-  const expectedAfterDoubleDash = scan.afterDoubleDash.map((argument) => argument.value);
-  if (!sameStrings(binding.positionals, expectedPositionals)) {
-    return 'Binding and scanning disagree about positional arguments.';
-  }
-  if (!sameStrings(binding.afterDoubleDash, expectedAfterDoubleDash)) {
-    return 'Binding and scanning disagree about post-terminator arguments.';
-  }
+  if (step.unclassified.length > 0 && !hasErrorDiagnostics(step.diagnostics)) return 'Unclassified input requires an error diagnostic.';
+  for (let index = start; index < end; index += 1) if (!owners.has(index)) return 'Unclassified argv element without ownership.';
   return undefined;
 }
 
-function sameStrings(left: readonly string[], right: readonly string[]): boolean {
-  return left.length === right.length && left.every((value, index) => value === right[index]);
+function snapshotOption(option: CliScannedOption): CliScannedOption {
+  const location = {
+    option: option.option, flag: option.flag, argvElement: option.argvElement, argvIndex: option.argvIndex,
+    ...(option.offset === undefined ? {} : { offset: option.offset })
+  };
+  return Object.freeze(option.rawValue === undefined ? location : {
+    ...location, rawValue: option.rawValue, valueArgvIndex: option.valueArgvIndex, inline: option.inline
+  });
 }
 
-function sameUnknownFlags(
-  left: readonly CliUnknownFlag[],
-  right: readonly CliUnknownFlag[]
-): boolean {
-  return left.length === right.length && left.every((flag, index) => {
-    const other = right[index];
-    return other !== undefined && flag.argvElement === other.argvElement &&
-      flag.flag === other.flag && flag.argvIndex === other.argvIndex &&
-      flag.offset === other.offset && flag.inlineValue === other.inlineValue &&
-      sameStrings(flag.suggestions ?? [], other.suggestions ?? []);
+function snapshotStep(step: CliOptionScanStep): CliOptionScanStep {
+  return Object.freeze({
+    nextIndex: step.nextIndex,
+    options: Object.freeze(step.options.map(snapshotOption)),
+    controlOptions: Object.freeze(step.controlOptions.map(snapshotOption)),
+    arguments: Object.freeze(step.arguments.map((arg) => Object.freeze({ value: arg.value, argvIndex: arg.argvIndex }))),
+    controls: Object.freeze(step.controls.map((arg) => Object.freeze({ value: arg.value, argvIndex: arg.argvIndex }))),
+    afterDoubleDash: Object.freeze(step.afterDoubleDash.map((arg) => Object.freeze({ value: arg.value, argvIndex: arg.argvIndex }))),
+    unclassified: Object.freeze(step.unclassified.map((arg) => Object.freeze({ value: arg.value, argvIndex: arg.argvIndex }))),
+    unknownFlags: Object.freeze(step.unknownFlags.map(freezeUnknownFlag)),
+    diagnostics: Object.freeze(step.diagnostics.map((diagnostic) => Object.freeze({ source: diagnostic.source, code: diagnostic.code, severity: diagnostic.severity,
+      message: diagnostic.message, details: freezeRecord(diagnostic.details) }))),
+    ...(step.doubleDashArgvIndex === undefined ? {} : { doubleDashArgvIndex: step.doubleDashArgvIndex })
   });
 }
 
 function validateBindingResult(
-  result: CliOptionBindingResult,
-  input: CliOptionBindingInput
+  result: CliOptionBindingResult, options: readonly CliOption[], scannedOptions?: ReadonlySet<string>
 ): string | undefined {
-  if (!isRecord(result)) return 'Binding result must be an object.';
-  if (result.status === 'invalid') {
-    if (!isDiagnosticArray(result.diagnostics) ||
-      !isUnknownFlagArray(result.unknownFlags, input)) {
-      return 'Invalid binding results must contain diagnostics and indexed unknown flags.';
-    }
-    return hasErrorDiagnostics(result.diagnostics)
-      ? undefined
-      : 'Invalid binding results must contain at least one error diagnostic.';
-  }
-  if (result.status !== 'bound') return 'Binding result has an unknown status.';
-  if (!isPlainDataRecord(result.values) || !isPlainDataRecord(result.specified) ||
-    !isStringArray(result.positionals) || !isStringArray(result.afterDoubleDash) ||
-    !isUnknownFlagArray(result.unknownFlags, input)) {
-    return 'Successful binding result fields are malformed.';
-  }
-  const optionNames = new Set(input.options.map((option) => option.name));
-  if (Reflect.ownKeys(result.specified).some((name) =>
-    typeof name !== 'string' || !optionNames.has(name)) ||
-    Reflect.ownKeys(result.values).some((name) =>
-      typeof name !== 'string' || !optionNames.has(name))) {
-    return 'Binding result contains an undeclared option name.';
-  }
-  for (const option of input.options) {
-    if (!Object.hasOwn(result.specified, option.name) ||
-      typeof result.specified[option.name] !== 'boolean') {
-      return `Binding result must specify presence for option ${option.name}.`;
-    }
+  if (!isRecord(result)) return 'Binding result must contain data properties.';
+  if (result.status === 'invalid') return isDiagnosticArray(result.diagnostics) && hasErrorDiagnostics(result.diagnostics)
+    ? undefined : 'Invalid binding requires an error diagnostic.';
+  if (result.status !== 'bound' || !isRecord(result.values) || !isRecord(result.specified)) return 'Malformed binding result.';
+  const names = new Set(options.map((option) => option.name));
+  if ([...Reflect.ownKeys(result.values), ...Reflect.ownKeys(result.specified)].some((name) => typeof name !== 'string' || !names.has(name))) return 'Binding contains an undeclared option.';
+  for (const option of options) {
+    if (!Object.hasOwn(result.specified, option.name) || typeof result.specified[option.name] !== 'boolean') return `Binding must specify presence for ${option.name}.`;
     const specified = result.specified[option.name] === true;
-    if (option.required && !specified) {
-      return `Required option ${option.name} must be specified.`;
-    }
-    const hasValue = Object.hasOwn(result.values, option.name);
-    const valueRequired = specified || option.hasDefault;
-    if (valueRequired !== hasValue) {
-      return `Binding values and presence disagree for option ${option.name}.`;
-    }
+    if (scannedOptions !== undefined && specified !== scannedOptions.has(option.name)) return `Decoded presence disagrees with classification for ${option.name}.`;
+    if (option.required && !specified) return `Required option ${option.name} must be specified.`;
+    if (Object.hasOwn(result.values, option.name) !== (specified || option.hasDefault)) return `Values and presence disagree for ${option.name}.`;
   }
   return undefined;
 }
@@ -943,7 +748,7 @@ function readStructuredInvocationInput(candidate: unknown): StructuredInputReadR
   if (sourceId !== undefined && typeof sourceId !== 'string') {
     return { status: 'invalid', reason: 'sourceId must be a string.' };
   }
-  const commandPath = fields['commandPath'] ?? [];
+  const commandPath = adoptArray(fields['commandPath'] ?? []);
   if (!isStringArray(commandPath)) {
     return { status: 'invalid', reason: 'commandPath must be a dense string array.' };
   }
@@ -979,7 +784,9 @@ function readStructuredInvocationInput(candidate: unknown): StructuredInputReadR
     string,
     string | readonly string[] | undefined
   >;
-  for (const [name, value] of positionalEntries) {
+  for (const [name, original] of positionalEntries) {
+    const value = Array.isArray(original) ? adoptArray(original) : original;
+    if (Array.isArray(original) && value === undefined) return { status: 'invalid', reason: 'Positional arrays must contain dense data properties.' };
     if (value !== undefined && typeof value !== 'string' && !isStringArray(value)) {
       return {
         status: 'invalid',
@@ -988,7 +795,7 @@ function readStructuredInvocationInput(candidate: unknown): StructuredInputReadR
     }
     positionalValues[name] = isStringArray(value) ? Object.freeze([...value]) : value;
   }
-  const passthroughArguments = fields['passthroughArguments'] ?? [];
+  const passthroughArguments = adoptArray(fields['passthroughArguments'] ?? []);
   if (!isStringArray(passthroughArguments)) {
     return {
       status: 'invalid',
@@ -1013,20 +820,10 @@ function validateStructuredInput(
   input: StructuredInvocationInput
 ): string | undefined {
   const bindingIssue = validateBindingResult({
-    status: 'bound',
-    values: input.optionValues,
-    specified: input.specifiedOptions,
-    positionals: [],
-    afterDoubleDash: input.passthroughArguments ?? [],
-    unknownFlags: []
-  }, {
-    command,
-    options: command.options,
-    argv: [],
-    argvIndexes: []
-  });
+    status: 'bound', values: input.optionValues, specified: input.specifiedOptions
+  }, command.options);
   if (bindingIssue !== undefined) return bindingIssue;
-  if (!isPlainDataRecord(input.positionalValues)) {
+  if (!isRecord(input.positionalValues)) {
     return 'Positional values must be a plain object with data properties.';
   }
   const positionalNames = new Set(command.positionals.map((positional) => positional.name));
@@ -1052,23 +849,8 @@ function validateStructuredInput(
   return undefined;
 }
 
-function deprecatedAliasDiagnostics(aliases: readonly RoutedAliasUse[]): readonly CliCoreDiagnostic[] {
-  return Object.freeze(aliases.flatMap(({ alias, command, token }) => alias.deprecated === undefined
-    ? []
-    : [{
-        source: 'command' as const,
-        code: 'CLI_DEPRECATED_ALIAS' as const,
-        severity: 'warning' as const,
-        message: `Command alias ${token} is deprecated.`,
-        alias: token,
-        aliasPath: alias.path,
-        commandPath: command.path,
-        ...(typeof alias.deprecated === 'string' ? { reason: alias.deprecated } : {})
-      }]));
-}
-
 function deprecatedCommandDiagnostics(command: CliCommand): readonly CliCoreDiagnostic[] {
-  return command.deprecated === undefined
+  return command.deprecated === undefined || command.deprecated === false
     ? Object.freeze([])
     : Object.freeze([{
         source: 'command',
@@ -1165,6 +947,19 @@ function invalidStructuredInvocationDiagnostic(reason: string): CliCoreDiagnosti
   });
 }
 
+function deduplicateDiagnostics(diagnostics: readonly CliDiagnostic[]): readonly CliDiagnostic[] {
+  const seen = new Set<string>();
+  return diagnostics.filter((diagnostic) => {
+    const location = diagnostic.source === 'option' ? diagnostic.details : diagnostic;
+    const fields = location as Readonly<Record<string, unknown>>;
+    const key = [diagnostic.source, diagnostic.code, diagnostic.message, fields['argvIndex'], fields['offset'], fields['option']]
+      .map((field) => typeof field === 'string' || typeof field === 'number' ? String(field) : '').join('\u0000');
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function failure(
   source: CliInvocationSource,
   command: CliCommand | undefined,
@@ -1192,13 +987,16 @@ function structuredSource(sourceId?: string): CliInvocationSource {
 }
 
 function freezeArgv(argv: readonly string[]): readonly string[] {
-  if (!isStringArray(argv)) throw new TypeError('argv must be a dense string array.');
-  return Object.freeze([...argv]);
+  const adopted = adoptArray(argv);
+  if (adopted === undefined || adopted.some((value) => typeof value !== 'string')) throw new TypeError('argv must be a dense string array with no custom properties.');
+  return adopted as readonly string[];
 }
 
 function freezeUnknownFlag(flag: CliUnknownFlag): CliUnknownFlag {
   return Object.freeze({
-    ...flag,
+    argvElement: flag.argvElement, flag: flag.flag, argvIndex: flag.argvIndex,
+    ...(flag.offset === undefined ? {} : { offset: flag.offset }),
+    ...(flag.inlineValue === undefined ? {} : { inlineValue: flag.inlineValue }),
     ...(flag.suggestions === undefined
       ? {}
       : { suggestions: Object.freeze([...flag.suggestions]) })
@@ -1207,7 +1005,7 @@ function freezeUnknownFlag(flag: CliUnknownFlag): CliUnknownFlag {
 
 function freezeRecord(record: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> {
   const copy = Object.create(null) as Record<string, unknown>;
-  for (const [name, value] of Object.entries(record)) copy[name] = value;
+  for (const [name, value] of ownDataEntries(record) ?? []) copy[name] = value;
   return Object.freeze(copy);
 }
 
@@ -1215,7 +1013,7 @@ function freezeBooleanRecord(
   record: Readonly<Record<string, boolean>>
 ): Readonly<Record<string, boolean>> {
   const copy = Object.create(null) as Record<string, boolean>;
-  for (const [name, value] of Object.entries(record)) copy[name] = value;
+  for (const [name, value] of ownDataEntries(record) ?? []) if (typeof value === 'boolean') copy[name] = value;
   return Object.freeze(copy);
 }
 
@@ -1223,8 +1021,10 @@ function freezePositionalRecord(
   record: Readonly<Record<string, string | readonly string[] | undefined>>
 ): Readonly<Record<string, string | readonly string[] | undefined>> {
   const copy = Object.create(null) as Record<string, string | readonly string[] | undefined>;
-  for (const [name, value] of Object.entries(record)) {
-    copy[name] = Array.isArray(value) ? Object.freeze([...value]) : value;
+  for (const [name, value] of ownDataEntries(record) ?? []) {
+    if (value === undefined || typeof value === 'string' || isStringArray(value)) {
+      copy[name] = Array.isArray(value) ? Object.freeze([...value]) : value;
+    }
   }
   return Object.freeze(copy);
 }
@@ -1233,32 +1033,13 @@ function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function isPlainDataRecord(value: unknown): value is Readonly<Record<string, unknown>> {
-  if (!isRecord(value)) return false;
-  const prototype: unknown = Object.getPrototypeOf(value);
-  if (prototype !== Object.prototype && prototype !== null) return false;
-  return Reflect.ownKeys(value).every((property) => {
-    const descriptor = Object.getOwnPropertyDescriptor(value, property);
-    return descriptor !== undefined && 'value' in descriptor;
-  });
-}
-
-function ownDataEntries(
-  value: unknown
-): readonly (readonly [string, unknown])[] | undefined {
-  if (!isPlainDataRecord(value)) return undefined;
-  const entries: Array<readonly [string, unknown]> = [];
-  for (const property of Reflect.ownKeys(value)) {
-    if (typeof property !== 'string') return undefined;
-    const descriptor = Object.getOwnPropertyDescriptor(value, property);
-    if (descriptor === undefined || !('value' in descriptor)) return undefined;
-    entries.push([property, descriptor.value]);
-  }
-  return entries;
+function ownDataEntries(value: unknown): readonly (readonly [string, unknown])[] | undefined {
+  const record = adoptRecord(value);
+  return record === undefined ? undefined : Object.entries(record);
 }
 
 function isStringArray(value: unknown): value is readonly string[] {
-  return isDenseArray(value) && value.every((entry) => typeof entry === 'string');
+  return Array.isArray(value) && value.every((entry) => typeof entry === 'string');
 }
 
 function isOptionalOffset(value: unknown): value is number | undefined {
@@ -1266,45 +1047,9 @@ function isOptionalOffset(value: unknown): value is number | undefined {
     (typeof value === 'number' && Number.isInteger(value) && value >= 0);
 }
 
-function isCompleteArgvIndex(value: unknown, input: CliOptionBindingInput): value is number {
-  return typeof value === 'number' && Number.isInteger(value) && input.argvIndexes.includes(value);
-}
-
-function valueAtCompleteIndex(
-  input: CliOptionBindingInput,
-  completeIndex: number
-): string | undefined {
-  const localIndex = input.argvIndexes.indexOf(completeIndex);
-  return localIndex < 0 ? undefined : input.argv[localIndex];
-}
-
-function isUnknownFlagArray(
-  value: unknown,
-  input: CliOptionBindingInput
-): value is readonly CliUnknownFlag[] {
-  return isDenseArray(value) && value.every((entry) => isRecord(entry) &&
-    typeof entry['argvElement'] === 'string' && typeof entry['flag'] === 'string' &&
-    isCompleteArgvIndex(entry['argvIndex'], input) &&
-    valueAtCompleteIndex(input, entry['argvIndex']) === entry['argvElement'] &&
-    isOptionalOffset(entry['offset']) &&
-    hasValidOptionMemberLocation(entry['argvElement'], entry['flag'], entry['offset']) &&
-    !(entry['offset'] !== undefined && entry['inlineValue'] !== undefined) &&
-    (entry['inlineValue'] === undefined || typeof entry['inlineValue'] === 'string') &&
-    (entry['suggestions'] === undefined || isStringArray(entry['suggestions'])));
-}
-
 function isDiagnosticArray(value: unknown): value is readonly CliOptionDiagnostic[] {
-  return isDenseArray(value) && value.every((entry) => isRecord(entry) &&
+  return Array.isArray(value) && value.every((entry) => isRecord(entry) &&
     entry['source'] === 'option' && typeof entry['code'] === 'string' &&
     (entry['severity'] === 'error' || entry['severity'] === 'warning') &&
     typeof entry['message'] === 'string' && isRecord(entry['details']));
-}
-
-function isDenseArray(value: unknown): value is readonly unknown[] {
-  if (!Array.isArray(value)) return false;
-  for (let index = 0; index < value.length; index += 1) {
-    const descriptor = Object.getOwnPropertyDescriptor(value, index);
-    if (descriptor === undefined || !('value' in descriptor)) return false;
-  }
-  return true;
 }

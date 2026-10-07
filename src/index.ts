@@ -2,6 +2,7 @@ export {
   CliDefinitionError,
   defineCli,
   findCliCommand,
+  findCliCommandChild,
   findCliCommandChildren
 } from './command/index.ts';
 export { completeCli } from './completion/index.ts';
@@ -53,12 +54,12 @@ export type {
   CliInvocationSource,
   CliOptionBinder,
   CliOptionBindingFailure,
-  CliOptionBindingInput,
+  CliOptionScope,
+  CliOptionBindingSession,
+  CliArgvClassification,
+  CliOptionScanStep,
   CliOptionBindingResult,
   CliOptionBindingSuccess,
-  CliOptionScanFailure,
-  CliOptionScanResult,
-  CliOptionScanSuccess,
   CliScannedArgument,
   CliScannedOption,
   CliUnknownFlag,
