@@ -49,3 +49,28 @@ const structured = createCliInvocation(program, {
   commandPath: ['deploy'], optionValues: {}, specifiedOptions: {}, positionalValues: { target: 'api' }
 });
 if (structured.status !== 'ready' || structured.commandKey !== 'ship deploy') throw new Error('structured invocation failed');
+
+const parent = defineCli({ name: 'tool', commands: [{ name: 'run' }] });
+const finalUnknownParser = createCliInvocationParser({ create: () => ({
+  next: () => ({ nextIndex: 1, options: [], controlOptions: [], arguments: [], controls: [], afterDoubleDash: [],
+    unknownFlags: [{ argvElement: '--extra', flag: '--extra', argvIndex: 0 }], diagnostics: [], unclassified: [] }),
+  bind: () => ({ status: 'bound', values: {}, specified: {} })
+}) });
+if (finalUnknownParser.parse(parent, { argv: ['--extra'], unknownFlagPolicy: 'collect' }).status !== 'ready') {
+  throw new Error('final unknown flag collection failed');
+}
+if (finalUnknownParser.parse(parent, { argv: ['--extra', 'run'], unknownFlagPolicy: 'collect' }).status !== 'invalid') {
+  throw new Error('uncertain command routing was accepted');
+}
+const passthrough = Array.from({ length: 150000 }, (_, index) => `value-${index}`);
+const largeParser = createCliInvocationParser({ create: () => ({
+  next: () => ({ nextIndex: passthrough.length + 1, options: [], controlOptions: [], arguments: [], controls: [],
+    afterDoubleDash: passthrough.map((value, index) => ({ value, argvIndex: index + 1 })), doubleDashArgvIndex: 0,
+    unknownFlags: [], diagnostics: [], unclassified: [] }),
+  bind: () => ({ status: 'bound', values: {}, specified: {} })
+}) });
+const large = largeParser.parse(defineCli({ name: 'tool', acceptsPassthroughArguments: true }), { argv: ['--', ...passthrough] });
+if (large.status !== 'ready' || large.passthroughArguments.length !== passthrough.length ||
+  large.passthroughArguments.some((value, index) => value !== passthrough[index])) {
+  throw new Error('large passthrough ownership failed');
+}

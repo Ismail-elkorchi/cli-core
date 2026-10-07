@@ -412,7 +412,7 @@ function bindRoute(
     !commandIndexes.has(argument.argvIndex)).map((argument) => argument.value));
   const positionalBinding = bindPositionals(route.command, positionals);
   const diagnostics: CliDiagnostic[] = [...warnings, ...route.diagnostics, ...unknownDiagnostics];
-  if (positionalBinding.status === 'invalid') diagnostics.push(...positionalBinding.diagnostics);
+  if (positionalBinding.status === 'invalid') append(diagnostics, positionalBinding.diagnostics);
   if (scan.afterDoubleDash.length > 0 && !route.command.acceptsPassthroughArguments) {
     diagnostics.push(passthroughArgumentsDiagnostic(route.command));
   }
@@ -426,6 +426,10 @@ function bindRoute(
     positionals, passthroughArguments: Object.freeze(scan.afterDoubleDash.map((argument) => argument.value)),
     unknownFlags: scan.unknownFlags, diagnostics: Object.freeze(diagnostics)
   });
+}
+
+function append<Value>(target: Value[], values: readonly Value[]): void {
+  for (const value of values) target.push(value);
 }
 
 function routeCommand(
@@ -456,9 +460,14 @@ function routeCommand(
       break;
     }
     const step = snapshotStep(raw);
-    options.push(...step.options); controlOptions.push(...step.controlOptions); args.push(...step.arguments); controls.push(...step.controls); after.push(...step.afterDoubleDash);
-    unknown.push(...step.unknownFlags); unclassified.push(...step.unclassified);
-    scanDiagnostics.push(...step.diagnostics);
+    append(options, step.options);
+    append(controlOptions, step.controlOptions);
+    append(args, step.arguments);
+    append(controls, step.controls);
+    append(after, step.afterDoubleDash);
+    append(unknown, step.unknownFlags);
+    append(unclassified, step.unclassified);
+    append(scanDiagnostics, step.diagnostics);
     if (step.doubleDashArgvIndex !== undefined) doubleDash = step.doubleDashArgvIndex;
     index = step.nextIndex;
     if (step.unclassified.length > 0) {
@@ -467,8 +476,10 @@ function routeCommand(
       continue;
     }
     const children = findCliCommandChildren(program, command);
-    if (children.length > 0 && step.unknownFlags.length > 0) {
-      diagnostics.push(...step.unknownFlags.map(unknownFlagDiagnostic));
+    // A final-token unknown cannot hide a later command or consume a suffix value.
+    // All other unknown ownership remains uncertain while children are in scope.
+    if (children.length > 0 && step.unknownFlags.some((flag) => flag.argvIndex < argv.length - 1)) {
+      for (const flag of step.unknownFlags) diagnostics.push(unknownFlagDiagnostic(flag));
       blocked = true;
       uncertain = true;
       continue;

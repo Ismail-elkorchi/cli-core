@@ -348,3 +348,87 @@ test('unknown commands retain known global classification without selecting late
   assert.deepEqual(uncertain.classification.options, []);
   assert.deepEqual(uncertain.classification.unclassified, [arg('--json', 2)]);
 });
+
+test('final unknown flags on invokable parents retain collection and decode-once semantics', () => {
+  for (const nested of [false, true]) {
+    const p = defineCli(nested
+      ? { name: 'tool', commands: [{ name: 'parent', commands: [{ name: 'run' }] }] }
+      : { name: 'tool', commands: [{ name: 'run' }] });
+    const prefix = nested ? ['parent'] : [];
+    for (const flag of ['--extra', '--extra=value', '-x']) {
+      let calls = 0;
+      const unknown = { argvElement: flag, flag: flag === '--extra=value' ? '--extra' : flag, argvIndex: prefix.length,
+        ...(flag === '--extra=value' ? { inlineValue: 'value' } : {}) };
+      const parser = scripted([
+        ...(nested ? [step(1, { arguments: [arg('parent', 0)] })] : []),
+        step(prefix.length + 1, { unknownFlags: [unknown] })
+      ], () => { calls++; return bound(); });
+      const route = parser.route(p, { argv: [...prefix, flag] });
+      assert.equal(route.status, 'routed');
+      assert.equal(route.classification.complete, true);
+      assert.deepEqual(route.command.path, prefix);
+      assert.deepEqual(route.classification.unknownFlags, [unknown]);
+      assert.deepEqual(parser.bind(route).diagnostics.map(({ code }) => code), ['CLI_UNKNOWN_FLAG']);
+      const collected = parser.bind(route, { unknownFlagPolicy: 'collect' });
+      assert.equal(collected.status, 'ready');
+      assert.deepEqual(collected.unknownFlags, [unknown]);
+      assert.deepEqual(collected.diagnostics, []);
+      assert.equal(calls, 1);
+    }
+  }
+});
+
+test('unknown parents still block suffix ownership and grouping commands require children', () => {
+  const p = defineCli({ name: 'tool', options: [{ name: 'known', kind: 'boolean', flags: ['--known'] }], commands: [{ name: 'run' }] });
+  for (const suffix of ['run', 'value', '--known', '--']) {
+    const parser = scripted([step(1, { unknownFlags: [{ argvElement: '--extra', flag: '--extra', argvIndex: 0 }] })], () => { throw new Error('must not decode uncertain ownership'); });
+    const route = parser.route(p, { argv: ['--extra', suffix] });
+    assert.equal(route.status, 'invalid');
+    assert.equal(route.classification.complete, false);
+    assert.deepEqual(route.classification.unclassified, [arg(suffix, 1)]);
+    assert.deepEqual(route.command.path, []);
+    assert.equal(parser.bind(route, { unknownFlagPolicy: 'collect' }).status, 'invalid');
+  }
+  const batched = scripted([step(2, {
+    unknownFlags: [{ argvElement: '--extra', flag: '--extra', argvIndex: 0 }],
+    options: [occurrence('known', '--known', 1)]
+  })]).route(p, { argv: ['--extra', '--known'] });
+  assert.equal(batched.status, 'invalid');
+  const group = defineCli({ name: 'tool', invokable: false, commands: [{ name: 'run' }] });
+  const result = scripted([step(1, { unknownFlags: [{ argvElement: '--extra', flag: '--extra', argvIndex: 0 }] })]).parse(group, { argv: ['--extra'], unknownFlagPolicy: 'collect' });
+  assert.equal(result.status, 'invalid');
+  assert.equal(result.diagnostics[0].code, 'CLI_SUBCOMMAND_REQUIRED');
+});
+
+test('large owned passthrough spans retain every token in order', () => {
+  const values = Array.from({ length: 150000 }, (_, index) => `value-${index}`);
+  const p = defineCli({ name: 'tool', acceptsPassthroughArguments: true });
+  const parser = scripted([step(values.length + 1, {
+    doubleDashArgvIndex: 0, afterDoubleDash: values.map((value, index) => arg(value, index + 1))
+  })]);
+  const result = parser.parse(p, { argv: ['--', ...values] });
+  assert.equal(result.status, 'ready');
+  assert.deepEqual(result.passthroughArguments, values);
+});
+
+test('large owned option and control clusters retain offsets and prior spans', () => {
+  const size = 130000;
+  for (const field of ['options', 'controlOptions', 'unknownFlags']) {
+    const token = `-${'v'.repeat(size)}`;
+    const entries = Array.from({ length: size }, (_, index) => ({
+      ...(field === 'unknownFlags' ? {} : { option: 'verbose' }),
+      flag: '-v', argvElement: token, argvIndex: 1, offset: index + 1
+    }));
+    const p = defineCli({ name: 'tool', options: field === 'options' ? [{ name: 'verbose', kind: 'count', flags: ['-v'] }] : [] });
+    const parser = scripted([
+      step(1, { [field]: [{ ...(field === 'unknownFlags' ? {} : { option: 'verbose' }), flag: '-v', argvElement: '-v', argvIndex: 0 }] }),
+      step(2, { [field]: entries })
+    ], () => field === 'options' ? bound({ verbose: size + 1 }, { verbose: true }) : bound());
+    const route = parser.route(p, { argv: ['-v', token] });
+    assert.equal(route.status, 'routed');
+    assert.equal(route.classification[field].length, size + 1);
+    assert.equal(route.classification[field][0].argvIndex, 0);
+    assert.deepEqual(route.classification[field].slice(1), entries);
+    assert.equal(parser.bind(route, { unknownFlagPolicy: 'collect' }).status, 'ready');
+  }
+});
