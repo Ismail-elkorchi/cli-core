@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.4.0 - Unreleased
+## 0.4.0 - 2026-10-08
 
 ### Breaking changes
 
@@ -10,7 +10,8 @@
   wrapper. Integrations must update their callback signatures.
 - Made scanner and decoder diagnostics disjoint, with consistent core handling
   of unknown-option policy and a dedicated routing-uncertainty diagnostic.
-- Made framework diagnostic collections readonly and preserved owned containers
+- Made framework-owned diagnostic records and collections consistently immutable
+  and preserved owned containers
   for reuse instead of treating them as caller-owned mutable values.
 
 ### Fixes
