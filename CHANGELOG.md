@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.4.0 - 2026-10-08
+
+### Breaking changes
+
+- Replaced the scanner/binder contract with owned binder sessions, retaining
+  parser-specific option parsing behind the binder boundary.
+- Passed `CliCommand` directly to command callbacks and removed the scope
+  wrapper. Integrations must update their callback signatures.
+- Made scanner and decoder diagnostics disjoint, with consistent core handling
+  of unknown-option policy and a dedicated routing-uncertainty diagnostic.
+- Made framework-owned diagnostic records and collections consistently immutable
+  and preserved owned containers
+  for reuse instead of treating them as caller-owned mutable values.
+
+### Fixes
+
+- Corrected public type identity and distributed invocation unions so command
+  discrimination and handler types remain aligned.
+- Strengthened release validation to check npm, both lockfile version fields,
+  JSR, and an exact changelog version token, including prereleases.
+
 ## 0.3.0 - 2026-08-23
 
 - Added closed, immutable, renderer-neutral examples to root and command

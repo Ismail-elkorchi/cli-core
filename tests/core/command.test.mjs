@@ -280,3 +280,32 @@ test('declared and effective option metadata retain one inheritance model', () =
   assert.deepEqual(p.commands[1].options.map(({ name }) => name), ['global', 'local']);
   assert.equal(p.commands[1].options[0], p.root.declaredOptions[0]);
 });
+
+test('individual optional definition fields reject invalid values independently', () => {
+  const cases = [
+    [{ name: 'app', description: 1 }, 'description', 'string'],
+    [{ name: 'app', invokable: 'yes' }, 'invokable', 'boolean'],
+    [{ name: 'app', acceptsPassthroughArguments: 1 }, 'acceptsPassthroughArguments', 'boolean'],
+    [{ name: 'app', commands: [{ name: 'run', deprecated: 1 }] }, 'deprecated', 'boolean-or-string'],
+    [{ name: 'app', commands: [{ name: 'run', aliases: [{ name: 'r', deprecated: {} }] }] }, 'deprecated', 'boolean-or-string'],
+    [{ name: 'app', options: [{ name: 'x', kind: 'boolean', flags: ['--x'], hidden: 'yes' }] }, 'hidden', 'boolean'],
+    [{ name: 'app', options: [{ name: 'x', kind: 'boolean', flags: ['--x'], description: false }] }, 'description', 'string'],
+    [{ name: 'app', positionals: [{ name: 'file', required: 'yes' }] }, 'required', 'boolean']
+  ];
+  for (const [definition, property, expected] of cases) {
+    assert.throws(() => defineCli(definition), (error) => {
+      assert(error instanceof CliDefinitionError);
+      assert(error.issues.some((issue) => issue.code === 'INVALID_PROPERTY' &&
+        issue.property === property && issue.expected === expected));
+      return true;
+    });
+  }
+  const valid = defineCli({
+    name: 'app', description: '', invokable: false, acceptsPassthroughArguments: false,
+    commands: [{ name: 'run', deprecated: false, aliases: [{ name: 'r', deprecated: 'Use run.' }],
+      positionals: [{ name: 'file', required: false }],
+      options: [{ name: 'x', kind: 'boolean', flags: ['--x'], hidden: false, description: '' }] }]
+  });
+  assert.equal(valid.root.invokable, false);
+  assert.equal(findCliCommand(valid, ['run']).deprecated, undefined);
+});

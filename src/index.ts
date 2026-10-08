@@ -54,7 +54,6 @@ export type {
   CliInvocationSource,
   CliOptionBinder,
   CliOptionBindingFailure,
-  CliOptionScope,
   CliOptionBindingSession,
   CliArgvClassification,
   CliOptionScanStep,

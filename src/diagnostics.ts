@@ -54,6 +54,12 @@ export type CliCoreDiagnostic =
     })
   | (DiagnosticBase & {
       readonly source: 'invocation';
+      readonly code: 'CLI_ROUTING_UNCERTAIN';
+      readonly commandPath: readonly string[];
+      readonly flags: readonly { readonly flag: string; readonly argvElement: string; readonly argvIndex: number; readonly offset?: number }[];
+    })
+  | (DiagnosticBase & {
+      readonly source: 'invocation';
       readonly code: 'CLI_UNKNOWN_FLAG';
       readonly flag: string;
       readonly argvElement: string;

@@ -25,12 +25,6 @@ export interface CliArgvParseInput {
   readonly unknownFlagPolicy?: 'error' | 'collect';
 }
 
-/** Command scope selected by the router for the next lexical span. */
-export interface CliOptionScope {
-  readonly command: CliCommand;
-  readonly options: readonly CliOption[];
-}
-
 /** One non-option argument classified by a binder. */
 export interface CliScannedArgument {
   readonly value: string;
@@ -104,15 +98,18 @@ export interface CliOptionBindingSuccess {
 
 export interface CliOptionBindingFailure {
   readonly status: 'invalid';
+  /** Decoder-only diagnostics; retained scan errors may account for an empty list. */
   readonly diagnostics: readonly CliOptionDiagnostic[];
 }
 
 export type CliOptionBindingResult = CliOptionBindingSuccess | CliOptionBindingFailure;
 
-/** One invocation's grammar state. bind decodes the spans already returned by next. */
+/** One invocation's grammar state. Each scan contributes lexical diagnostics once;
+ * bind returns only decoding diagnostics, never repeats those from next.
+ * An invalid bind may have no diagnostics when scanning already reported an error. */
 export interface CliOptionBindingSession {
-  readonly next: (scope: CliOptionScope) => CliOptionScanStep;
-  readonly bind: (scope: CliOptionScope) => CliOptionBindingResult;
+  readonly next: (command: CliCommand) => CliOptionScanStep;
+  readonly bind: (command: CliCommand) => CliOptionBindingResult;
 }
 
 /** Grammar owner creates an isolated cursor for each invocation. */
@@ -236,9 +233,19 @@ type ExactStructuredInvocationInput<Input extends StructuredInvocationInput> = I
   ? Input & Record<Exclude<keyof Input, keyof StructuredInvocationInput>, never>
   : never;
 
-type StructuredInputReadResult =
-  | { readonly status: 'valid'; readonly input: StructuredInvocationInput }
+interface OwnedStructuredInvocationInput extends StructuredInvocationInput {
+  readonly commandPath: readonly string[];
+  readonly passthroughArguments: readonly string[];
+}
+
+type BoundaryResult<Value> =
+  | { readonly status: 'valid'; readonly value: Value }
   | { readonly status: 'invalid'; readonly reason: string };
+
+interface OwnedBindingSession {
+  readonly next: CliOptionBindingSession['next'];
+  readonly bind: (command: CliCommand, scannedOptions: ReadonlySet<string>) => BoundaryResult<CliOptionBindingResult>;
+}
 
 interface RoutedAliasUse {
   readonly alias: CliAlias;
@@ -258,31 +265,31 @@ interface PositionalBindingFailure {
 
 /** Creates a command router and decoder around an isolated grammar cursor. */
 export function createCliInvocationParser(binder: CliOptionBinder): CliInvocationParser {
-  const owned = new WeakMap<object, CliOptionBindingSession>();
+  const owned = new WeakMap<object, OwnedBindingSession>();
   const results = new WeakMap<object, Map<string, CliInvocationResult>>();
   function route<Definition extends CliDefinition>(
     program: CliProgram<Definition>, input: CliArgvParseInput = {}
   ): CliCommandRoute<Definition> {
     const argv = freezeArgv(input.argv ?? []);
     const created = binder.create(argv);
-    let decoded: CliOptionBindingResult | undefined;
+    let decoded: BoundaryResult<CliOptionBindingResult> | undefined;
     let decodedOnce = false;
     let decodingFailed = false;
     let decodingError: unknown;
-    const session: CliOptionBindingSession = Object.freeze({
-      next: (scope: CliOptionScope) => created.next(scope),
-      bind: (scope: CliOptionScope) => {
+    const session: OwnedBindingSession = Object.freeze({
+      next: (command: CliCommand) => created.next(command),
+      bind: (command: CliCommand, scannedOptions: ReadonlySet<string>) => {
         if (!decodedOnce) {
           decodedOnce = true;
           try {
-            decoded = adoptBinding(created.bind(scope));
+            decoded = readBinding(created.bind(command), command.options, scannedOptions);
           } catch (error) {
             decodingFailed = true;
             decodingError = error;
           }
         }
         if (decodingFailed) throw decodingError;
-        return decoded as CliOptionBindingResult;
+        return decoded!;
       }
     });
     const result = routeCommand(program, session, argv);
@@ -337,18 +344,18 @@ export function createCliInvocation(
       []
     );
   }
-  const input = read.input;
+  const input = read.value;
   const source = structuredSource(input.sourceId);
-  const path = Object.freeze([...(input.commandPath ?? [])]);
+  const path = input.commandPath;
   const command = findCliCommand(program, path);
   if (command === undefined) {
-    return failure(source, undefined, [{
+    return failure(source, undefined, [Object.freeze({
       source: 'command',
       code: 'CLI_UNKNOWN_COMMAND_PATH',
       severity: 'error',
       message: `Unknown command path: ${path.join(' ')}.`,
       commandPath: path
-    }], []);
+    })], []);
   }
   if (!command.invokable) {
     return failure(source, command, [subcommandRequiredDiagnostic(command)], []);
@@ -357,7 +364,7 @@ export function createCliInvocation(
   if (issue !== undefined) {
     return failure(source, command, [invalidStructuredInvocationDiagnostic(issue)], []);
   }
-  const passthroughArguments = Object.freeze([...(input.passthroughArguments ?? [])]);
+  const passthroughArguments = input.passthroughArguments;
   if (passthroughArguments.length > 0 && !command.acceptsPassthroughArguments) {
     return failure(source, command, [passthroughArgumentsDiagnostic(command)], []);
   }
@@ -367,9 +374,9 @@ export function createCliInvocation(
     commandKey: command.key,
     command,
     usedAliases: Object.freeze([]),
-    optionValues: freezeRecord(input.optionValues),
-    specifiedOptions: freezeBooleanRecord(input.specifiedOptions),
-    positionalValues: freezePositionalRecord(input.positionalValues),
+    optionValues: input.optionValues,
+    specifiedOptions: input.specifiedOptions,
+    positionalValues: input.positionalValues,
     positionals: Object.freeze(command.positionals.flatMap((positional) => {
       const value = input.positionalValues[positional.name];
       return Array.isArray(value) ? [...value] : typeof value === 'string' ? [value] : [];
@@ -382,19 +389,21 @@ export function createCliInvocation(
 
 function bindRoute(
   route: CliCommandRoute,
-  session: CliOptionBindingSession,
+  session: OwnedBindingSession,
   policy: 'error' | 'collect'
 ): CliInvocationResult {
   const scan = route.classification;
   const source = argvSource(scan.argv);
+  const unknownDiagnostics = policy === 'collect' ? [] : scan.unknownFlags.map(unknownFlagDiagnostic);
+  let diagnostics: CliDiagnostic[] = [...route.diagnostics, ...unknownDiagnostics];
   if (route.status === 'invalid') {
-    return failure(source, route.command, route.diagnostics, scan.unknownFlags);
+    return failure(source, route.command, diagnostics, scan.unknownFlags);
   }
-  const binding = session.bind(Object.freeze({ command: route.command, options: route.command.options }));
-  const issue = validateBindingResult(binding, route.command.options, new Set(scan.options.map((option) => option.option)));
-  if (issue !== undefined) {
-    return failure(source, route.command, [invalidBinderDiagnostic('bind', issue)], scan.unknownFlags);
+  const read = session.bind(route.command, new Set(scan.options.map((option) => option.option)));
+  if (read.status === 'invalid') {
+    return failure(source, route.command, [...diagnostics, invalidBinderDiagnostic('bind', read.reason)], scan.unknownFlags);
   }
+  const binding = read.value;
   const warnings = [
     ...route.usedAliases.flatMap((use) => use.deprecated === undefined || use.deprecated === false
       ? [] : [Object.freeze({ source: 'command' as const, code: 'CLI_DEPRECATED_ALIAS' as const,
@@ -403,15 +412,18 @@ function bindRoute(
           ...(typeof use.deprecated === 'string' ? { reason: use.deprecated } : {}) })]),
     ...deprecatedCommandDiagnostics(route.command)
   ];
-  const unknownDiagnostics = policy === 'collect' ? [] : scan.unknownFlags.map(unknownFlagDiagnostic);
+  diagnostics = [...warnings, ...diagnostics];
   if (binding.status === 'invalid') {
-    return failure(source, route.command, deduplicateDiagnostics([...warnings, ...route.diagnostics, ...binding.diagnostics, ...unknownDiagnostics]), scan.unknownFlags);
+    append(diagnostics, binding.diagnostics);
+    if (!hasErrorDiagnostics(scan.diagnostics) && !hasErrorDiagnostics(binding.diagnostics)) {
+      diagnostics.push(invalidBinderDiagnostic('bind', 'Invalid binding requires an error diagnostic from scanning or decoding.'));
+    }
+    return failure(source, route.command, diagnostics, scan.unknownFlags);
   }
   const commandIndexes = new Set(route.commandIndexes);
   const positionals = Object.freeze(scan.arguments.filter((argument) =>
     !commandIndexes.has(argument.argvIndex)).map((argument) => argument.value));
   const positionalBinding = bindPositionals(route.command, positionals);
-  const diagnostics: CliDiagnostic[] = [...warnings, ...route.diagnostics, ...unknownDiagnostics];
   if (positionalBinding.status === 'invalid') append(diagnostics, positionalBinding.diagnostics);
   if (scan.afterDoubleDash.length > 0 && !route.command.acceptsPassthroughArguments) {
     diagnostics.push(passthroughArgumentsDiagnostic(route.command));
@@ -421,8 +433,8 @@ function bindRoute(
   }
   return Object.freeze({
     status: 'ready', source, commandKey: route.command.key, command: route.command,
-    usedAliases: route.usedAliases, optionValues: freezeRecord(binding.values),
-    specifiedOptions: freezeBooleanRecord(binding.specified), positionalValues: positionalBinding.values,
+    usedAliases: route.usedAliases, optionValues: binding.values,
+    specifiedOptions: binding.specified, positionalValues: positionalBinding.values,
     positionals, passthroughArguments: Object.freeze(scan.afterDoubleDash.map((argument) => argument.value)),
     unknownFlags: scan.unknownFlags, diagnostics: Object.freeze(diagnostics)
   });
@@ -433,7 +445,7 @@ function append<Value>(target: Value[], values: readonly Value[]): void {
 }
 
 function routeCommand(
-  program: CliProgram, session: CliOptionBindingSession, argv: readonly string[]
+  program: CliProgram, session: OwnedBindingSession, argv: readonly string[]
 ): CliCommandRoute {
   let command = program.root;
   const aliases: CliAliasUse[] = [];
@@ -452,15 +464,14 @@ function routeCommand(
   let uncertain = false;
   let index = 0;
   while (index < argv.length && !uncertain) {
-    const raw = adoptStep(session.next(Object.freeze({ command, options: command.options })));
     const children = findCliCommandChildren(program, command);
-    const issue = validateScanStep(raw, argv, index, command, children.length > 0);
-    if (issue !== undefined) {
-      diagnostics.push(invalidBinderDiagnostic('scan', issue));
+    const read = readStep(session.next(command), argv, index, command, children.length > 0);
+    if (read.status === 'invalid') {
+      diagnostics.push(invalidBinderDiagnostic('scan', read.reason));
       blocked = true;
       break;
     }
-    const step = snapshotStep(raw);
+    const step = read.value;
     append(options, step.options);
     append(controlOptions, step.controlOptions);
     append(args, step.arguments);
@@ -479,7 +490,11 @@ function routeCommand(
     // A final-token unknown cannot hide a later command or consume a suffix value.
     // All other unknown ownership remains uncertain while children are in scope.
     if (children.length > 0 && step.unknownFlags.some((flag) => flag.argvIndex < argv.length - 1)) {
-      for (const flag of step.unknownFlags) diagnostics.push(unknownFlagDiagnostic(flag));
+      diagnostics.push(Object.freeze({
+        source: 'invocation', code: 'CLI_ROUTING_UNCERTAIN', severity: 'error',
+        message: 'Unknown option syntax prevents safe command routing.', commandPath: command.path,
+        flags: step.unknownFlags
+      }));
       blocked = true;
       uncertain = true;
       continue;
@@ -530,14 +545,14 @@ function bindPositionals(
     if (definition.variadic) {
       const rest = Object.freeze(positionals.slice(inputIndex));
       if (definition.required && rest.length === 0) {
-        diagnostics.push({
+        diagnostics.push(Object.freeze({
           source: 'positionals',
           code: 'CLI_MISSING_POSITIONAL',
           severity: 'error',
           message: `Missing required positional: ${definition.name}.`,
           commandPath: command.path,
           positional: definition.name
-        });
+        }));
       }
       values[definition.name] = rest;
       inputIndex = positionals.length;
@@ -546,14 +561,14 @@ function bindPositionals(
     const value = positionals[inputIndex];
     if (value === undefined) {
       if (definition.required) {
-        diagnostics.push({
+        diagnostics.push(Object.freeze({
           source: 'positionals',
           code: 'CLI_MISSING_POSITIONAL',
           severity: 'error',
           message: `Missing required positional: ${definition.name}.`,
           commandPath: command.path,
           positional: definition.name
-        });
+        }));
       }
       values[definition.name] = undefined;
     } else {
@@ -562,14 +577,14 @@ function bindPositionals(
     }
   }
   if (inputIndex < positionals.length) {
-    diagnostics.push({
+    diagnostics.push(Object.freeze({
       source: 'positionals',
       code: 'CLI_UNEXPECTED_POSITIONAL',
       severity: 'error',
       message: 'Unexpected positional input.',
       commandPath: command.path,
       values: Object.freeze(positionals.slice(inputIndex))
-    });
+    }));
   }
   if (hasErrorDiagnostics(diagnostics)) {
     return { status: 'invalid', diagnostics: Object.freeze(diagnostics) };
@@ -578,15 +593,17 @@ function bindPositionals(
 }
 
 function adoptDiagnostics(value: unknown): unknown {
-  return adoptArray(value)?.map((entry) => {
+  const entries = adoptArray(value);
+  if (entries === undefined) return undefined;
+  return Object.freeze(entries.map((entry) => {
     const record = adoptRecord(entry);
-    return record === undefined ? entry : Object.freeze({ ...record, details: adoptRecord(record['details']) });
-  });
+    return record === undefined ? undefined : Object.freeze({ ...record, details: adoptRecord(record['details']) });
+  }));
 }
 
-function adoptStep(value: unknown): CliOptionScanStep {
+function readStep(value: unknown, argv: readonly string[], start: number, command: CliCommand, hasChildren: boolean): BoundaryResult<CliOptionScanStep> {
   const record = adoptRecord(value);
-  if (record === undefined) return undefined as unknown as CliOptionScanStep;
+  if (record === undefined) return { status: 'invalid', reason: 'Scan step must contain data properties.' };
   const output = { ...record };
   for (const field of ['options', 'controlOptions', 'arguments', 'controls', 'afterDoubleDash', 'unclassified']) {
     output[field] = adoptArray(record[field])?.map(adoptRecord);
@@ -597,15 +614,19 @@ function adoptStep(value: unknown): CliOptionScanStep {
       ...(flag['suggestions'] === undefined ? {} : { suggestions: adoptArray(flag['suggestions']) ?? null }) });
   });
   output['diagnostics'] = adoptDiagnostics(record['diagnostics']);
-  return output as unknown as CliOptionScanStep;
+  const step = output as unknown as CliOptionScanStep;
+  const reason = validateScanStep(step, argv, start, command, hasChildren);
+  return reason === undefined ? { status: 'valid', value: snapshotStep(step) } : { status: 'invalid', reason };
 }
 
-function adoptBinding(value: unknown): CliOptionBindingResult {
+function readBinding(value: unknown, options: readonly CliOption[], scannedOptions: ReadonlySet<string>): BoundaryResult<CliOptionBindingResult> {
   const record = adoptRecord(value);
-  if (record === undefined) return undefined as unknown as CliOptionBindingResult;
-  return Object.freeze(record['status'] === 'invalid'
+  if (record === undefined) return { status: 'invalid', reason: 'Binding result must contain data properties.' };
+  const binding = Object.freeze(record['status'] === 'invalid'
     ? { status: 'invalid', diagnostics: adoptDiagnostics(record['diagnostics']) }
     : { status: record['status'], values: adoptRecord(record['values']), specified: adoptRecord(record['specified']) }) as CliOptionBindingResult;
+  const reason = validateBindingResult(binding, options, scannedOptions);
+  return reason === undefined ? { status: 'valid', value: binding } : { status: 'invalid', reason };
 }
 
 const optionScopes = new WeakMap<CliCommand, ReadonlyMap<string, string>>();
@@ -699,8 +720,7 @@ function snapshotStep(step: CliOptionScanStep): CliOptionScanStep {
     afterDoubleDash: Object.freeze(step.afterDoubleDash.map((arg) => Object.freeze({ value: arg.value, argvIndex: arg.argvIndex }))),
     unclassified: Object.freeze(step.unclassified.map((arg) => Object.freeze({ value: arg.value, argvIndex: arg.argvIndex }))),
     unknownFlags: Object.freeze(step.unknownFlags.map(freezeUnknownFlag)),
-    diagnostics: Object.freeze(step.diagnostics.map((diagnostic) => Object.freeze({ source: diagnostic.source, code: diagnostic.code, severity: diagnostic.severity,
-      message: diagnostic.message, details: freezeRecord(diagnostic.details) }))),
+    diagnostics: step.diagnostics,
     ...(step.doubleDashArgvIndex === undefined ? {} : { doubleDashArgvIndex: step.doubleDashArgvIndex })
   });
 }
@@ -709,8 +729,8 @@ function validateBindingResult(
   result: CliOptionBindingResult, options: readonly CliOption[], scannedOptions?: ReadonlySet<string>
 ): string | undefined {
   if (!isRecord(result)) return 'Binding result must contain data properties.';
-  if (result.status === 'invalid') return isDiagnosticArray(result.diagnostics) && hasErrorDiagnostics(result.diagnostics)
-    ? undefined : 'Invalid binding requires an error diagnostic.';
+  if (result.status === 'invalid') return isDiagnosticArray(result.diagnostics)
+    ? undefined : 'Invalid binding requires a diagnostic array.';
   if (result.status !== 'bound' || !isRecord(result.values) || !isRecord(result.specified)) return 'Malformed binding result.';
   const names = new Set(options.map((option) => option.name));
   if ([...Reflect.ownKeys(result.values), ...Reflect.ownKeys(result.specified)].some((name) => typeof name !== 'string' || !names.has(name))) return 'Binding contains an undeclared option.';
@@ -724,9 +744,9 @@ function validateBindingResult(
   return undefined;
 }
 
-function readStructuredInvocationInput(candidate: unknown): StructuredInputReadResult {
-  const entries = ownDataEntries(candidate);
-  if (entries === undefined) {
+function readStructuredInvocationInput(candidate: unknown): BoundaryResult<OwnedStructuredInvocationInput> {
+  const fields = adoptRecord(candidate);
+  if (fields === undefined) {
     return {
       status: 'invalid',
       reason: 'Input must be a plain object with data properties.'
@@ -740,10 +760,9 @@ function readStructuredInvocationInput(candidate: unknown): StructuredInputReadR
     'positionalValues',
     'passthroughArguments'
   ]);
-  if (entries.some(([property]) => !allowedProperties.has(property))) {
+  if (Object.keys(fields).some((property) => !allowedProperties.has(property))) {
     return { status: 'invalid', reason: 'Input contains an unsupported property.' };
   }
-  const fields: Readonly<Record<string, unknown>> = Object.fromEntries(entries);
   const sourceId = fields['sourceId'];
   if (sourceId !== undefined && typeof sourceId !== 'string') {
     return { status: 'invalid', reason: 'sourceId must be a string.' };
@@ -752,39 +771,33 @@ function readStructuredInvocationInput(candidate: unknown): StructuredInputReadR
   if (!isStringArray(commandPath)) {
     return { status: 'invalid', reason: 'commandPath must be a dense string array.' };
   }
-  const optionEntries = ownDataEntries(fields['optionValues']);
-  if (optionEntries === undefined) {
+  const optionValues = adoptRecord(fields['optionValues']);
+  if (optionValues === undefined) {
     return {
       status: 'invalid',
       reason: 'optionValues must be a plain object with data properties.'
     };
   }
-  const specifiedEntries = ownDataEntries(fields['specifiedOptions']);
-  if (specifiedEntries === undefined || specifiedEntries.some(([, value]) =>
+  const specifiedOptions = adoptRecord(fields['specifiedOptions']);
+  if (specifiedOptions === undefined || Object.values(specifiedOptions).some((value) =>
     typeof value !== 'boolean')) {
     return {
       status: 'invalid',
       reason: 'specifiedOptions must be a plain object of booleans with data properties.'
     };
   }
-  const positionalEntries = ownDataEntries(fields['positionalValues']);
-  if (positionalEntries === undefined) {
+  const positionalRecord = adoptRecord(fields['positionalValues']);
+  if (positionalRecord === undefined) {
     return {
       status: 'invalid',
       reason: 'positionalValues must be a plain object with data properties.'
     };
   }
-  const optionValues = Object.create(null) as Record<string, unknown>;
-  for (const [name, value] of optionEntries) optionValues[name] = value;
-  const specifiedOptions = Object.create(null) as Record<string, boolean>;
-  for (const [name, value] of specifiedEntries) {
-    if (typeof value === 'boolean') specifiedOptions[name] = value;
-  }
   const positionalValues = Object.create(null) as Record<
     string,
     string | readonly string[] | undefined
   >;
-  for (const [name, original] of positionalEntries) {
+  for (const [name, original] of Object.entries(positionalRecord)) {
     const value = Array.isArray(original) ? adoptArray(original) : original;
     if (Array.isArray(original) && value === undefined) return { status: 'invalid', reason: 'Positional arrays must contain dense data properties.' };
     if (value !== undefined && typeof value !== 'string' && !isStringArray(value)) {
@@ -793,7 +806,7 @@ function readStructuredInvocationInput(candidate: unknown): StructuredInputReadR
         reason: 'positionalValues entries must be strings, string arrays, or undefined.'
       };
     }
-    positionalValues[name] = isStringArray(value) ? Object.freeze([...value]) : value;
+    positionalValues[name] = value;
   }
   const passthroughArguments = adoptArray(fields['passthroughArguments'] ?? []);
   if (!isStringArray(passthroughArguments)) {
@@ -804,13 +817,13 @@ function readStructuredInvocationInput(candidate: unknown): StructuredInputReadR
   }
   return {
     status: 'valid',
-    input: Object.freeze({
+    value: Object.freeze({
       ...(typeof sourceId === 'string' ? { sourceId } : {}),
-      commandPath: Object.freeze([...commandPath]),
-      optionValues: Object.freeze(optionValues),
-      specifiedOptions: Object.freeze(specifiedOptions),
+      commandPath,
+      optionValues,
+      specifiedOptions: specifiedOptions as Readonly<Record<string, boolean>>,
       positionalValues: Object.freeze(positionalValues),
-      passthroughArguments: Object.freeze([...passthroughArguments])
+      passthroughArguments
     })
   };
 }
@@ -852,14 +865,14 @@ function validateStructuredInput(
 function deprecatedCommandDiagnostics(command: CliCommand): readonly CliCoreDiagnostic[] {
   return command.deprecated === undefined || command.deprecated === false
     ? Object.freeze([])
-    : Object.freeze([{
+    : Object.freeze([Object.freeze({
         source: 'command',
         code: 'CLI_DEPRECATED_COMMAND',
         severity: 'warning',
         message: `Command ${command.key} is deprecated.`,
         commandPath: command.path,
         ...(typeof command.deprecated === 'string' ? { reason: command.deprecated } : {})
-      }]);
+      })]);
 }
 
 function compileAliasUse(use: RoutedAliasUse): CliAliasUse {
@@ -947,19 +960,6 @@ function invalidStructuredInvocationDiagnostic(reason: string): CliCoreDiagnosti
   });
 }
 
-function deduplicateDiagnostics(diagnostics: readonly CliDiagnostic[]): readonly CliDiagnostic[] {
-  const seen = new Set<string>();
-  return diagnostics.filter((diagnostic) => {
-    const location = diagnostic.source === 'option' ? diagnostic.details : diagnostic;
-    const fields = location as Readonly<Record<string, unknown>>;
-    const key = [diagnostic.source, diagnostic.code, diagnostic.message, fields['argvIndex'], fields['offset'], fields['option']]
-      .map((field) => typeof field === 'string' || typeof field === 'number' ? String(field) : '').join('\u0000');
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-}
-
 function failure(
   source: CliInvocationSource,
   command: CliCommand | undefined,
@@ -971,7 +971,7 @@ function failure(
     source,
     ...(command === undefined ? {} : { command }),
     diagnostics: Object.freeze([...diagnostics]),
-    unknownFlags: Object.freeze(unknownFlags.map(freezeUnknownFlag))
+    unknownFlags: Object.freeze([...unknownFlags])
   });
 }
 
@@ -1003,39 +1003,8 @@ function freezeUnknownFlag(flag: CliUnknownFlag): CliUnknownFlag {
   });
 }
 
-function freezeRecord(record: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> {
-  const copy = Object.create(null) as Record<string, unknown>;
-  for (const [name, value] of ownDataEntries(record) ?? []) copy[name] = value;
-  return Object.freeze(copy);
-}
-
-function freezeBooleanRecord(
-  record: Readonly<Record<string, boolean>>
-): Readonly<Record<string, boolean>> {
-  const copy = Object.create(null) as Record<string, boolean>;
-  for (const [name, value] of ownDataEntries(record) ?? []) if (typeof value === 'boolean') copy[name] = value;
-  return Object.freeze(copy);
-}
-
-function freezePositionalRecord(
-  record: Readonly<Record<string, string | readonly string[] | undefined>>
-): Readonly<Record<string, string | readonly string[] | undefined>> {
-  const copy = Object.create(null) as Record<string, string | readonly string[] | undefined>;
-  for (const [name, value] of ownDataEntries(record) ?? []) {
-    if (value === undefined || typeof value === 'string' || isStringArray(value)) {
-      copy[name] = Array.isArray(value) ? Object.freeze([...value]) : value;
-    }
-  }
-  return Object.freeze(copy);
-}
-
 function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function ownDataEntries(value: unknown): readonly (readonly [string, unknown])[] | undefined {
-  const record = adoptRecord(value);
-  return record === undefined ? undefined : Object.entries(record);
 }
 
 function isStringArray(value: unknown): value is readonly string[] {

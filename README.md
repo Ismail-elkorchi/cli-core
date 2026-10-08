@@ -113,12 +113,14 @@ labels. Integrations remain responsible for decoding option values.
 isolated grammar session per invocation:
 
 - `create(argv)` receives the immutable original argument snapshot.
-- The session's `next(scope)` classifies one contiguous span under the current
+- The session's `next(command)` classifies one contiguous span under the current
   command's option scope. It advances `nextIndex` and reports indexed options,
   ordinary arguments, integration controls, unknown flags, diagnostics, and
   explicitly unclassified syntax.
-- The session's `bind(scope)` decodes its retained occurrences once, after the
+- The session's `bind(command)` decodes its retained occurrences once, after the
   command is selected. It must not reparse raw argv to rediscover ownership.
+  Both callbacks receive the immutable `CliCommand` directly; its `options`
+  already contains the effective inherited option declarations.
 
 Core validates span ownership and current-scope option membership, adopts its
 own immutable classification, and resolves child command tokens as traversal
@@ -130,6 +132,9 @@ Recognized options with malformed values retain command context and diagnostics;
 they cannot produce a ready invocation. Unclassifiable syntax or an unknown flag
 before a child command stops routing. The remaining suffix stays unclassified,
 so an option value cannot be reinterpreted as a help or version control.
+`CLI_ROUTING_UNCERTAIN` reports that structural failure even under the collect
+policy. Ordinary unknown-flag diagnostics are added by core when the policy is
+`error`, consistently on successful and failed routes.
 
 Place command-local flags after the command that declares them. Ancestor flags
 may appear around descendant command tokens because descendants inherit those
@@ -164,6 +169,13 @@ without partial values.
 
 Core diagnostics are discriminated by `source` and `code`. Option integrations
 can create immutable option diagnostics with `createCliOptionDiagnostic()`.
+Each stage contributes diagnostics once: `next()` reports lexical diagnostics,
+while `bind()` reports decoding diagnostics without repeating lexical ones.
+An invalid binding may contribute no new diagnostics only when an error has
+already been retained from scanning. Core preserves distinct diagnostic entries
+and does not infer equality from messages or application-defined details.
+Framework-owned diagnostic records are immutable; nested application payloads
+remain application-owned.
 
 ## Help, completion, and dispatch
 
@@ -187,3 +199,23 @@ application error policy.
 ## License
 
 MIT
+
+## Migrating to 0.4
+
+Replace independent scanner/binder calls with one `createCliInvocationParser()`
+whose binder creates a session for each argv snapshot. Use `next(command)` to
+classify one owned span and `bind(command)` to decode retained occurrences once.
+Callers that used a scope wrapper should read the supplied command directly,
+including `command.options`; `CliOptionScope` is removed without an alias.
+
+Keep routes with their creating parser. Use `route()` before deciding whether
+to show help or version information, and `bind(route)` only when decoding is
+needed. Separate lexical and decoding diagnostic contributions as described
+above; integrations no longer repair core unknown-flag policy results.
+
+Compiled program types now retain their definition identity. Different literal
+command trees are not interchangeable merely because their root names match.
+Union definitions keep correlated command keys. Optional, non-tuple, or
+union-valued child collections and union-valued tuple slots retain known leading
+names and widen descendants rather than claiming a finite exhaustive command
+set. Fixed finite literal tuples stay precise.
